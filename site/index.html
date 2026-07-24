@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="一个公开共享、直接托管 HTML 文档的轻量笔记站。"
+    />
+    <title>HTML 笔记</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="HTML 笔记首页">
+        <span class="brand-mark" aria-hidden="true">&lt;/&gt;</span>
+        <span>HTML 笔记</span>
+      </a>
+      <span class="status"><i aria-hidden="true"></i>公开阅读</span>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">PUBLIC HTML NOTES</p>
+        <h1>一些值得留下的<br />页面与想法。</h1>
+        <p class="intro">
+          每篇内容都是独立的 HTML 文档，保持原本的排版与表达，直接在浏览器中阅读。
+        </p>
+      </section>
+
+      <section class="library" aria-labelledby="library-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">LIBRARY</p>
+            <h2 id="library-title">全部文档</h2>
+          </div>
+          <label class="search">
+            <span class="sr-only">搜索文档</span>
+            <input id="search" type="search" placeholder="搜索标题或摘要" />
+          </label>
+        </div>
+
+        <div id="documents" class="document-list" aria-live="polite">
+          <p class="loading">正在读取文档……</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>HTML Notes</span>
+      <span>由 Cloudflare Pages 托管</span>
+    </footer>
+
+    <script src="/assets/home.js" defer></script>
+  </body>
+</html>
