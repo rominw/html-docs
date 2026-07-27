@@ -6,6 +6,37 @@
   --line: rgba(25, 25, 22, 0.18);
   --accent: #e6552f;
   --card: rgba(255, 255, 255, 0.42);
+  --glow: rgba(230, 85, 47, 0.11);
+  --mark-bg: #191916;
+  --mark-ink: #ffffff;
+  --control-bg: rgba(255, 255, 255, 0.45);
+}
+
+:root[data-theme="minimal"] {
+  --ink: #17233f;
+  --muted: #64718a;
+  --paper: #f7f9fc;
+  --line: rgba(23, 35, 63, 0.14);
+  --accent: #315fce;
+  --card: rgba(49, 95, 206, 0.055);
+  --glow: rgba(49, 95, 206, 0.09);
+  --mark-bg: #315fce;
+  --mark-ink: #ffffff;
+  --control-bg: rgba(255, 255, 255, 0.72);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #f0eee7;
+  --muted: #9d9b93;
+  --paper: #171816;
+  --line: rgba(240, 238, 231, 0.16);
+  --accent: #76d7b0;
+  --card: rgba(118, 215, 176, 0.065);
+  --glow: rgba(118, 215, 176, 0.1);
+  --mark-bg: #76d7b0;
+  --mark-ink: #10221b;
+  --control-bg: rgba(255, 255, 255, 0.055);
 }
 
 * {
@@ -20,7 +51,7 @@ body {
   margin: 0;
   color: var(--ink);
   background:
-    radial-gradient(circle at 85% 3%, rgba(230, 85, 47, 0.11), transparent 24rem),
+    radial-gradient(circle at 85% 3%, var(--glow), transparent 24rem),
     var(--paper);
   font-family:
     Inter, "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
@@ -58,11 +89,17 @@ footer {
   place-items: center;
   width: 38px;
   height: 38px;
-  color: white;
-  background: var(--ink);
+  color: var(--mark-ink);
+  background: var(--mark-bg);
   border-radius: 50%;
   font-family: ui-monospace, monospace;
   font-size: 12px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 18px;
+  align-items: center;
 }
 
 .status {
@@ -71,6 +108,33 @@ footer {
   align-items: center;
   color: var(--muted);
   font-size: 13px;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  gap: 8px;
+  min-width: 88px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  background: var(--control-bg);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease,
+    background 180ms ease;
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+  transform: translateY(-1px);
 }
 
 .status i {
@@ -247,6 +311,10 @@ footer {
 
   .hero {
     padding-top: 88px;
+  }
+
+  .status {
+    display: none;
   }
 
   .intro {

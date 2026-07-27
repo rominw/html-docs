@@ -47,7 +47,7 @@ const documents = await Promise.all(
       title,
       description,
       date,
-      url: `/documents/${encodeURIComponent(file)}`,
+      url: `documents/${encodeURIComponent(file)}`,
     };
   }),
 );

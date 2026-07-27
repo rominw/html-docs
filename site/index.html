@@ -8,15 +8,34 @@
       content="一个公开共享、直接托管 HTML 文档的轻量笔记站。"
     />
     <title>HTML 笔记</title>
-    <link rel="stylesheet" href="/assets/style.css" />
+    <script>
+      try {
+        document.documentElement.dataset.theme =
+          localStorage.getItem("html-notes-theme") || "paper";
+      } catch (_) {
+        document.documentElement.dataset.theme = "paper";
+      }
+    </script>
+    <link rel="stylesheet" href="assets/style.css" />
   </head>
   <body>
     <header class="site-header">
-      <a class="brand" href="/" aria-label="HTML 笔记首页">
+      <a class="brand" href="./" aria-label="HTML 笔记首页">
         <span class="brand-mark" aria-hidden="true">&lt;/&gt;</span>
         <span>HTML 笔记</span>
       </a>
-      <span class="status"><i aria-hidden="true"></i>公开阅读</span>
+      <div class="header-actions">
+        <span class="status"><i aria-hidden="true"></i>公开阅读</span>
+        <button
+          id="theme-toggle"
+          class="theme-toggle"
+          type="button"
+          aria-label="切换主题"
+        >
+          <span aria-hidden="true">◐</span>
+          <span id="theme-label">纸张</span>
+        </button>
+      </div>
     </header>
 
     <main>
@@ -48,9 +67,9 @@
 
     <footer>
       <span>HTML Notes</span>
-      <span>由 Cloudflare Pages 托管</span>
+      <span>纯静态 · 由 GitHub Pages 托管</span>
     </footer>
 
-    <script src="/assets/home.js" defer></script>
+    <script src="assets/home.js" defer></script>
   </body>
 </html>

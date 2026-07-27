@@ -1,6 +1,34 @@
 const container = document.querySelector("#documents");
 const search = document.querySelector("#search");
+const themeToggle = document.querySelector("#theme-toggle");
+const themeLabel = document.querySelector("#theme-label");
 let documents = [];
+
+const themes = [
+  { value: "paper", label: "纸张" },
+  { value: "minimal", label: "极简" },
+  { value: "dark", label: "深色" },
+];
+
+function setTheme(value) {
+  const theme = themes.find((item) => item.value === value) || themes[0];
+  document.documentElement.dataset.theme = theme.value;
+  themeLabel.textContent = theme.label;
+  themeToggle.title = `当前：${theme.label}主题。点击切换`;
+  try {
+    localStorage.setItem("html-notes-theme", theme.value);
+  } catch (_) {
+    // 浏览器禁止存储时，主题仍可在当前页面使用。
+  }
+}
+
+setTheme(document.documentElement.dataset.theme);
+themeToggle.addEventListener("click", () => {
+  const current = themes.findIndex(
+    (item) => item.value === document.documentElement.dataset.theme,
+  );
+  setTheme(themes[(current + 1) % themes.length].value);
+});
 
 function escapeHtml(value) {
   const node = document.createElement("span");
@@ -46,7 +74,7 @@ function render(items) {
     .join("");
 }
 
-fetch("/documents.json")
+fetch("documents.json")
   .then((response) => {
     if (!response.ok) throw new Error("文档索引读取失败");
     return response.json();
