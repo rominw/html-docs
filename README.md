@@ -1,36 +1,36 @@
-# HTML 笔记站
+# HTML 笔记
 
-这是一个为 Cloudflare Pages 准备的纯静态 HTML 网站。`site/documents` 中的每个 HTML
-文件都会原样发布，构建脚本只读取文档信息并生成首页索引，不会修改文章内容。
+这是一个以完整 HTML 文档作为文章正文的个人博客。公开访客可以阅读已发布文章，管理员通过 `/admin` 上传、预览、编辑和发布 `.html` 文件。
 
-## 添加文档
+## 功能
 
-1. 把完整的 `.html` 文件放进 `site/documents`。
-2. 建议在文档 `<head>` 中写入 `<title>` 和 description：
+- HTML 文件拖放或选择上传，最大 2 MB
+- 自动读取 `<title>` 和 `<meta name="description">`
+- HTML 源码编辑与隔离实时预览
+- 草稿、发布、修改和删除
+- Cloudflare D1 保存文章元数据和完整 HTML 正文
+- 公开文章使用隔离 `iframe` 展示，文章脚本默认不运行
+- ChatGPT 登录与管理员邮箱白名单
 
-   ```html
-   <title>文档标题</title>
-   <meta name="description" content="文档摘要" />
-   ```
+## 本地运行
 
-3. 日期可以写成：
-
-   ```html
-   <time datetime="2026-07-24">2026年7月24日</time>
-   ```
-
-4. 运行 `npm run build`，首页索引会写入 `site/documents.json`。
-
-## Cloudflare Pages 设置
-
-- Framework preset：None
-- Build command：`npm run build`
-- Build output directory：`site`
-- Root directory：留空
-
-部署完成后，文档地址类似：
-
-```text
-https://项目名.pages.dev/documents/文件名
+```bash
+npm install
+npm run dev
 ```
 
+在 `.env` 中配置后台管理员：
+
+```text
+ADMIN_EMAIL=你的 ChatGPT 登录邮箱
+```
+
+## 数据库
+
+数据库结构在 `db/schema.ts`，迁移文件保存在 `drizzle/`。修改结构后运行：
+
+```bash
+npm run db:generate
+```
+
+早期的纯静态版本仍保留在 `site/`，但不再作为当前站点的构建入口。
