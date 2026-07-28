@@ -1,14 +1,14 @@
 [
   {
-    "title": "欢迎来到 HTML 笔记",
-    "description": "这是一篇用于确认网站工作方式的示例 HTML 文档。",
-    "date": "2026-07-24",
-    "url": "documents/welcome.html"
-  },
-  {
     "title": "Git 日常操作指南",
     "description": "一份面向日常开发的 Git 操作指南：提交、分支、同步、撤销与常见问题。",
     "date": "2026-07-28",
     "url": "documents/git-guide.html"
+  },
+  {
+    "title": "关于留页",
+    "description": "关于留页：一个收集独立 HTML 文档的公开笔记站。",
+    "date": "2026-07-24",
+    "url": "documents/about.html"
   }
 ]

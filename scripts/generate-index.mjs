@@ -52,6 +52,17 @@ const documents = await Promise.all(
   }),
 );
 
+documents.sort((a, b) => {
+  const aTime = Date.parse(a.date);
+  const bTime = Date.parse(b.date);
+  const aHasDate = !Number.isNaN(aTime);
+  const bHasDate = !Number.isNaN(bTime);
+
+  if (aHasDate && bHasDate && aTime !== bTime) return bTime - aTime;
+  if (aHasDate !== bHasDate) return aHasDate ? -1 : 1;
+  return a.title.localeCompare(b.title, "zh-CN");
+});
+
 await writeFile(
   path.join(root, "site", "documents.json"),
   `${JSON.stringify(documents, null, 2)}\n`,

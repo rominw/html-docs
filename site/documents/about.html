@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="这是一篇用于确认网站工作方式的示例 HTML 文档。" />
-    <title>欢迎来到 HTML 笔记</title>
+    <meta name="description" content="关于留页：一个收集独立 HTML 文档的公开笔记站。" />
+    <title>关于留页</title>
     <style>
       body {
         max-width: 760px;
@@ -24,15 +24,15 @@
   <body>
     <nav><a href="../">← 返回全部文档</a></nav>
     <article>
-      <h1>欢迎来到 HTML 笔记</h1>
+      <h1>关于留页</h1>
       <time datetime="2026-07-24">2026年7月24日</time>
       <p>
-        这是一篇示例文档。它拥有自己的 HTML、排版和样式，Cloudflare Pages
-        会原样展示它。
+        留页收集一些值得留下的页面与想法。这里的内容不是套用同一模板的文章，
+        而是一份份保持自身结构、排版和表达的独立 HTML 文档。
       </p>
       <p>
-        要发布新内容，只需把一个完整的 <code>.html</code> 文件放进
-        <code>site/documents</code> 目录。发布前运行构建，首页就会自动读取文档标题、摘要和日期。
+        新文档放入 <code>site/documents</code> 后，首页会读取它的标题、摘要和日期。
+        Cloudflare Workers Static Assets 负责将这些页面原样发布到网络。
       </p>
     </article>
   </body>
