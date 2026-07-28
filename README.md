@@ -1,6 +1,7 @@
 # HTML 笔记站
 
-这是一个托管在 Cloudflare Pages 的纯静态 HTML 笔记站。`site/documents`
+这是一个通过 Cloudflare Workers Static Assets 托管的纯静态 HTML 笔记站。
+`site/documents`
 中的每个 `.html` 文件都会原样发布；构建脚本只读取标题、摘要和日期并生成
 首页索引，不修改文章正文。
 
@@ -20,25 +21,22 @@
    <time datetime="2026-07-27">2026年7月27日</time>
    ```
 
-4. 提交到 `master` 后，Cloudflare Pages 会自动构建并发布网站。
+4. 提交到 `master` 后，Cloudflare Workers Builds 会自动构建并发布网站。
 
 不熟悉 Git 命令时，也可以直接在 GitHub 网页中打开 `site/documents`，点击
 **Add file → Upload files** 上传 HTML，然后提交。
 
-## Cloudflare Pages 设置
+## Cloudflare 部署
 
-在 Cloudflare 控制台中选择 **Workers & Pages → Create application → Pages
-→ Import an existing Git repository**，连接此 GitHub 仓库，并使用：
+Cloudflare 项目 `html-docs` 已连接此 GitHub 仓库。当前部署方式为
+Workers Builds + Static Assets：
 
 - Production branch：`master`
-- Framework preset：`None`
 - Build command：`npm run build`
-- Build output directory：`site`
-- Root directory：留空
+- Static assets directory：`site`
 
-部署成功后，网站地址为 `https://<项目名>.pages.dev/`。以后每次向 `master`
-提交内容，Cloudflare Pages 都会自动重新构建；其他分支和 Pull Request 会生成
-独立的预览部署。
+以后每次向 `master` 提交内容，Cloudflare 都会自动重新构建并发布。
+生产地址和每次构建记录可在 Cloudflare 项目 `html-docs` 中查看。
 
 ## 本地预览
 
