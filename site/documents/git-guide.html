@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="一份面向日常开发的 Git 操作指南：提交、分支、同步、撤销与常见问题。"
+    />
+    <title>Git 日常操作指南</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #18201c;
+        --muted: #68716c;
+        --paper: #f3f0e7;
+        --card: #fbfaf5;
+        --line: #d8d4c8;
+        --accent: #d8492f;
+        --accent-soft: #f7ded6;
+        --code: #202821;
+        --code-ink: #edf6ef;
+        --green: #34785b;
+        --shadow: 0 24px 70px rgba(47, 44, 35, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 92% 2%, rgba(216, 73, 47, 0.12), transparent 26rem),
+          var(--paper);
+        font: 16px/1.75 Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .shell {
+        width: min(1160px, calc(100% - 36px));
+        margin: 0 auto;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 76px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .back {
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .back:hover {
+        color: var(--accent);
+      }
+
+      .topbar span {
+        color: var(--muted);
+        font-size: 13px;
+        letter-spacing: 0.08em;
+      }
+
+      .hero {
+        padding: 86px 0 64px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .kicker {
+        margin: 0 0 16px;
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+      }
+
+      h1 {
+        max-width: 850px;
+        margin: 0;
+        font: 800 clamp(46px, 8vw, 92px)/0.98 Georgia, "Songti SC", serif;
+        letter-spacing: -0.045em;
+      }
+
+      .lead {
+        max-width: 680px;
+        margin: 32px 0 0;
+        color: var(--muted);
+        font-size: clamp(18px, 2.4vw, 23px);
+      }
+
+      .meta {
+        display: flex;
+        gap: 18px;
+        margin-top: 28px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 760px);
+        gap: 70px;
+        justify-content: center;
+        padding: 62px 0 100px;
+      }
+
+      aside {
+        align-self: start;
+        position: sticky;
+        top: 28px;
+      }
+
+      aside strong {
+        display: block;
+        margin-bottom: 14px;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+      }
+
+      aside a {
+        display: block;
+        padding: 7px 0;
+        color: var(--muted);
+        font-size: 14px;
+        text-decoration: none;
+      }
+
+      aside a:hover {
+        color: var(--accent);
+      }
+
+      main > section {
+        margin-bottom: 72px;
+        scroll-margin-top: 28px;
+      }
+
+      h2 {
+        margin: 0 0 22px;
+        font: 700 clamp(28px, 5vw, 42px)/1.15 Georgia, "Songti SC", serif;
+        letter-spacing: -0.025em;
+      }
+
+      h3 {
+        margin: 34px 0 12px;
+        font-size: 18px;
+      }
+
+      p {
+        margin: 0 0 18px;
+      }
+
+      code {
+        padding: 2px 6px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: var(--card);
+        font: 0.9em/1.5 "SFMono-Regular", Consolas, monospace;
+      }
+
+      pre {
+        position: relative;
+        overflow-x: auto;
+        margin: 18px 0 26px;
+        padding: 22px 24px;
+        border-radius: 12px;
+        color: var(--code-ink);
+        background: var(--code);
+        box-shadow: var(--shadow);
+      }
+
+      pre::before {
+        content: "$";
+        position: absolute;
+        top: 8px;
+        right: 12px;
+        color: #91a396;
+        font: 700 12px/1 monospace;
+      }
+
+      pre code {
+        padding: 0;
+        border: 0;
+        color: inherit;
+        background: transparent;
+        font-size: 14px;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin: 26px 0;
+      }
+
+      .flow div {
+        position: relative;
+        padding: 18px 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--card);
+        text-align: center;
+      }
+
+      .flow div:not(:last-child)::after {
+        content: "→";
+        position: absolute;
+        z-index: 1;
+        top: 50%;
+        right: -16px;
+        color: var(--accent);
+        font-weight: 900;
+        transform: translateY(-50%);
+      }
+
+      .flow strong,
+      .flow span {
+        display: block;
+      }
+
+      .flow span {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .note,
+      .warning {
+        margin: 24px 0;
+        padding: 18px 20px;
+        border-left: 4px solid var(--green);
+        border-radius: 0 9px 9px 0;
+        background: rgba(52, 120, 91, 0.09);
+      }
+
+      .warning {
+        border-left-color: var(--accent);
+        background: var(--accent-soft);
+      }
+
+      .note strong,
+      .warning strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 22px 0;
+        background: var(--card);
+      }
+
+      th,
+      td {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        font-size: 13px;
+      }
+
+      td:first-child {
+        width: 42%;
+      }
+
+      .checklist {
+        padding: 0;
+        list-style: none;
+      }
+
+      .checklist li {
+        margin: 10px 0;
+        padding-left: 28px;
+      }
+
+      .checklist li::before {
+        content: "✓";
+        float: left;
+        margin-left: -28px;
+        color: var(--green);
+        font-weight: 900;
+      }
+
+      footer {
+        padding: 30px 0 46px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @media (max-width: 780px) {
+        .hero {
+          padding-top: 58px;
+        }
+
+        .layout {
+          display: block;
+          padding-top: 42px;
+        }
+
+        aside {
+          position: static;
+          margin-bottom: 50px;
+          columns: 2;
+        }
+
+        aside strong {
+          column-span: all;
+        }
+
+        .flow {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .flow div::after {
+          display: none;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .shell {
+          width: min(100% - 24px, 1160px);
+        }
+
+        .topbar span {
+          display: none;
+        }
+
+        .meta {
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        pre {
+          padding: 20px 16px;
+        }
+
+        th,
+        td {
+          display: block;
+          width: 100% !important;
+        }
+
+        th {
+          display: none;
+        }
+
+        td {
+          border-bottom: 0;
+        }
+
+        tr {
+          display: block;
+          padding: 8px 0;
+          border-bottom: 1px solid var(--line);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="shell topbar">
+      <a class="back" href="../">← 返回全部文档</a>
+      <span>HTML NOTES · FIELD GUIDE 01</span>
+    </header>
+
+    <div class="shell hero">
+      <p class="kicker">VERSION CONTROL · QUICK START</p>
+      <h1>Git 日常操作指南</h1>
+      <p class="lead">
+        从第一次配置，到提交、同步、分支协作和安全撤销。目标不是背命令，
+        而是建立一套不容易出错的工作节奏。
+      </p>
+      <div class="meta">
+        <time datetime="2026-07-28">2026年7月28日</time>
+        <span>阅读约 10 分钟</span>
+        <span>适用于 GitHub / GitLab / Cloudflare Pages</span>
+      </div>
+    </div>
+
+    <div class="shell layout">
+      <aside aria-label="文章目录">
+        <strong>目录</strong>
+        <a href="#model">先理解四个区域</a>
+        <a href="#setup">首次配置</a>
+        <a href="#daily">日常提交流程</a>
+        <a href="#sync">同步远程更新</a>
+        <a href="#branch">使用分支协作</a>
+        <a href="#undo">安全撤销</a>
+        <a href="#ignore">忽略文件</a>
+        <a href="#problems">常见问题</a>
+        <a href="#project">本站发布示例</a>
+        <a href="#cheatsheet">速查表</a>
+      </aside>
+
+      <main>
+        <section id="model">
+          <h2>先理解四个区域</h2>
+          <p>
+            Git 的大多数命令，只是在四个区域之间移动内容。理解这条路径后，
+            <code>add</code>、<code>commit</code> 和 <code>push</code>
+            就不再是一串需要死记的咒语。
+          </p>
+          <div class="flow" aria-label="Git 内容流转过程">
+            <div><strong>工作区</strong><span>正在编辑的文件</span></div>
+            <div><strong>暂存区</strong><span>准备提交的内容</span></div>
+            <div><strong>本地仓库</strong><span>已经创建的提交</span></div>
+            <div><strong>远程仓库</strong><span>GitHub 等服务器</span></div>
+          </div>
+          <p>
+            <code>git add</code> 把改动放入暂存区，<code>git commit</code>
+            把暂存内容保存为本地提交，<code>git push</code> 再把提交发送到远程仓库。
+          </p>
+        </section>
+
+        <section id="setup">
+          <h2>首次配置</h2>
+          <p>安装 Git 后，先设置提交记录中显示的姓名和邮箱。这通常只需执行一次。</p>
+          <pre><code>git config --global user.name "你的名字"
+git config --global user.email "you@example.com"
+git config --global init.defaultBranch main
+
+# 检查当前配置
+git config --global --list</code></pre>
+
+          <h3>克隆已有项目</h3>
+          <pre><code>git clone https://github.com/owner/project.git
+cd project</code></pre>
+
+          <h3>把普通文件夹变成仓库</h3>
+          <pre><code>cd your-project
+git init
+git add .
+git commit -m "Initial commit"</code></pre>
+        </section>
+
+        <section id="daily">
+          <h2>日常提交流程</h2>
+          <p>每次准备提交时，建议坚持“查看—选择—复查—提交—推送”的顺序。</p>
+          <pre><code># 1. 查看改了什么
+git status
+git diff
+
+# 2. 选择要进入本次提交的文件
+git add path/to/file
+
+# 3. 复查已经暂存的内容
+git diff --staged
+
+# 4. 创建本地提交
+git commit -m "Add search to document list"
+
+# 5. 推送到远程仓库
+git push</code></pre>
+          <div class="note">
+            <strong>一次提交只做一件事</strong>
+            功能、重构和格式化尽量分开提交。这样历史更清晰，撤销时也更安全。
+          </div>
+
+          <h3>怎样写提交信息</h3>
+          <table>
+            <thead>
+              <tr><th>推荐</th><th>原因</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>Add article search</code></td><td>说明新增了什么能力</td></tr>
+              <tr><td><code>Fix mobile navigation</code></td><td>说明修复对象</td></tr>
+              <tr><td><code>Update deployment guide</code></td><td>说明更新范围</td></tr>
+              <tr><td><code>修改一下</code></td><td>过于含糊，日后无法快速理解</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="sync">
+          <h2>同步远程更新</h2>
+          <p>
+            开始工作前先同步，可以减少冲突。<code>fetch</code> 只下载远程信息，
+            不修改当前文件；<code>pull</code> 则会下载并整合到当前分支。
+          </p>
+          <pre><code># 查看远程仓库
+git remote -v
+
+# 下载远程状态，但暂不合并
+git fetch origin
+
+# 拉取并合并当前分支
+git pull
+
+# 保持提交历史更线性
+git pull --rebase</code></pre>
+          <div class="warning">
+            <strong>本地还有未提交修改时，不要急着 pull</strong>
+            先提交改动，或者用 <code>git stash</code> 临时收起，再进行同步。
+          </div>
+          <pre><code>git stash push -m "临时保存"
+git pull --rebase
+git stash pop</code></pre>
+        </section>
+
+        <section id="branch">
+          <h2>使用分支协作</h2>
+          <p>
+            分支让新功能与稳定版本互不干扰。通常从最新的主分支创建功能分支，
+            完成后推送并发起 Pull Request。
+          </p>
+          <pre><code># 从主分支开始
+git switch master
+git pull --rebase
+
+# 创建并切换到功能分支
+git switch -c feature/git-guide
+
+# 完成修改后提交并首次推送
+git add site/documents/git-guide.html
+git commit -m "Add Git operations guide"
+git push -u origin feature/git-guide</code></pre>
+          <p>
+            合并完成后，可以清理本地分支：
+          </p>
+          <pre><code>git switch master
+git pull
+git branch -d feature/git-guide</code></pre>
+        </section>
+
+        <section id="undo">
+          <h2>安全撤销</h2>
+          <p>先判断改动位于哪个区域，再选择相应命令。</p>
+          <table>
+            <thead>
+              <tr><th>目标</th><th>命令</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>撤销工作区中某个文件的修改</td>
+                <td><code>git restore path/to/file</code></td>
+              </tr>
+              <tr>
+                <td>把文件移出暂存区，保留修改</td>
+                <td><code>git restore --staged path/to/file</code></td>
+              </tr>
+              <tr>
+                <td>修改最近一次提交信息</td>
+                <td><code>git commit --amend</code></td>
+              </tr>
+              <tr>
+                <td>撤销一个已经推送的提交</td>
+                <td><code>git revert &lt;commit&gt;</code></td>
+              </tr>
+              <tr>
+                <td>找回误删分支或提交</td>
+                <td><code>git reflog</code></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="warning">
+            <strong>谨慎使用 reset --hard 和强制推送</strong>
+            它们可能永久丢弃未保存内容或改写共享历史。多人协作时，优先使用
+            <code>git revert</code> 创建一个可追踪的反向提交。
+          </div>
+        </section>
+
+        <section id="ignore">
+          <h2>忽略不应提交的文件</h2>
+          <p>
+            在仓库根目录建立 <code>.gitignore</code>，排除依赖、缓存、构建产物
+            和本地密钥。已经被 Git 跟踪的文件，不会因为后来加入忽略规则而自动消失。
+          </p>
+          <pre><code># 依赖与缓存
+node_modules/
+.cache/
+
+# 本地环境变量
+.env
+.env.*
+
+# 系统和编辑器文件
+.DS_Store
+.vscode/
+
+# 构建产物
+dist/</code></pre>
+          <p>
+            如果文件已经被跟踪，可用
+            <code>git rm --cached path/to/file</code> 停止跟踪，但保留本地文件。
+            提交前务必确认其中没有密码、令牌或私钥。
+          </p>
+        </section>
+
+        <section id="problems">
+          <h2>常见问题</h2>
+          <h3>推送被拒绝：远程包含本地没有的提交</h3>
+          <pre><code>git pull --rebase
+# 如有冲突，解决后：
+git add path/to/resolved-file
+git rebase --continue
+git push</code></pre>
+
+          <h3>不确定自己在哪个分支</h3>
+          <pre><code>git branch --show-current
+git status</code></pre>
+
+          <h3>提交到了错误分支，但还没有推送</h3>
+          <pre><code># 在当前提交处创建正确分支
+git switch -c correct-branch
+
+# 回到原分支，再恢复它原本的位置
+git switch original-branch
+git reset --keep HEAD~1</code></pre>
+
+          <h3>发生合并冲突</h3>
+          <p>
+            打开冲突文件，寻找 <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code>、
+            <code>=======</code> 和 <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> 标记，
+            手动保留正确内容并删除标记，然后执行 <code>git add</code> 和
+            <code>git commit</code>。不确定时先备份当前文件。
+          </p>
+        </section>
+
+        <section id="project">
+          <h2>本站的实际发布流程</h2>
+          <p>
+            本站由 Cloudflare Pages 托管。把完整 HTML 文件放入
+            <code>site/documents</code>，生成首页索引并推送到
+            <code>master</code>，Cloudflare 就会自动构建和发布。
+          </p>
+          <pre><code>git pull --rebase
+
+# 添加文章后生成 site/documents.json
+npm run build
+
+# 检查、提交、推送
+git status
+git add site/documents/git-guide.html site/documents.json
+git commit -m "Add Git operations guide"
+git push origin master</code></pre>
+          <ul class="checklist">
+            <li>文章包含唯一且准确的 <code>&lt;title&gt;</code></li>
+            <li>文章包含用于首页展示的 description</li>
+            <li><code>&lt;time datetime="YYYY-MM-DD"&gt;</code> 日期有效</li>
+            <li><code>npm run build</code> 正常完成</li>
+            <li><code>git status</code> 只包含预期文件</li>
+          </ul>
+        </section>
+
+        <section id="cheatsheet">
+          <h2>一分钟速查表</h2>
+          <pre><code>git status                 # 查看当前状态
+git diff                   # 查看未暂存修改
+git diff --staged          # 查看已暂存修改
+git add &lt;file&gt;             # 暂存指定文件
+git commit -m "Message"    # 创建提交
+git pull --rebase          # 同步远程提交
+git push                   # 推送当前分支
+git switch -c &lt;branch&gt;     # 新建并切换分支
+git log --oneline --graph  # 查看精简历史
+git restore &lt;file&gt;         # 丢弃未暂存修改
+git revert &lt;commit&gt;        # 安全撤销已发布提交</code></pre>
+          <div class="note">
+            <strong>最重要的习惯</strong>
+            提交前看 <code>status</code> 和 <code>diff</code>；推送前读一遍提交信息。
+            多花十秒复查，通常能省下半小时排错。
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <footer>
+      <div class="shell">HTML Notes · Git 日常操作指南 · 2026</div>
+    </footer>
+  </body>
+</html>
