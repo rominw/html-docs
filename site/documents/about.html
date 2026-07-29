@@ -3,37 +3,491 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="关于留页：一个收集独立 HTML 文档的公开笔记站。" />
+    <meta
+      name="description"
+      content="关于留页：让值得留下的页面，继续保持它原本的样子。"
+    />
     <title>关于留页</title>
     <style>
-      body {
-        max-width: 760px;
-        margin: 0 auto;
-        padding: 64px 24px;
-        color: #20201d;
-        background: #faf8f2;
-        font: 18px/1.8 Georgia, "Noto Serif SC", "Songti SC", serif;
+      :root {
+        color-scheme: light;
+        --ink: #1d211d;
+        --muted: #6d716b;
+        --paper: #f3f0e7;
+        --paper-deep: #e8e3d6;
+        --card: rgba(255, 255, 255, 0.46);
+        --line: rgba(29, 33, 29, 0.18);
+        --accent: #df5132;
+        --green: #3d745d;
       }
-      nav a { color: #d74c28; }
-      h1 { margin-bottom: 12px; font-size: clamp(36px, 7vw, 64px); line-height: 1.08; }
-      time { color: #77746c; font-size: 14px; }
-      article { margin-top: 52px; }
-      code { padding: 2px 6px; background: #ebe6d9; border-radius: 4px; }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 84% 7%, rgba(223, 81, 50, 0.12), transparent 24rem),
+          linear-gradient(180deg, var(--paper), #f8f6ef 58%, var(--paper));
+        font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .shell {
+        width: min(1080px, calc(100% - 40px));
+        margin-inline: auto;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 78px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .back {
+        font-size: 14px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .back:hover {
+        color: var(--accent);
+      }
+
+      .stamp {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+        gap: 64px;
+        align-items: end;
+        min-height: 640px;
+        padding: 90px 0 78px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .eyebrow {
+        margin: 0 0 22px;
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+      }
+
+      h1 {
+        margin: 0;
+        font: 800 clamp(92px, 18vw, 190px)/0.8 Georgia, "Songti SC", serif;
+        letter-spacing: -0.09em;
+      }
+
+      h1 span {
+        display: block;
+      }
+
+      h1 span:last-child {
+        margin-left: 0.72em;
+        color: var(--accent);
+      }
+
+      .hero-copy {
+        padding-bottom: 10px;
+      }
+
+      .lead {
+        margin: 0;
+        font: 600 clamp(24px, 3vw, 34px)/1.42 Georgia, "Songti SC", serif;
+        letter-spacing: -0.02em;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px 18px;
+        margin-top: 30px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      main {
+        padding: 110px 0 120px;
+      }
+
+      .manifesto {
+        display: grid;
+        grid-template-columns: 180px minmax(0, 690px);
+        gap: 60px;
+        justify-content: center;
+        margin-bottom: 120px;
+      }
+
+      .section-label {
+        margin: 7px 0 0;
+        color: var(--green);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+      }
+
+      .prose {
+        font: 20px/1.9 Georgia, "Noto Serif SC", "Songti SC", serif;
+      }
+
+      .prose p {
+        margin: 0 0 1.45em;
+      }
+
+      .prose p:first-child::first-letter {
+        float: left;
+        margin: 0.08em 0.12em 0 0;
+        color: var(--accent);
+        font-size: 4.2em;
+        font-weight: 800;
+        line-height: 0.76;
+      }
+
+      .principles {
+        margin-bottom: 120px;
+      }
+
+      h2 {
+        max-width: 720px;
+        margin: 0 0 38px;
+        font: 700 clamp(36px, 6vw, 64px)/1.06 Georgia, "Songti SC", serif;
+        letter-spacing: -0.04em;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .card {
+        min-height: 260px;
+        padding: 28px;
+        background: var(--card);
+      }
+
+      .card + .card {
+        border-left: 1px solid var(--line);
+      }
+
+      .number {
+        display: block;
+        margin-bottom: 76px;
+        color: var(--accent);
+        font: 700 13px/1 Georgia, serif;
+      }
+
+      .card h3 {
+        margin: 0 0 12px;
+        font: 700 26px/1.2 Georgia, "Songti SC", serif;
+      }
+
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.75;
+      }
+
+      .process {
+        display: grid;
+        grid-template-columns: minmax(0, 0.82fr) minmax(360px, 1.18fr);
+        gap: 80px;
+        align-items: start;
+        margin-bottom: 120px;
+      }
+
+      .process-copy p {
+        max-width: 460px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.8;
+      }
+
+      .steps {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: step;
+      }
+
+      .steps li {
+        display: grid;
+        grid-template-columns: 48px 1fr;
+        gap: 18px;
+        padding: 23px 0;
+        border-top: 1px solid var(--line);
+        counter-increment: step;
+      }
+
+      .steps li:last-child {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .steps li::before {
+        content: "0" counter(step);
+        color: var(--accent);
+        font: 700 13px/1.7 Georgia, serif;
+      }
+
+      .steps strong,
+      .steps span {
+        display: block;
+      }
+
+      .steps strong {
+        margin-bottom: 4px;
+        font-size: 17px;
+      }
+
+      .steps span {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      code {
+        padding: 2px 6px;
+        border-radius: 5px;
+        background: var(--paper-deep);
+        font: 0.88em/1.5 "SFMono-Regular", Consolas, monospace;
+      }
+
+      blockquote {
+        margin: 0;
+        padding: 80px 7vw;
+        border-radius: 2px;
+        color: #f4f1e8;
+        background: var(--ink);
+        font: 600 clamp(30px, 5vw, 58px)/1.35 Georgia, "Songti SC", serif;
+        letter-spacing: -0.035em;
+      }
+
+      blockquote em {
+        color: #f18b70;
+        font-style: normal;
+      }
+
+      footer {
+        padding: 28px 0 44px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      footer .shell {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+      }
+
+      @media (max-width: 760px) {
+        .hero {
+          display: block;
+          min-height: auto;
+          padding: 70px 0 60px;
+        }
+
+        .hero-copy {
+          margin-top: 62px;
+        }
+
+        .manifesto,
+        .process {
+          display: block;
+        }
+
+        .section-label {
+          margin-bottom: 26px;
+        }
+
+        .cards {
+          display: block;
+        }
+
+        .card {
+          min-height: 0;
+        }
+
+        .card + .card {
+          border-top: 1px solid var(--line);
+          border-left: 0;
+        }
+
+        .number {
+          margin-bottom: 32px;
+        }
+
+        .process-copy {
+          margin-bottom: 42px;
+        }
+      }
+
+      @media (max-width: 460px) {
+        .shell {
+          width: min(100% - 26px, 1080px);
+        }
+
+        .stamp {
+          display: none;
+        }
+
+        h1 {
+          font-size: 104px;
+        }
+
+        main {
+          padding: 76px 0 84px;
+        }
+
+        .manifesto,
+        .principles,
+        .process {
+          margin-bottom: 84px;
+        }
+
+        .prose {
+          font-size: 18px;
+        }
+
+        blockquote {
+          padding: 52px 24px;
+        }
+
+        footer .shell {
+          display: block;
+        }
+      }
     </style>
   </head>
   <body>
-    <nav><a href="../">← 返回全部文档</a></nav>
-    <article>
-      <h1>关于留页</h1>
-      <time datetime="2026-07-24">2026年7月24日</time>
-      <p>
-        留页收集一些值得留下的页面与想法。这里的内容不是套用同一模板的文章，
-        而是一份份保持自身结构、排版和表达的独立 HTML 文档。
-      </p>
-      <p>
-        新文档放入 <code>site/documents</code> 后，首页会读取它的标题、摘要和日期。
-        Cloudflare Workers Static Assets 负责将这些页面原样发布到网络。
-      </p>
-    </article>
+    <header class="shell topbar">
+      <a class="back" href="../">← 返回全部文档</a>
+      <span class="stamp">PAGES WORTH KEEPING</span>
+    </header>
+
+    <section class="shell hero">
+      <div>
+        <p class="eyebrow">ABOUT THIS PLACE</p>
+        <h1 aria-label="留页"><span>留</span><span>页</span></h1>
+      </div>
+      <div class="hero-copy">
+        <p class="lead">让值得留下的页面，继续保持它原本的样子。</p>
+        <div class="meta">
+          <time datetime="2026-07-24">建立于 2026年7月24日</time>
+          <span>更新于 2026年7月29日</span>
+        </div>
+      </div>
+    </section>
+
+    <main class="shell">
+      <section class="manifesto">
+        <p class="section-label">为什么是「留页」</p>
+        <div class="prose">
+          <p>
+            不是每个想法都需要成为一篇格式统一的博客文章。有些内容依赖自己的排版，
+            有些需要一张图、一段交互，或者一套只属于那一页的阅读节奏。
+          </p>
+          <p>
+            留页想做的事情很简单：把这些页面留下来。它们可以彼此不同，不必服从同一套
+            模板；首页只负责让人找到它们，不负责把它们改造成相同的样子。
+          </p>
+          <p>
+            “留”不是囤积，而是选择。只有那些以后仍值得回看、分享或继续生长的页面，
+            才会被放在这里。
+          </p>
+        </div>
+      </section>
+
+      <section class="principles">
+        <p class="section-label">THREE SMALL RULES</p>
+        <h2>每一页，都保留自己的形状。</h2>
+        <div class="cards">
+          <article class="card">
+            <span class="number">01</span>
+            <h3>独立</h3>
+            <p>每篇内容都是完整的 HTML 文档，可以拥有自己的结构、字体、颜色与交互。</p>
+          </article>
+          <article class="card">
+            <span class="number">02</span>
+            <h3>原样</h3>
+            <p>发布过程只读取标题、摘要和日期，不重新包装，也不覆盖页面本身的表达。</p>
+          </article>
+          <article class="card">
+            <span class="number">03</span>
+            <h3>可抵达</h3>
+            <p>首页提供清晰的索引和搜索，让一份被留下的内容，在需要时仍能被找到。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="process">
+        <div class="process-copy">
+          <p class="section-label">HOW A PAGE STAYS</p>
+          <h2>一页如何被留下</h2>
+          <p>
+            它不是复杂的内容管理系统，只是一条尽量短的发布路径。内容保留在文件里，
+            Git 记录变化，Cloudflare 将它送到读者面前。
+          </p>
+        </div>
+        <ol class="steps">
+          <li>
+            <div>
+              <strong>写成完整页面</strong>
+              <span>一份带有标题、摘要和日期的独立 <code>.html</code> 文件。</span>
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>放进文档目录</strong>
+              <span>构建脚本读取元数据，自动更新首页索引并按日期排列。</span>
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>交给 Git 记住</strong>
+              <span>每次修改都有清晰历史，页面可以生长，也可以回到从前。</span>
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>发布到网络</strong>
+              <span>Cloudflare Workers Static Assets 自动构建并提供静态页面。</span>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <blockquote>
+        写下，是为了当下；<br />
+        <em>留下，是为了以后仍能抵达。</em>
+      </blockquote>
+    </main>
+
+    <footer>
+      <div class="shell">
+        <span>留页 · PAGES WORTH KEEPING</span>
+        <span>保持独立，保持原样。</span>
+      </div>
+    </footer>
   </body>
 </html>

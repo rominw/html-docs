@@ -7,8 +7,14 @@
   },
   {
     "title": "关于留页",
-    "description": "关于留页：一个收集独立 HTML 文档的公开笔记站。",
+    "description": "关于留页：让值得留下的页面，继续保持它原本的样子。",
     "date": "2026-07-24",
     "url": "documents/about.html"
+  },
+  {
+    "title": "异步任务编排与资源调度",
+    "description": "",
+    "date": "",
+    "url": "documents/async-task-orchestration-design.html"
   }
 ]
