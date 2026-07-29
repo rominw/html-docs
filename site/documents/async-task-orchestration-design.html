@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
+  <meta name="description" content="一套面向父子任务拆分、有限资源排队、冲突准入、事件恢复与进度聚合的通用系统设计。">
+  <meta name="date" content="2026-07-29">
   <title>异步任务编排与资源调度</title>
   <style>
     :root {
@@ -29,6 +31,8 @@
     header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
     h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
     .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
     .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
     .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
       background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
@@ -77,6 +81,10 @@
       <div class="kicker">ASYNCHRONOUS ORCHESTRATION</div>
       <h1>异步任务编排与资源调度</h1>
       <p class="lead">一种适用于“拆分工作、生成产物、绑定资源、排队执行、冲突准入、事件恢复和进度聚合”的通用系统设计。</p>
+      <div class="doc-meta">
+        <time datetime="2026-07-29">2026年7月29日</time>
+        <span>架构设计笔记</span>
+      </div>
       <div class="actions">
         <a class="btn" href="#concept">开始阅读</a>
         <button class="btn" id="theme" type="button">切换主题</button>

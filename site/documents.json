@@ -1,5 +1,11 @@
 [
   {
+    "title": "异步任务编排与资源调度",
+    "description": "一套面向父子任务拆分、有限资源排队、冲突准入、事件恢复与进度聚合的通用系统设计。",
+    "date": "2026-07-29",
+    "url": "documents/async-task-orchestration-design.html"
+  },
+  {
     "title": "Git 日常操作指南",
     "description": "一份面向日常开发的 Git 操作指南：提交、分支、同步、撤销与常见问题。",
     "date": "2026-07-28",
@@ -10,11 +16,5 @@
     "description": "关于留页：让值得留下的页面，继续保持它原本的样子。",
     "date": "2026-07-24",
     "url": "documents/about.html"
-  },
-  {
-    "title": "异步任务编排与资源调度",
-    "description": "",
-    "date": "",
-    "url": "documents/async-task-orchestration-design.html"
   }
 ]
