@@ -16,5 +16,11 @@
     "description": "关于留页：让值得留下的页面，继续保持它原本的样子。",
     "date": "2026-07-24",
     "url": "documents/about.html"
+  },
+  {
+    "title": "Goose Agent 架构设计与内核深度解析",
+    "description": "",
+    "date": "",
+    "url": "documents/goose-architecture.html"
   }
 ]
