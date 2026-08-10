@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pi Agent Harness — 完整项目解析</title>
+<meta name="description" content="Pi 开源 AI 编码智能体 monorepo 的完整架构与内核设计深度解析，涵盖 ai/agent/tui/protocol/coding-agent/server/storage 全部 9 个包。">
+<meta name="date" content="2026-08-10">
+<style>
+:root {
+  --bg: #0d1117;
+  --bg-card: #161b22;
+  --bg-code: #0d1117;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --text-dim: #8b949e;
+  --text-bright: #f0f6fc;
+  --accent: #58a6ff;
+  --accent2: #3fb950;
+  --accent3: #d2a8ff;
+  --accent4: #ffa657;
+  --accent5: #f778ba;
+  --accent6: #79c0ff;
+  --red: #f85149;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --bg-card: #f6f8fa;
+    --bg-code: #f0f2f5;
+    --border: #d0d7de;
+    --text: #24292f;
+    --text-dim: #57606a;
+    --text-bright: #1f2328;
+    --accent: #0969da;
+    --accent2: #1a7f37;
+    --accent3: #8250df;
+    --accent4: #bc4c00;
+    --accent5: #bf3989;
+    --accent6: #0550ae;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  font-size: 15px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
+header {
+  text-align: center;
+  padding: 60px 0 40px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 40px;
+}
+header h1 {
+  font-size: 2.4em;
+  color: var(--text-bright);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+header .subtitle {
+  color: var(--text-dim);
+  font-size: 1.15em;
+  margin-top: 12px;
+}
+header .meta {
+  margin-top: 20px;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+header .meta span {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 0.85em;
+  color: var(--accent);
+}
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  margin: 0 -24px 32px;
+  padding: 12px 24px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+nav a {
+  color: var(--text-dim);
+  text-decoration: none;
+  margin-right: 24px;
+  font-size: 0.9em;
+  transition: color 0.2s;
+}
+nav a:hover { color: var(--accent); }
+h2 {
+  color: var(--text-bright);
+  font-size: 1.6em;
+  margin-top: 56px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--border);
+  scroll-margin-top: 60px;
+}
+h3 {
+  color: var(--text-bright);
+  font-size: 1.25em;
+  margin-top: 36px;
+  margin-bottom: 12px;
+  scroll-margin-top: 60px;
+}
+h4 {
+  color: var(--accent);
+  font-size: 1.05em;
+  margin-top: 24px;
+  margin-bottom: 8px;
+}
+p { margin-bottom: 14px; }
+ul, ol { margin-bottom: 14px; padding-left: 24px; }
+li { margin-bottom: 6px; }
+strong { color: var(--text-bright); }
+code {
+  font-family: var(--font-mono);
+  background: var(--bg-code);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.88em;
+  color: var(--accent6);
+  border: 1px solid var(--border);
+}
+pre {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  overflow-x: auto;
+  margin: 16px 0;
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text);
+}
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+}
+.card.blue { border-left: 4px solid var(--accent); }
+.card.green { border-left: 4px solid var(--accent2); }
+.card.purple { border-left: 4px solid var(--accent3); }
+.card.orange { border-left: 4px solid var(--accent4); }
+.card.pink { border-left: 4px solid var(--accent5); }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 0.9em;
+}
+th, td {
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+th { color: var(--text-bright); background: var(--bg-card); font-weight: 600; }
+td { color: var(--text); }
+tr:hover td { background: var(--bg-card); }
+.svg-wrap {
+  margin: 24px 0;
+  text-align: center;
+}
+.svg-wrap svg { max-width: 100%; height: auto; }
+.svg-caption {
+  color: var(--text-dim);
+  font-size: 0.85em;
+  margin-top: 8px;
+}
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  font-weight: 600;
+}
+.badge.blue { background: rgba(88,166,255,0.15); color: var(--accent); }
+.badge.green { background: rgba(63,185,80,0.15); color: var(--accent2); }
+.badge.purple { background: rgba(210,168,255,0.15); color: var(--accent3); }
+.badge.orange { background: rgba(255,166,87,0.15); color: var(--accent4); }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+@media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+.tag {
+  display: inline-block;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 0.8em;
+  margin: 2px;
+  color: var(--text-dim);
+}
+.toc-num { color: var(--accent); font-weight: 700; margin-right: 6px; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 20px 0; }
+.stat {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+.stat .num { font-size: 1.8em; font-weight: 700; color: var(--accent); }
+.stat .label { font-size: 0.85em; color: var(--text-dim); margin-top: 4px; }
+footer {
+  text-align: center;
+  padding: 40px 0 0;
+  border-top: 1px solid var(--border);
+  margin-top: 60px;
+  color: var(--text-dim);
+  font-size: 0.85em;
+}
+hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+.anchor { scroll-margin-top: 60px; }
+</style>
+</head>
+<body>
+
+<header>
+<h1>Pi Agent Harness</h1>
+<div class="subtitle">开源 AI 编码智能体 monorepo — 完整项目深度解析</div>
+<div class="meta">
+<span>TypeScript</span>
+<span>Monorepo</span>
+<span>243K+ LOC</span>
+<span>9 Packages</span>
+<span>v0.83.0</span>
+</div>
+</header>
+
+<nav>
+<a href="#overview">总览</a>
+<a href="#architecture">架构分层</a>
+<a href="#ai">pi-ai</a>
+<a href="#agent">pi-agent-core</a>
+<a href="#tui">pi-tui</a>
+<a href="#coding-agent">pi-coding-agent</a>
+<a href="#protocol">pi-protocol</a>
+<a href="#server">pi-server</a>
+<a href="#storage">pi-storage</a>
+<a href="#events">事件系统</a>
+<a href="#engineering">工程规范</a>
+<a href="#philosophy">设计哲学</a>
+</nav>
+
+<!-- ========== 1. 总览 ========== -->
+<h2 id="overview" class="anchor">一、项目总览</h2>
+
+<p><strong>Pi</strong>（<code>@earendil-works/pi-*</code>）是一个开源、可自扩展的 <strong>AI 编码智能体</strong> monorepo，由 earendil-works 维护（核心作者 Mario Zechner / badlogic，即 libGDX 的创建者）。它的旗舰产品是 <code>pi</code>——一个交互式 CLI 编码智能体，同时提供了完整的多模型 LLM 接入层、智能体运行时框架、终端 UI 库和远程会话基础设施。</p>
+
+<div class="stat-grid">
+<div class="stat"><div class="num">9</div><div class="label">Workspace 包</div></div>
+<div class="stat"><div class="num">243K+</div><div class="label">TypeScript 行数</div></div>
+<div class="stat"><div class="num">38</div><div class="label">LLM 厂商</div></div>
+<div class="stat"><div class="num">70+</div><div class="label">扩展示例</div></div>
+<div class="stat"><div class="num">29</div><div class="label">事件类型</div></div>
+<div class="stat"><div class="num">0.83.0</div><div class="label">当前版本</div></div>
+</div>
+
+<h3>核心组成</h3>
+<div class="grid-2">
+<div class="card blue">
+<h4>pi-coding-agent <span class="badge blue">应用层</span></h4>
+<p>交互式 CLI 编码智能体。提供 <code>read</code>、<code>bash</code>、<code>edit</code>、<code>write</code>、<code>grep</code>、<code>find</code>、<code>ls</code> 七个内置工具，支持交互式 TUI、非交互打印、JSON 事件输出、RPC 远程四种模式。</p>
+</div>
+<div class="card green">
+<h4>pi-agent-core <span class="badge green">运行时</span></h4>
+<p>三层智能体运行时：无状态循环 <code>AgentLoop</code>、有状态封装 <code>Agent</code>、产品级线束 <code>AgentHarness</code>。支持会话分支、上下文压缩、技能系统、29 种细粒度事件。</p>
+</div>
+<div class="card purple">
+<h4>pi-ai <span class="badge purple">基础层</span></h4>
+<p>统一 38 个 LLM 厂商的接入层。三层架构（Models → Provider → API Module），懒加载避免拉入重依赖，自动模型发现脚本从 models.dev 等数据源生成完整目录。</p>
+</div>
+<div class="card orange">
+<h4>pi-tui <span class="badge orange">基础层</span></h4>
+<p>差分渲染终端 UI 库。行级 diff 算法只重绘变化区域，flexbox 风格布局引擎，Kitty/Legacy/modifyOtherKeys 三层键盘协议匹配，overlay 浮层系统。</p>
+</div>
+</div>
+
+<!-- ========== 2. 架构分层 ========== -->
+<h2 id="architecture" class="anchor">二、架构分层</h2>
+
+<p>整个 monorepo 严格分为三层，依赖方向<strong>只能从上到下</strong>——应用层依赖运行时层，运行时层依赖基础层，基础层之间互不依赖。</p>
+
+<div class="svg-wrap">
+<svg viewBox="0 0 860 480" width="100%" role="img" aria-label="Pi 包依赖分层架构图">
+<style>
+.layer-bg { rx: 14; ry: 14; stroke-width: 0.5; }
+.layer-label { font-size: 13px; font-weight: 600; }
+.node { rx: 8; ry: 8; stroke-width: 0.5; }
+.node-title { font-size: 14px; font-weight: 700; }
+.node-sub { font-size: 11px; }
+.arrow { stroke: #888780; stroke-width: 1.2; opacity: 0.5; fill: none; }
+.title { font-size: 20px; font-weight: 700; }
+@media (prefers-color-scheme: light) {
+  text { fill: #24292f; }
+  .node { fill: #ffffff; }
+}
+@media (prefers-color-scheme: dark) {
+  text { fill: #c9d1d9; }
+  .node { fill: #161b22; }
+}
+</style>
+<defs>
+<marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+<path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+
+<text class="title" x="430" y="30" text-anchor="middle">Pi 包依赖分层架构</text>
+
+<!-- 基础层 -->
+<rect class="layer-bg" x="20" y="50" width="820" height="100" fill="rgba(88,166,255,0.08)" stroke="var(--accent)"/>
+<text class="layer-label" x="35" y="72" fill="var(--accent)">基础层 · 无内部依赖</text>
+
+<g>
+<rect class="node" x="50" y="82" width="180" height="50" stroke="var(--accent)"/>
+<text class="node-title" x="140" y="100" text-anchor="middle">pi-ai</text>
+<text class="node-sub" x="140" y="118" text-anchor="middle">38 厂商 LLM 适配</text>
+</g>
+<g>
+<rect class="node" x="290" y="82" width="180" height="50" stroke="var(--accent)"/>
+<text class="node-title" x="380" y="100" text-anchor="middle">pi-tui</text>
+<text class="node-sub" x="380" y="118" text-anchor="middle">差分渲染终端 UI</text>
+</g>
+<g>
+<rect class="node" x="530" y="82" width="180" height="50" stroke="var(--accent)"/>
+<text class="node-title" x="620" y="100" text-anchor="middle">pi-protocol</text>
+<text class="node-sub" x="620" y="118" text-anchor="middle">CBOR 传输协议</text>
+</g>
+
+<!-- 运行时层 -->
+<rect class="layer-bg" x="20" y="170" width="820" height="100" fill="rgba(63,185,80,0.08)" stroke="var(--accent2)"/>
+<text class="layer-label" x="35" y="192" fill="var(--accent2)">运行时层</text>
+
+<g>
+<rect class="node" x="50" y="202" width="180" height="50" stroke="var(--accent2)"/>
+<text class="node-title" x="140" y="220" text-anchor="middle">pi-agent-core</text>
+<text class="node-sub" x="140" y="238" text-anchor="middle">智能体运行时内核</text>
+</g>
+<g>
+<rect class="node" x="290" y="202" width="180" height="50" stroke="var(--accent2)"/>
+<text class="node-title" x="380" y="220" text-anchor="middle">pi-client</text>
+<text class="node-sub" x="380" y="238" text-anchor="middle">远程会话客户端</text>
+</g>
+<g>
+<rect class="node" x="530" y="202" width="180" height="50" stroke="var(--accent2)"/>
+<text class="node-title" x="620" y="220" text-anchor="middle">pi-storage</text>
+<text class="node-sub" x="620" y="238" text-anchor="middle">SQLite 持久化</text>
+</g>
+
+<!-- 应用层 -->
+<rect class="layer-bg" x="20" y="290" width="820" height="170" fill="rgba(210,168,255,0.08)" stroke="var(--accent3)"/>
+<text class="layer-label" x="35" y="312" fill="var(--accent3)">应用层</text>
+
+<g>
+<rect class="node" x="150" y="320" width="260" height="55" stroke="var(--accent3)"/>
+<text class="node-title" x="280" y="340" text-anchor="middle">pi-coding-agent</text>
+<text class="node-sub" x="280" y="358" text-anchor="middle">CLI · read / bash / edit / write</text>
+</g>
+<g>
+<rect class="node" x="460" y="320" width="260" height="55" stroke="var(--accent3)"/>
+<text class="node-title" x="590" y="340" text-anchor="middle">pi-server</text>
+<text class="node-sub" x="590" y="358" text-anchor="middle">远程会话服务端</text>
+</g>
+<g>
+<rect class="node" x="305" y="395" width="260" height="48" stroke="var(--border)" stroke-dasharray="4 2"/>
+<text class="node-title" x="435" y="413" text-anchor="middle">pi-evals</text>
+<text class="node-sub" x="435" y="430" text-anchor="middle">独立评测工具</text>
+</g>
+
+<!-- 箭头：运行时 → 基础 -->
+<g class="arrow" marker-end="url(#arr)">
+<path d="M140 202 L140 132"/>
+<path d="M380 202 L620 132"/>
+<path d="M620 202 L140 132"/>
+<path d="M620 202 L620 132"/>
+</g>
+<!-- 箭头：应用 → 运行时/基础 -->
+<g class="arrow" marker-end="url(#arr)">
+<path d="M230 320 L140 252"/>
+<path d="M280 320 L140 132"/>
+<path d="M280 320 L380 132"/>
+<path d="M280 320 L380 252"/>
+<path d="M280 320 L620 132"/>
+<path d="M330 320 L140 252"/>
+<path d="M590 320 L590 252"/>
+<path d="M590 320 L620 132"/>
+<path d="M530 320 L280 252"/>
+</g>
+</svg>
+</div>
+<div class="svg-caption">↑ 箭头指向被依赖方。pi-coding-agent 作为"聚合者"，向上汇聚了五个基础/运行时包。</div>
+
+<div class="card blue">
+<h4>分层规则</h4>
+<table>
+<tr><th>层</th><th>包</th><th>规则</th></tr>
+<tr><td><span class="badge blue">基础层</span></td><td><code>pi-ai</code> / <code>pi-tui</code> / <code>pi-protocol</code></td><td>互不依赖，各自独立</td></tr>
+<tr><td><span class="badge green">运行时层</span></td><td><code>pi-agent-core</code> / <code>pi-client</code> / <code>pi-storage</code></td><td>只依赖基础层</td></tr>
+<tr><td><span class="badge purple">应用层</span></td><td><code>pi-coding-agent</code> / <code>pi-server</code></td><td>依赖运行时 + 基础层</td></tr>
+<tr><td><span class="badge orange">独立</span></td><td><code>pi-evals</code></td><td>评测工具，不参与核心架构</td></tr>
+</table>
+</div>
+
+<!-- ========== 3. pi-ai ========== -->
+<h2 id="ai" class="anchor">三、pi-ai — 多厂商 LLM 接入层</h2>
+
+<p><code>@earendil-works/pi-ai</code> 是整个项目的 LLM 基础设施，统一了 <strong>38 个 LLM 厂商</strong>的接入。它的设计目标是让上层代码不需要关心"你调用的是 Anthropic 还是 OpenAI"——所有差异在 API 适配层被抹平。</p>
+
+<h3>3.1 三层架构</h3>
+
+<div class="svg-wrap">
+<svg viewBox="0 0 680 280" width="85%" role="img">
+<style>
+.box { rx: 8; ry: 8; stroke-width: 1; }
+.box-title { font-size: 14px; font-weight: 700; }
+.box-sub { font-size: 11px; }
+@media (prefers-color-scheme: light) { text { fill: #24292f; } .box { fill: #fff; } }
+@media (prefers-color-scheme: dark) { text { fill: #c9d1d9; } .box { fill: #161b22; } }
+</style>
+<rect class="box" x="40" y="20" width="600" height="60" fill="rgba(88,166,255,0.1)" stroke="var(--accent)"/>
+<text class="box-title" x="340" y="44" text-anchor="middle">Models 运行时</text>
+<text class="box-sub" x="340" y="62" text-anchor="middle">createModels() → 鉴权 → 分发到 Provider</text>
+
+<rect class="box" x="40" y="105" width="600" height="60" fill="rgba(63,185,80,0.1)" stroke="var(--accent2)"/>
+<text class="box-title" x="340" y="129" text-anchor="middle">Provider 工厂（38 个）</text>
+<text class="box-sub" x="340" y="147" text-anchor="middle">createProvider({ id, auth, models, api }) → 组装</text>
+
+<rect class="box" x="40" y="190" width="600" height="70" fill="rgba(210,168,255,0.1)" stroke="var(--accent3)"/>
+<text class="box-title" x="340" y="214" text-anchor="middle">API Module（10 种协议）</text>
+<text class="box-sub" x="340" y="232" text-anchor="middle">anthropic-messages / openai-responses / openai-completions</text>
+<text class="box-sub" x="340" y="248" text-anchor="middle">google-generative-ai / bedrock-converse / mistral / pi-messages</text>
+
+<path d="M340 80 L340 105 M340 165 L340 190" stroke="var(--text-dim)" stroke-width="1" marker-end="url(#arr)"/>
+</svg>
+</div>
+
+<h3>3.2 统一事件协议</h3>
+<p>所有 API 适配器都输出统一的 <strong>12 种流式事件</strong>，上层只需要处理这套协议：</p>
+
+<pre><code>type AssistantMessageEvent =
+  | { type: "start"; partial: AssistantMessage }
+  | { type: "text_start" | "text_delta" | "text_end"; ... }
+  | { type: "thinking_start" | "thinking_delta" | "thinking_end"; ... }
+  | { type: "toolcall_start" | "toolcall_delta" | "toolcall_end"; ... }
+  | { type: "done"; reason: "stop" | "length" | "toolUse"; message }
+  | { type: "error"; reason: "aborted" | "error"; error }</code></pre>
+
+<h3>3.3 模型自动发现</h3>
+<p><code>scripts/generate-models.ts</code>（2862 行）从 <strong>models.dev</strong>、<strong>OpenRouter</strong>、<strong>Vercel AI Gateway</strong> 三个数据源拉取模型目录，经过合并、去重、手动覆盖后，生成：</p>
+<ul>
+<li><code>src/providers/data/*.json</code> — 模型元数据</li>
+<li><code>*.models.ts</code> — 类型安全的薄包装</li>
+<li><code>models.generated.ts</code> — 聚合入口</li>
+</ul>
+
+<div class="card green">
+<h4>懒加载机制</h4>
+<p>每个 API 适配器都有 <code>.lazy.ts</code> 包装器（仅 4 行），只有在第一次 <code>stream()</code> 调用时才 <code>import()</code> 真正的实现。这样 import <code>@earendil-works/pi-ai</code> 时不会拉入所有厂商的 SDK。</p>
+</div>
+
+<h3>3.4 缓存机制</h3>
+<table>
+<tr><th>缓存类型</th><th>控制方式</th><th>说明</th></tr>
+<tr><td>Prompt Cache</td><td><code>cacheRetention: "none" | "short" | "long"</code></td><td>映射为各厂商的 cache_control 标记</td></tr>
+<tr><td>Session Affinity</td><td><code>sessionId</code></td><td>确保同一会话路由到同一 replica</td></tr>
+<tr><td>模型目录缓存</td><td><code>ModelsStore</code></td><td>ETag 增量更新，离线可用</td></tr>
+</table>
+
+<!-- ========== 4. pi-agent-core ========== -->
+<h2 id="agent" class="anchor">四、pi-agent-core — 智能体运行时内核</h2>
+
+<p>这是整个项目最核心的包，采用<strong>三层分离</strong>设计，每层职责单一、可独立使用。</p>
+
+<h3>4.1 三层内核架构</h3>
+
+<div class="svg-wrap">
+<svg viewBox="0 0 680 340" width="85%" role="img">
+<style>
+.layer-box { rx: 10; ry: 10; stroke-width: 1; }
+.lyr-title { font-size: 15px; font-weight: 700; }
+.lyr-file { font-size: 11px; }
+.lyr-desc { font-size: 12px; }
+@media (prefers-color-scheme: light) { text { fill: #24292f; } }
+@media (prefers-color-scheme: dark) { text { fill: #c9d1d9; } }
+</style>
+
+<!-- Layer 3: Harness -->
+<rect class="layer-box" x="30" y="20" width="620" height="80" fill="rgba(210,168,255,0.1)" stroke="var(--accent3)"/>
+<text class="lyr-title" x="340" y="42" text-anchor="middle" fill="var(--accent3)">AgentHarness · 产品级线束 (1185 行)</text>
+<text class="lyr-file" x="340" y="58" text-anchor="middle">agent-harness.ts</text>
+<text class="lyr-desc" x="340" y="76" text-anchor="middle">Session 树状分支 · Compaction 上下文压缩 · Skills · Hooks · 并发追踪</text>
+<text class="lyr-desc" x="340" y="92" text-anchor="middle">22 种扩展事件（9 钩子 + 13 通知）</text>
+
+<!-- Layer 2: Agent -->
+<rect class="layer-box" x="30" y="120" width="620" height="70" fill="rgba(63,185,80,0.1)" stroke="var(--accent2)"/>
+<text class="lyr-title" x="340" y="142" text-anchor="middle" fill="var(--accent2)">Agent · 有状态封装 (588 行)</text>
+<text class="lyr-file" x="340" y="158" text-anchor="middle">agent.ts</text>
+<text class="lyr-desc" x="340" y="176" text-anchor="middle">消息历史 · 工具列表 · 运行互斥锁 · steer/followUp 队列 · 7 种事件</text>
+
+<!-- Layer 1: AgentLoop -->
+<rect class="layer-box" x="30" y="210" width="620" height="70" fill="rgba(88,166,255,0.1)" stroke="var(--accent)"/>
+<text class="lyr-title" x="340" y="232" text-anchor="middle" fill="var(--accent)">AgentLoop · 无状态引擎 (792 行)</text>
+<text class="lyr-file" x="340" y="248" text-anchor="middle">agent-loop.ts</text>
+<text class="lyr-desc" x="340" y="266" text-anchor="middle">纯函数 · 双层 while 循环 · 流式 LLM 调用 · 工具执行 · steering 检查</text>
+
+<!-- 箭头 -->
+<path d="M340 100 L340 120 M340 190 L340 210" stroke="var(--text-dim)" stroke-width="1.5" marker-end="url(#arr)"/>
+</svg>
+</div>
+
+<h3>4.2 双层循环机制</h3>
+
+<div class="svg-wrap">
+<svg viewBox="0 0 680 460" width="80%" role="img">
+<style>
+.flow-box { rx: 6; ry: 6; stroke-width: 1; }
+.flow-text { font-size: 12px; }
+.decision { font-size: 12px; font-weight: 600; }
+@media (prefers-color-scheme: light) { text { fill: #24292f; } .flow-box { fill: #fff; } }
+@media (prefers-color-scheme: dark) { text { fill: #c9d1d9; } .flow-box { fill: #161b22; } }
+</style>
+<defs>
+<marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+<path d="M2 1L8 5L2 9" fill="none" stroke="var(--text-dim)" stroke-width="1.5" stroke-linecap="round"/>
+</marker>
+</defs>
+
+<!-- 外层循环标注 -->
+<rect x="20" y="20" width="640" height="380" fill="none" stroke="var(--accent4)" stroke-width="1.5" stroke-dasharray="6 3" rx="10"/>
+<text x="30" y="15" class="decision" fill="var(--accent4)">外层循环：while (有 followUp)</text>
+
+<!-- 内层循环标注 -->
+<rect x="40" y="50" width="600" height="310" fill="none" stroke="var(--accent5)" stroke-width="1.5" stroke-dasharray="4 2" rx="8"/>
+<text x="50" y="45" class="decision" fill="var(--accent5)">内层循环：while (有工具调用 || 排队消息)</text>
+
+<!-- 流程节点 -->
+<rect class="flow-box" x="220" y="65" width="240" height="36" fill="rgba(88,166,255,0.15)" stroke="var(--accent)"/>
+<text class="flow-text" x="340" y="88" text-anchor="middle">调 LLM 流式获取 assistant 响应</text>
+
+<path d="M340 101 L340 120" stroke="var(--text-dim)" marker-end="url(#arr2)"/>
+
+<rect class="flow-box" x="220" y="120" width="240" height="36" fill="rgba(63,185,80,0.15)" stroke="var(--accent2)"/>
+<text class="flow-text" x="340" y="143" text-anchor="middle">emit message_start/update/end</text>
+
+<path d="M340 156 L340 175" stroke="var(--text-dim)" marker-end="url(#arr2)"/>
+
+<!-- 决策：有工具调用？ -->
+<polygon points="340,175 440,205 340,235 240,205" fill="rgba(255,166,87,0.15)" stroke="var(--accent4)"/>
+<text class="decision" x="340" y="210" text-anchor="middle">有工具调用?</text>
+
+<path d="M440 205 L480 205" stroke="var(--text-dim)" marker-end="url(#arr2)"/>
+<text class="flow-text" x="495" y="209" fill="var(--accent2)">否 →</text>
+
+<path d="M340 235 L340 255" stroke="var(--text-dim)" marker-end="url(#arr2)"/>
+<text class="flow-text" x="355" y="250" fill="var(--accent4)">是 ↓</text>
+
+<rect class="flow-box" x="220" y="255" width="240" height="36" fill="rgba(63,185,80,0.15)" stroke="var(--accent2)"/>
+<text class="flow-text" x="340" y="278" text-anchor="middle">并行/顺序执行工具</text>
+
+<path d="M340 291 L340 310" stroke="var(--text-dim)" marker-end="url(#arr2)"/>
+
+<!-- 决策：有 steering？ -->
+<polygon points="340,310 440,340 340,370 240,340" fill="rgba(255,166,87,0.15)" stroke="var(--accent4)"/>
+<text class="decision" x="340" y="345" text-anchor="middle">有 steering?</text>
+
+<path d="M340 370 L340 395" stroke="var(--text-dim)" marker-end="url(#arr2)"/>
+<text class="flow-text" x="355" y="385" fill="var(--accent2)">是 ↓ 注入队列</text>
+
+<!-- 内层循环回退 -->
+<path d="M240 340 L160 340 L160 83 L220 83" stroke="var(--accent5)" stroke-width="1.5" stroke-dasharray="3 2" fill="none" marker-end="url(#arr2)"/>
+<text class="flow-text" x="120" y="215" fill="var(--accent5)" transform="rotate(-90 120 215)">内层继续</text>
+
+<!-- 外层 -->
+<rect class="flow-box" x="480" y="190" width="160" height="36" fill="rgba(247,120,186,0.15)" stroke="var(--accent5)"/>
+<text class="flow-text" x="560" y="213" text-anchor="middle">检查 followUp 队列</text>
+
+<path d="M560 226 L560 250" stroke="var(--text-dim)" marker-end="url(#arr2)"/>
+
+<polygon points="560,250 620,270 560,290 500,270" fill="rgba(255,166,87,0.15)" stroke="var(--accent4)"/>
+<text class="decision" x="560" y="274" text-anchor="middle">有?</text>
+
+<path d="M620 270 L640 270 L640 40 L340 40 L340 65" stroke="var(--accent4)" stroke-width="1.5" stroke-dasharray="3 2" fill="none" marker-end="url(#arr2)"/>
+<text class="flow-text" x="660" y="155" fill="var(--accent4)" transform="rotate(90 660 155)">外层继续</text>
+
+<text class="flow-text" x="560" y="312" text-anchor="middle" fill="var(--text-dim)">无 → 结束</text>
+</svg>
+</div>
+
+<h3>4.3 消息模型</h3>
+<pre><code>type AgentMessage = Message | CustomAgentMessages[keyof CustomAgentMessages]</code></pre>
+<p>应用可以通过 declaration merging 加入自定义消息类型（如 UI 通知、artifact 卡片），这些消息<strong>存入会话但不发给 LLM</strong>——<code>convertToLlm</code> 函数负责在调 LLM 前过滤。</p>
+
+<h3>4.4 工具执行两种模式</h3>
+<table>
+<tr><th>模式</th><th>行为</th><th>触发条件</th></tr>
+<tr><td><strong>parallel</strong>（默认）</td><td>先顺序 prepare 所有工具（校验+beforeToolCall），再并发执行</td><td>默认</td></tr>
+<tr><td><strong>sequential</strong></td><td>一个工具完整跑完再跑下一个</td><td>任一工具标记 <code>executionMode: "sequential"</code></td></tr>
+</table>
+
+<div class="card orange">
+<h4>截断安全</h4>
+<p>当 LLM 响应的 <code>stopReason === "length"</code>（输出被 token 上限截断），所有工具调用<strong>一律失败</strong>——因为参数可能是不完整的 JSON。失败结果会告诉模型"重新发起调用"。</p>
+</div>
+
+<!-- ========== 5. pi-tui ========== -->
+<h2 id="tui" class="anchor">五、pi-tui — 差分渲染终端 UI 库</h2>
+
+<p><code>@earendil-works/pi-tui</code> 是一个不依赖任何 agent 概念的通用终端 UI 库。它的核心竞争力是<strong>行级差分渲染</strong>——只重绘屏幕上发生变化的行，大幅减少终端写入量。</p>
+
+<h3>5.1 差分渲染算法</h3>
+
+<div class="svg-wrap">
+<svg viewBox="0 0 680 360" width="80%" role="img">
+<style>
+.dr-box { rx: 6; ry: 6; stroke-width: 1; }
+.dr-text { font-size: 12px; }
+@media (prefers-color-scheme: light) { text { fill: #24292f; } .dr-box { fill: #fff; } }
+@media (prefers-color-scheme: dark) { text { fill: #c9d1d9; } .dr-box { fill: #161b22; } }
+</style>
+<defs>
+<marker id="arr3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+<path d="M2 1L8 5L2 9" fill="none" stroke="var(--text-dim)" stroke-width="1.5"/>
+</marker>
+</defs>
+
+<rect class="dr-box" x="200" y="10" width="280" height="36" fill="rgba(88,166,255,0.15)" stroke="var(--accent)"/>
+<text class="dr-text" x="340" y="33" text-anchor="middle">1. 渲染所有组件 → newLines[]</text>
+<path d="M340 46 L340 60" stroke="var(--text-dim)" marker-end="url(#arr3)"/>
+
+<rect class="dr-box" x="200" y="60" width="280" height="36" fill="rgba(88,166,255,0.15)" stroke="var(--accent)"/>
+<text class="dr-text" x="340" y="83" text-anchor="middle">2. 合成 Overlay 浮层</text>
+<path d="M340 96 L340 110" stroke="var(--text-dim)" marker-end="url(#arr3)"/>
+
+<rect class="dr-box" x="200" y="110" width="280" height="36" fill="rgba(88,166,255,0.15)" stroke="var(--accent)"/>
+<text class="dr-text" x="340" y="133" text-anchor="middle">3. 提取光标标记 (CURSOR_MARKER)</text>
+<path d="M340 146 L340 160" stroke="var(--text-dim)" marker-end="url(#arr3)"/>
+
+<rect class="dr-box" x="160" y="160" width="360" height="50" fill="rgba(255,166,87,0.15)" stroke="var(--accent4)"/>
+<text class="dr-text" x="340" y="180" text-anchor="middle" font-weight="700">4. 逐行比较 newLines vs previousLines</text>
+<text class="dr-text" x="340" y="198" text-anchor="middle">找到 firstChanged 和 lastChanged</text>
+<path d="M340 210 L340 224" stroke="var(--text-dim)" marker-end="url(#arr3)"/>
+
+<rect class="dr-box" x="200" y="224" width="280" height="36" fill="rgba(63,185,80,0.15)" stroke="var(--accent2)"/>
+<text class="dr-text" x="340" y="247" text-anchor="middle">5. 仅重绘 [firstChanged, lastChanged]</text>
+<path d="M340 260 L340 274" stroke="var(--text-dim)" marker-end="url(#arr3)"/>
+
+<rect class="dr-box" x="200" y="274" width="280" height="36" fill="rgba(63,185,80,0.15)" stroke="var(--accent2)"/>
+<text class="dr-text" x="340" y="297" text-anchor="middle">6. ESC[nA/B 移动光标 + 同步输出</text>
+
+<!-- 全量重绘触发 -->
+<rect class="dr-box" x="520" y="155" width="150" height="60" fill="rgba(247,120,186,0.1)" stroke="var(--accent5)" stroke-dasharray="3 2"/>
+<text class="dr-text" x="595" y="175" text-anchor="middle" fill="var(--accent5)">全量重绘触发:</text>
+<text class="dr-text" x="595" y="190" text-anchor="middle">· 宽度变化</text>
+<text class="dr-text" x="595" y="205" text-anchor="middle">· 高度变化</text>
+</svg>
+</div>
+
+<h3>5.2 组件系统</h3>
+<p>组件是<strong>纯渲染函数</strong>：<code>render(width)</code> 返回 <code>string[]</code>（每行一个带 ANSI 的字符串），框架负责差分。组件不需要知道自己在屏幕上的位置。</p>
+
+<table>
+<tr><th>组件</th><th>说明</th></tr>
+<tr><td><code>Text</code></td><td>文本组件，带渲染缓存</td></tr>
+<tr><td><code>Markdown</code></td><td>Markdown 渲染（基于 marked）</td></tr>
+<tr><td><code>Input</code> / <code>Editor</code></td><td>单行输入 / 多行编辑器（Emacs 快捷键 + kill-ring）</td></tr>
+<tr><td><code>HStack</code> / <code>VStack</code></td><td>flexbox 风格布局（basis/grow/shrink）</td></tr>
+<tr><td><code>ScrollView</code></td><td>滚动视口（scrollTop/follow）</td></tr>
+<tr><td><code>Box</code> / <code>Image</code></td><td>边框容器 / Kitty+iTerm2 图片协议</td></tr>
+</table>
+
+<h3>5.3 输入处理</h3>
+<div class="card pink">
+<p><strong>三层键盘协议匹配</strong>：Legacy 转义序列 → Kitty CSI-u → modifyOtherKeys，自动协商最佳协议。StdinBuffer 解决序列分块到达问题（带 10ms 超时）。</p>
+<p><strong>渲染节流</strong>：16ms 最小间隔（~60fps），<code>renderRequested</code> 布尔标志合并多次请求为一次渲染。所有定时器 <code>.unref()</code> 防止阻止进程退出。</p>
+</div>
+
+<!-- ========== 6. pi-coding-agent ========== -->
+<h2 id="coding-agent" class="anchor">六、pi-coding-agent — CLI 编码智能体</h2>
+
+<p>这是面向最终用户的产品，也是整个 monorepo 的"聚合者"——直接依赖 agent/ai/client/protocol/tui 五个包，提供完整的交互式编码体验。</p>
+
+<h3>6.1 四种运行模式</h3>
+<table>
+<tr><th>模式</th><th>入口</th><th>用途</th></tr>
+<tr><td><strong>interactive</strong></td><td><code>InteractiveMode</code></td><td>TUI 交互式对话（默认）</td></tr>
+<tr><td><strong>print</strong></td><td><code>runPrintMode()</code></td><td>非交互，输出纯文本（适合管道）</td></tr>
+<tr><td><strong>json</strong></td><td><code>runJsonEvent()</code></td><td>JSON 事件流输出（适合程序化集成）</td></tr>
+<tr><td><strong>rpc</strong></td><td><code>runRpcMode()</code></td><td>RPC 模式，供 IDE/客户端连接</td></tr>
+</table>
+
+<h3>6.2 工具系统</h3>
+<p>每个工具采用统一定义模式，同时提供 <code>createXxxToolDefinition()</code>（返回 ToolDefinition）和 <code>createXxxTool()</code>（返回 AgentTool）两个工厂函数：</p>
+
+<table>
+<tr><th>工具</th><th>输入</th><th>说明</th></tr>
+<tr><td><code>read</code></td><td><code>{ path, offset?, limit? }</code></td><td>读文件，支持分页</td></tr>
+<tr><td><code>bash</code></td><td><code>{ command, timeout? }</code></td><td>执行 shell 命令</td></tr>
+<tr><td><code>edit</code></td><td>字符串替换</td><td>精确编辑文件内容</td></tr>
+<tr><td><code>write</code></td><td>文件写入</td><td>创建/覆盖文件</td></tr>
+<tr><td><code>grep</code></td><td>内容搜索</td><td>正则搜索文件内容</td></tr>
+<tr><td><code>find</code></td><td>文件查找</td><td>glob 模式文件查找</td></tr>
+<tr><td><code>ls</code></td><td>目录列出</td><td>列出目录内容</td></tr>
+</table>
+
+<h3>6.3 SDK 三层 API</h3>
+<div class="card blue">
+<table>
+<tr><th>层次</th><th>函数</th><th>适用场景</th></tr>
+<tr><td><strong>最简</strong></td><td><code>createAgentSession()</code></td><td>一行启动，全部默认值</td></tr>
+<tr><td><strong>中级</strong></td><td><code>createAgentSessionServices()</code> + <code>createAgentSessionFromServices()</code></td><td>分离服务创建和会话创建</td></tr>
+<tr><td><strong>高级</strong></td><td><code>createAgentSessionRuntime()</code></td><td>支持运行时重建（session 切换时重新创建 cwd 绑定服务）</td></tr>
+</table>
+</div>
+
+<h3>6.4 扩展系统</h3>
+<p>扩展是一个导出默认工厂函数的 TypeScript 模块，通过 <code>pi: ExtensionAPI</code> 对象获得全部能力：</p>
+
+<div class="grid-2">
+<div>
+<h4>可注册的能力</h4>
+<ul>
+<li><code>registerTool()</code> — 自定义工具</li>
+<li><code>registerCommand()</code> — 斜杠命令</li>
+<li><code>registerShortcut()</code> — 快捷键</li>
+<li><code>registerFlag()</code> — CLI 参数</li>
+<li><code>registerProvider()</code> — 自定义 LLM 厂商</li>
+<li><code>registerMessageRenderer()</code> — 消息渲染器</li>
+</ul>
+</div>
+<div>
+<h4>可订阅的事件（30+）</h4>
+<ul>
+<li>生命周期：<code>session_start</code>/<code>agent_end</code></li>
+<li>工具：<code>tool_call</code>/<code>tool_result</code></li>
+<li>Provider：<code>before_provider_request</code></li>
+<li>输入：<code>input</code>（可拦截）</li>
+<li>上下文：<code>context</code>（可修改）</li>
+</ul>
+</div>
+</div>
+
+<p>扩展发现路径（按优先级）：</p>
+<ol>
+<li>项目本地：<code>cwd/.pi/extensions/</code></li>
+<li>全局：<code>~/.pi/agent/extensions/</code></li>
+<li>显式配置：<code>--extensions</code> 参数</li>
+</ol>
+
+<p>加载使用 <strong>jiti</strong> 动态导入 TypeScript，支持源码运行、编译 Node.js、Bun 二进制三种模式。</p>
+
+<!-- ========== 7. pi-protocol ========== -->
+<h2 id="protocol" class="anchor">七、pi-protocol — CBOR 传输协议</h2>
+
+<p>纯传输层定义，无 I/O 依赖，被 server 和 coding-agent 共用。</p>
+
+<h3>三层序列化</h3>
+<pre><code>JS 对象 ──TypeBox Check──→ CBOR 字节流 ──4字节大端长度前缀──→ 传输帧
+         (schemas.ts)     (cbor/*)          (framing.ts)</code></pre>
+
+<div class="card purple">
+<h4>CBOR 安全限制</h4>
+<ul>
+<li>只支持 definite-length（定长），不支持 indefinite-length</li>
+<li>不支持 CBOR tags（major type 6）、break marker</li>
+<li><code>maxByteLength = 16MB</code>、<code>maxContainerLength = 1M</code>、<code>maxDepth = 64</code></li>
+<li>禁止 <code>-0</code>、循环引用、<code>undefined</code>、Symbol key</li>
+</ul>
+</div>
+
+<h3>消息类型体系</h3>
+<table>
+<tr><th>方向</th><th>消息</th><th>说明</th></tr>
+<tr><td rowspan="2">客户端 → 服务端</td><td><code>ClientHello</code></td><td>握手：版本协商</td></tr>
+<tr><td><code>RequestEnvelope</code></td><td>请求：list/create/attach/prompt/steer/abort/set_model/set_thinking</td></tr>
+<tr><td rowspan="3">服务端 → 客户端</td><td><code>ServerHello</code></td><td>握手响应 + <code>ServerSnapshot</code></td></tr>
+<tr><td><code>ResponseEnvelope</code></td><td>请求响应（ok/error）</td></tr>
+<tr><td><code>EventEnvelope</code></td><td>事件推送：<code>server_snapshot</code>/<code>session_snapshot</code>/<code>session_progress</code></td></tr>
+</table>
+
+<!-- ========== 8. pi-server ========== -->
+<h2 id="server" class="anchor">八、pi-server — 远程会话服务端</h2>
+
+<p>把 coding-agent 包装成可远程连接的会话服务端，支持 Unix Domain Socket 等传输方式。</p>
+
+<h3>连接生命周期</h3>
+<div class="card orange">
+<ol>
+<li><strong>握手</strong>：<code>awaitingHello</code> → <code>handshaking</code> → <code>ready</code>（超时 5s）</li>
+<li><strong>就绪</strong>：客户端发 <code>RequestEnvelope</code>，服务端执行后回 <code>ResponseEnvelope</code></li>
+<li><strong>事件推送</strong>：服务端主动推 <code>server_snapshot</code> / <code>session_snapshot</code> / <code>session_progress</code></li>
+</ol>
+</div>
+
+<h3>抽象接口</h3>
+<pre><code>PiSessionBackend（持久化层）
+  ├── listSessions()
+  ├── listModels()
+  ├── createSession() → PiSessionRuntime
+  └── openSession() → PiSessionRuntime
+
+PiSessionRuntime（活跃会话）
+  ├── snapshot() / getPhase()
+  ├── prompt() / steer() / abort()
+  ├── setModel() / setThinking()
+  ├── subscribe(event)
+  └── dispose()</code></pre>
+
+<p><code>LiveSessionManager</code> 处理并发打开同一会话的去重（<code>liveSessions</code> Map + <code>openingSessions</code> Promise Map），并在会话空闲时自动 dispose。</p>
+
+<!-- ========== 9. pi-storage ========== -->
+<h2 id="storage" class="anchor">九、pi-storage/sqlite-node — 持久化后端</h2>
+
+<p>实现 agent-core 的 <code>SessionRepository</code> 接口，持久化<strong>树状会话历史</strong>。</p>
+
+<h3>Schema 设计（6 张核心表）</h3>
+<table>
+<tr><th>表</th><th>用途</th></tr>
+<tr><td><code>sessions</code></td><td>会话元信息（cwd、parent_session_id、active_leaf_id）</td></tr>
+<tr><td><code>session_entries</code></td><td>条目树（parent_id 构成父子链，payload 存 JSON）</td></tr>
+<tr><td><code>session_sequences</code></td><td>单调递增序号发生器</td></tr>
+<tr><td><code>branch_entries</code> / <code>branch_tips</code></td><td>分支缓存（加速叶→根路径查询）</td></tr>
+<tr><td><code>session_materialized</code></td><td>会话级物化视图（token 计数、成本）</td></tr>
+<tr><td><code>entry_materialized</code></td><td>条目级物化视图</td></tr>
+</table>
+
+<div class="card green">
+<h4>设计要点</h4>
+<ul>
+<li><code>session_entries</code> 使用 <code>parent_id</code> 构成父子链（权威数据源）</li>
+<li><code>branch_entries</code> 是<strong>派生缓存</strong>，损坏可重建</li>
+<li>WAL 模式 + <code>synchronous=FULL</code> + <code>busy_timeout=5000</code> 保证并发安全</li>
+<li>全文搜索使用 <strong>FTS5 trigram 分词器</strong>，触发器自动同步</li>
+<li><code>SerialOperationQueue</code> 保证写操作串行化</li>
+</ul>
+</div>
+
+<h3>11 种 Entry 类型</h3>
+<p><span class="tag">message</span><span class="tag">thinking_level_change</span><span class="tag">model_change</span><span class="tag">active_tools_change</span><span class="tag">compaction</span><span class="tag">branch_summary</span><span class="tag">custom</span><span class="tag">custom_message</span><span class="tag">label</span><span class="tag">session_info</span><span class="tag">leaf</span></p>
+
+<!-- ========== 10. 事件系统 ========== -->
+<h2 id="events" class="anchor">十、完整事件系统</h2>
+
+<p>Pi 拥有目前 agent 框架中<strong>粒度最细的事件系统</strong>之一——29 种事件分两层，关键区分是"钩子"（能拦截改写）和"通知"（只读监听）。</p>
+
+<div class="svg-wrap">
+<svg viewBox="0 0 860 420" width="100%" role="img">
+<style>
+.ev-cat { rx: 8; ry: 8; stroke-width: 1; }
+.ev-title { font-size: 14px; font-weight: 700; }
+.ev-item { font-size: 11px; }
+@media (prefers-color-scheme: light) { text { fill: #24292f; } }
+@media (prefers-color-scheme: dark) { text { fill: #c9d1d9; } }
+</style>
+
+<!-- Agent 层 -->
+<rect class="ev-cat" x="20" y="20" width="820" height="70" fill="rgba(88,166,255,0.08)" stroke="var(--accent)"/>
+<text class="ev-title" x="35" y="42" fill="var(--accent)">Agent 层 · 7 种基础事件（全部纯通知）</text>
+<text class="ev-item" x="35" y="62">agent_start/end · turn_start/end · message_start/update/end · tool_execution_start/update/end</text>
+<text class="ev-item" x="35" y="78">定义于 types.ts，通过 subscribe(listener) 注册</text>
+
+<!-- Harness 钩子 -->
+<rect class="ev-cat" x="20" y="110" width="400" height="200" fill="rgba(63,185,80,0.08)" stroke="var(--accent2)"/>
+<text class="ev-title" x="35" y="132" fill="var(--accent2)">Harness 钩子 · 9 种（能拦截/改写）</text>
+<text class="ev-item" x="35" y="152">before_agent_start → 可替换 messages + systemPrompt</text>
+<text class="ev-item" x="35" y="168">context → 可替换发给 LLM 的消息列表</text>
+<text class="ev-item" x="35" y="184">before_provider_request → 可改 headers/timeout/transport</text>
+<text class="ev-item" x="35" y="200">before_provider_payload → 可改原始 HTTP 请求体（最底层）</text>
+<text class="ev-item" x="35" y="216">tool_call → 可 { block: true } 拦截工具执行</text>
+<text class="ev-item" x="35" y="232">tool_result → 可改写 content/details/isError/usage</text>
+<text class="ev-item" x="35" y="248">session_before_compact → 可取消/替换压缩结果</text>
+<text class="ev-item" x="35" y="264">session_before_tree → 可取消/替换分支摘要</text>
+<text class="ev-item" x="35" y="280">resources_update → 可替换 skills/promptTemplates</text>
+<text class="ev-item" x="35" y="298" fill="var(--accent4)">通过 emitHook 发出，监听器返回结果对象</text>
+
+<!-- Harness 通知 -->
+<rect class="ev-cat" x="440" y="110" width="400" height="200" fill="rgba(210,168,255,0.08)" stroke="var(--accent3)"/>
+<text class="ev-title" x="455" y="132" fill="var(--accent3)">Harness 通知 · 13 种（只读）</text>
+<text class="ev-item" x="455" y="152">after_provider_response · session_compact</text>
+<text class="ev-item" x="455" y="168">session_tree · queue_update</text>
+<text class="ev-item" x="455" y="184">model_update · thinking_level_update · tools_update</text>
+<text class="ev-item" x="455" y="200">retry_scheduled · retry_attempt_start · retry_finished</text>
+<text class="ev-item" x="455" y="216">save_point · abort · settled</text>
+<text class="ev-item" x="455" y="246" fill="var(--accent4)">通配订阅：SUBSCRIBER_EVENT_TYPE = "*"</text>
+<text class="ev-item" x="455" y="262" fill="var(--accent4)">错误隔离：normalizeHookError → AgentHarnessError</text>
+<text class="ev-item" x="455" y="278" fill="var(--accent4)">钩子合并：before_provider_request 串行叠加</text>
+<text class="ev-item" x="455" y="294" fill="var(--accent4)">headers patch：undefined = 删除 key</text>
+
+<!-- 应用举例 -->
+<rect class="ev-cat" x="20" y="330" width="820" height="80" fill="rgba(255,166,87,0.08)" stroke="var(--accent4)"/>
+<text class="ev-title" x="35" y="352" fill="var(--accent4)">实际应用</text>
+<text class="ev-item" x="35" y="372">权限控制（tool_call block）· 审计日志（before_provider_payload）· 成本追踪（tool_result usage）</text>
+<text class="ev-item" x="35" y="388">缓存优化（before_provider_request headers）· 自定义压缩（session_before_compact）</text>
+</svg>
+</div>
+
+<!-- ========== 11. 工程规范 ========== -->
+<h2 id="engineering" class="anchor">十一、工程规范</h2>
+
+<h3>11.1 质量门槛</h3>
+<div class="card blue">
+<ul>
+<li><strong>Biome</strong>：lint + format</li>
+<li><strong>tsgo</strong>（原生 TS 类型检查器）：类型校验</li>
+<li><strong>Husky</strong>：pre-commit 钩子</li>
+<li><strong>Vitest</strong>：单元测试（e2e 测试需环境变量触发，默认不跑）</li>
+<li><code>npm run check</code> 一次性覆盖：风格、依赖钉版、TS 导入兼容、shrinkwrap、浏览器冒烟</li>
+</ul>
+</div>
+
+<h3>11.2 供应链硬化</h3>
+<div class="card green">
+<ul>
+<li>直接依赖<strong>钉死精确版本</strong>（<code>.npmrc</code> 设 <code>save-exact</code>）</li>
+<li><code>package-lock.json</code> 为唯一真相源</li>
+<li>发布包带 <code>npm-shrinkwrap.json</code></li>
+<li>CI 跑 <code>npm audit</code></li>
+<li>生命周期脚本默认<strong>不执行</strong>（<code>--ignore-scripts</code>）</li>
+</ul>
+</div>
+
+<h3>11.3 TypeScript 硬规则</h3>
+<ul>
+<li>禁用 <code>any</code>（除非绝对必要）</li>
+<li>只用<strong>可擦除的 TS 语法</strong>（Node strip-only 模式）：禁用 parameter properties、enum、namespace、import =</li>
+<li>禁止 inline imports（<code>await import()</code>、dynamic type imports）</li>
+<li>顶层 import only</li>
+</ul>
+
+<h3>11.4 Git 规范</h3>
+<ul>
+<li><strong>锁步版本</strong>：所有包共用一个版本，每次发布全部更新</li>
+<li><code>patch</code> = 修复+新增，<code>minor</code> = 破坏性变更，无 major release</li>
+<li>Commit 格式：<code>{feat,fix,docs}[(ai,tui,agent,coding-agent)]: message</code></li>
+<li>多 agent 会话共用同一 cwd，只 stage 自己改的文件（<code>git add &lt;path&gt;</code>）</li>
+</ul>
+
+<h3>11.5 贡献门槛</h3>
+<p>新贡献者的 issue/PR 默认自动关闭，需维护者 <code>lgtm</code> 批准后才能参与。</p>
+
+<!-- ========== 12. 设计哲学 ========== -->
+<h2 id="philosophy" class="anchor">十二、设计哲学</h2>
+
+<div class="card purple">
+<h4>1. 关注点分离到极致</h4>
+<p><code>AgentLoop</code> 只管"怎么循环"，不关心状态怎么存。<code>Agent</code> 只管"状态和生命周期"，不关心会话怎么持久化。<code>AgentHarness</code> 只管"产品级功能"，不关心循环细节。每一层都能独立使用。</p>
+</div>
+
+<div class="card blue">
+<h4>2. 状态与逻辑分离</h4>
+<p>核心循环是<strong>纯函数</strong>，所有状态通过参数传入，所有输出通过 emit 回调发出。这让循环逻辑可测试、可复用。</p>
+</div>
+
+<div class="card green">
+<h4>3. 核心极简，可扩展</h4>
+<p>不符合核心定位的功能应做成 extension。仓库有 70+ 个扩展示例，涵盖自定义工具、命令、Provider、渲染器、工作流。一行代码可以启动一个 agent（<code>createAgentSession()</code>），也可以完全控制每个细节。</p>
+</div>
+
+<div class="card orange">
+<h4>4. 事件驱动而非回调地狱</h4>
+<p>29 种细粒度事件让扩展可以在不修改内核的情况下实现权限控制、审计、成本追踪、缓存优化、自定义压缩。钩子和通知的区分让"能改"和"只能看"的边界清晰。</p>
+</div>
+
+<div class="card pink">
+<h4>5. 供应链信任</h4>
+<p>从依赖钉版到生命周期脚本禁用，从 shrinkwrap 到 CI audit，每个环节都不盲信外部代码。</p>
+</div>
+
+<hr>
+
+<h3>文件规模一览</h3>
+<table>
+<tr><th>包</th><th>TS 文件数</th><th>代码行数</th><th>说明</th></tr>
+<tr><td>coding-agent</td><td>~514</td><td>~121K</td><td>最大包，CLI + 工具 + 扩展 + 模式</td></tr>
+<tr><td>ai</td><td>~311</td><td>~57K</td><td>38 厂商适配 + 模型生成</td></tr>
+<tr><td>tui</td><td>~40</td><td>~29K</td><td>差分渲染 + 组件库</td></tr>
+<tr><td>agent</td><td>~60</td><td>~18K</td><td>三层内核 + 会话 + 压缩</td></tr>
+<tr><td>server</td><td>~15</td><td>~5K</td><td>远程会话服务端</td></tr>
+<tr><td>protocol</td><td>~10</td><td>~3K</td><td>CBOR + 帧编解码</td></tr>
+<tr><td>storage/sqlite-node</td><td>~15</td><td>~5K</td><td>SQLite 持久化</td></tr>
+</table>
+
+<footer>
+<p>本文档基于 pi monorepo 源码深度分析生成 · 2026-08-10</p>
+<p>项目地址：<code>github.com/earendil-works/pi-mono</code></p>
+</footer>
+
+</body>
+</html>

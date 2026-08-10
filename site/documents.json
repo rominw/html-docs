@@ -1,5 +1,11 @@
 [
   {
+    "title": "Pi Agent Harness — 完整项目解析",
+    "description": "Pi 开源 AI 编码智能体 monorepo 的完整架构与内核设计深度解析，涵盖 ai/agent/tui/protocol/coding-agent/server/storage 全部 9 个包。",
+    "date": "2026-08-10",
+    "url": "documents/pi-complete-analysis.html"
+  },
+  {
     "title": "异步任务编排与资源调度",
     "description": "一套面向父子任务拆分、有限资源排队、冲突准入、事件恢复与进度聚合的通用系统设计。",
     "date": "2026-07-29",
