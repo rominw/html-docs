@@ -1,5 +1,11 @@
 [
   {
+    "title": "Goose Agent 架构设计与内核深度解析",
+    "description": "基于 Block 开源 Goose（v1.45.0）源码的架构深度解析：分层架构、状态机内核与 14 个 Operation、StateEffect 副作用、MCP 扩展系统、三层安全防护、Provider 抽象、上下文压缩与二开切入点。",
+    "date": "2026-08-10",
+    "url": "documents/goose-architecture.html"
+  },
+  {
     "title": "Pi Agent Harness — 完整项目解析",
     "description": "Pi 开源 AI 编码智能体 monorepo 的完整架构与内核设计深度解析，涵盖 ai/agent/tui/protocol/coding-agent/server/storage 全部 9 个包。",
     "date": "2026-08-10",
@@ -22,11 +28,5 @@
     "description": "关于留页：让值得留下的页面，继续保持它原本的样子。",
     "date": "2026-07-24",
     "url": "documents/about.html"
-  },
-  {
-    "title": "Goose Agent 架构设计与内核深度解析",
-    "description": "",
-    "date": "",
-    "url": "documents/goose-architecture.html"
   }
 ]
