@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="一个基于 Spring Cloud Stream 封装的内部分布式事件框架的源码级深度剖析：发送链路、Rabbit 拓扑、消费链路、监听器迁移魔法与可靠性边界。">
+<meta name="date" content="2026-08-28">
+<title>分布式事件机制详解：Spring Cloud Stream 事件框架刨根问底</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --fg:#1f2430; --fg-muted:#5b6472;
+    --border:#e3e6ec; --accent:#2563eb; --accent-soft:#eff4ff;
+    --code-bg:#0f172a; --code-fg:#dbe4f3;
+    --warn-bg:#fff7e6; --warn-border:#f0c36d; --warn-fg:#8a5b00;
+    --key-bg:#eefaf1; --key-border:#7cc79c; --key-fg:#1c6b3f;
+    --info-bg:#eef2ff; --info-border:#aab8f5; --info-fg:#3745a8;
+    --tag-bg:#e9edf5; --diagram-bg:#fbfcfe;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12151c; --panel:#1a1f2a; --fg:#e4e8f0; --fg-muted:#98a2b3;
+      --border:#2a3140; --accent:#6d9dff; --accent-soft:#1c2740;
+      --code-bg:#0b101c; --code-fg:#cfd9ec;
+      --warn-bg:#2e2513; --warn-border:#8a6d1f; --warn-fg:#e8c268;
+      --key-bg:#152a1d; --key-border:#3d7a55; --key-fg:#8fd6a8;
+      --info-bg:#1b2140; --info-border:#48549b; --info-fg:#b3c0f5;
+      --tag-bg:#232a38; --diagram-bg:#151a24;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
+    line-height:1.75;font-size:16px;}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 80px}
+  header.hero{border-bottom:1px solid var(--border);padding:36px 0 26px;margin-bottom:28px}
+  h1{font-size:30px;line-height:1.35;margin:0 0 10px}
+  .subtitle{color:var(--fg-muted);font-size:16.5px;margin:0}
+  .meta{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--fg-muted);font-size:13.5px}
+  .tag{background:var(--tag-bg);border-radius:999px;padding:2px 12px;font-size:12.5px;color:var(--fg)}
+  time{font-size:13.5px}
+  .notice{background:var(--info-bg);border:1px solid var(--info-border);color:var(--info-fg);
+    border-radius:10px;padding:12px 16px;font-size:14px;margin:0 0 26px}
+  nav.toc{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 22px;margin-bottom:34px}
+  nav.toc b{font-size:14px;color:var(--fg-muted);letter-spacing:.05em}
+  nav.toc ol{margin:8px 0 0;padding-left:22px;columns:2;column-gap:36px}
+  nav.toc li{margin:3px 0;font-size:14.5px;break-inside:avoid}
+  nav.toc a{color:var(--accent);text-decoration:none}
+  nav.toc a:hover{text-decoration:underline}
+  section{margin-bottom:44px}
+  h2{font-size:22.5px;margin:0 0 14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+  h2 .no{color:var(--accent);font-family:Consolas,monospace;margin-right:8px}
+  h3{font-size:17.5px;margin:26px 0 8px}
+  p{margin:10px 0}
+  code{font-family:Consolas,"JetBrains Mono","Courier New",monospace;font-size:.92em;
+    background:var(--tag-bg);border-radius:4px;padding:1px 6px}
+  pre{background:var(--code-bg);color:var(--code-fg);border-radius:10px;padding:16px 18px;
+    overflow-x:auto;line-height:1.6;font-size:13.5px}
+  pre code{background:none;padding:0;color:inherit;font-size:inherit}
+  table{border-collapse:collapse;width:100%;margin:14px 0;background:var(--panel);
+    border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:14.5px}
+  th,td{border-bottom:1px solid var(--border);padding:9px 13px;text-align:left;vertical-align:top}
+  th{background:var(--accent-soft);font-weight:600}
+  tr:last-child td{border-bottom:none}
+  .callout{border-radius:10px;padding:13px 17px;margin:16px 0;font-size:14.8px;border:1px solid}
+  .callout b:first-child{display:block;margin-bottom:4px}
+  .warn{background:var(--warn-bg);border-color:var(--warn-border);color:var(--warn-fg)}
+  .key{background:var(--key-bg);border-color:var(--key-border);color:var(--key-fg)}
+  .info{background:var(--info-bg);border-color:var(--info-border);color:var(--info-fg)}
+  .figure{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:18px 14px 10px;margin:18px 0}
+  .figure figcaption{text-align:center;color:var(--fg-muted);font-size:13px;padding:8px 0 6px}
+  svg text{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  .d-box{fill:var(--panel);stroke:var(--border)}
+  .d-accent{fill:var(--accent-soft);stroke:var(--accent)}
+  .d-broker{stroke:var(--warn-border);fill:var(--warn-bg)}
+  .d-pool{stroke:var(--key-border);fill:var(--key-bg)}
+  .d-text{fill:var(--fg);font-size:13px}
+  .d-title{fill:var(--fg);font-size:13.5px;font-weight:700}
+  .d-muted{fill:var(--fg-muted);font-size:11.5px}
+  .d-arrow{stroke:var(--fg-muted);fill:none;marker-end:url(#arr)}
+  .d-arrow-acc{stroke:var(--accent);fill:none;marker-end:url(#arrAcc)}
+  .d-label{fill:var(--fg-muted);font-size:11px}
+  ul.tight li,ol.tight li{margin:6px 0}
+  .foot{color:var(--fg-muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px;margin-top:50px}
+  @media (max-width:760px){nav.toc ol{columns:1} .wrap{padding:20px 14px 60px} h1{font-size:25px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>分布式事件机制详解<br>—— Spring Cloud Stream 事件框架刨根问底</h1>
+  <p class="subtitle">一个把「跨服务发事件」伪装成「调本地方法」、把「收远程事件」伪装成「写普通 <code>@EventListener</code>」的内部框架，从加载、发送、Broker 拓扑、消费到线程模型与可靠性边界的源码级拆解。</p>
+  <div class="meta">
+    <span class="tag">Spring Cloud Stream</span>
+    <span class="tag">RabbitMQ</span>
+    <span class="tag">Spring Boot 3</span>
+    <span class="tag">fastjson</span>
+    <time datetime="2026-08-28">2026-08-28</time>
+  </div>
+</header>
+
+<div class="notice">📌 <b>去敏说明</b>：本文为对外分享版。公司 / 项目标识、真实包名与配置前缀（<code>com.xxx.*</code>、<code>event.*</code> 为占位）、应用名（<code>admin-service</code> / <code>web-service</code> 为占位）、人名与本机路径均已替换或移除；个别业务类名在保留可读性的前提下做了轻度改名。机制与代码逻辑均为原始内容。</div>
+
+<nav class="toc">
+  <b>目录</b>
+  <ol>
+    <li><a href="#s0">一句话本质</a></li>
+    <li><a href="#s1">包结构与加载方式</a></li>
+    <li><a href="#s2">事件模型：三个基类定乾坤</a></li>
+    <li><a href="#s3">发送链路</a></li>
+    <li><a href="#s4">中间层：Spring Cloud Stream 在替你做什么</a></li>
+    <li><a href="#s5">消费链路</a></li>
+    <li><a href="#s6">最“魔法”的一步：监听器迁移</a></li>
+    <li><a href="#s7">两条真实链路走读</a></li>
+    <li><a href="#s8">坑与边界</a></li>
+    <li><a href="#s9">附录：配置速查</a></li>
+  </ol>
+</nav>
+
+<!-- ================= 0 ================= -->
+<section id="s0">
+  <h2><span class="no">0</span>一句话本质</h2>
+  <p>它把「跨服务发事件」伪装成「调本地方法」，把「收远程事件」伪装成「写一个普通 Spring <code>@EventListener</code>」。中间靠 Spring Cloud Stream + RabbitMQ 搬运，靠启动时的一次反射「偷梁换柱」把两条路接通：</p>
+  <ul class="tight">
+    <li><b>发送方</b>只认识 <code>eventProducer.send(event)</code> 一个方法；</li>
+    <li><b>接收方</b>只写普通 <code>@EventListener</code>，感知不到事件来自本机还是另一台机器；</li>
+    <li><b>桥</b>是两条固定的 RabbitMQ 主题（组事件 / 广播事件），全平台所有业务事件都挤在这两条主题上，靠 JSON 里的类型字段区分。</li>
+  </ul>
+
+  <figure class="figure">
+    <svg viewBox="0 0 1180 600" role="img" aria-label="全链路架构图" style="width:100%;height:auto">
+      <defs>
+        <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+          <path d="M0,0 L8,4.5 L0,9 z" fill="context-stroke"/>
+        </marker>
+        <marker id="arrAcc" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+          <path d="M0,0 L8,4.5 L0,9 z" fill="#2563eb"/>
+        </marker>
+      </defs>
+      <style>
+        @media (prefers-color-scheme: dark){ #arrAcc path{fill:#6d9dff} }
+      </style>
+
+      <!-- 三大泳道标题 -->
+      <text x="160" y="28" class="d-title" text-anchor="middle">发送方进程（任意服务）</text>
+      <text x="590" y="28" class="d-title" text-anchor="middle">RabbitMQ</text>
+      <text x="1010" y="28" class="d-title" text-anchor="middle">消费方进程（每个服务都跑）</text>
+      <line x1="330" y1="16" x2="330" y2="580" stroke="var(--border)" stroke-dasharray="4 4"/>
+      <line x1="840" y1="16" x2="840" y2="580" stroke="var(--border)" stroke-dasharray="4 4"/>
+
+      <!-- 左列：发送链路 -->
+      <rect x="40" y="52" width="250" height="58" rx="9" class="d-box"/>
+      <text x="165" y="76" class="d-text" text-anchor="middle">业务代码</text>
+      <text x="165" y="96" class="d-muted" text-anchor="middle">eventProducer.send(event)</text>
+
+      <path d="M165 110 L165 138" class="d-arrow"/>
+      <text x="175" y="130" class="d-label">① instanceof 判断走哪条主题</text>
+
+      <rect x="40" y="140" width="250" height="76" rx="9" class="d-accent"/>
+      <text x="165" y="165" class="d-text" text-anchor="middle">EventProducer</text>
+      <text x="165" y="185" class="d-muted" text-anchor="middle">② fastjson 序列化（WriteClassName）</text>
+      <text x="165" y="203" class="d-muted" text-anchor="middle">JSON 带 "@type":"事件类全名"</text>
+
+      <path d="M165 216 L165 244" class="d-arrow"/>
+      <text x="175" y="236" class="d-label">失败 @Retryable ×3，耗尽后静默丢弃</text>
+
+      <rect x="40" y="246" width="250" height="58" rx="9" class="d-box"/>
+      <text x="165" y="270" class="d-text" text-anchor="middle">StreamBridge.send(topic, json)</text>
+      <text x="165" y="290" class="d-muted" text-anchor="middle">动态 destination，无需预声明</text>
+
+      <path d="M290 275 C 380 275, 380 110, 445 110" class="d-arrow"/>
+      <path d="M290 275 C 380 275, 380 400, 445 400" class="d-arrow"/>
+
+      <!-- 中列：broker -->
+      <text x="590" y="66" class="d-title" text-anchor="middle">exchange：groupEventTopic</text>
+      <rect x="450" y="78" width="280" height="40" rx="8" class="d-broker" stroke-width="1.2"/>
+      <text x="590" y="103" class="d-muted" text-anchor="middle">组事件：每服务一条持久化队列</text>
+
+      <path d="M590 118 L590 150" class="d-arrow"/>
+      <rect x="450" y="152" width="130" height="52" rx="7" class="d-box"/>
+      <text x="515" y="173" class="d-text" text-anchor="middle">groupEventTopic</text>
+      <text x="515" y="192" class="d-muted" text-anchor="middle">.admin-service</text>
+      <rect x="600" y="152" width="130" height="52" rx="7" class="d-box"/>
+      <text x="665" y="173" class="d-text" text-anchor="middle">groupEventTopic</text>
+      <text x="665" y="192" class="d-muted" text-anchor="middle">.web-service</text>
+      <text x="590" y="228" class="d-label" text-anchor="middle">同服务多实例共享队列 → 轮询，一条消息仅一个实例消费</text>
+
+      <text x="590" y="352" class="d-title" text-anchor="middle">exchange：broadcastEventTopic</text>
+      <rect x="450" y="364" width="280" height="40" rx="8" class="d-broker" stroke-width="1.2"/>
+      <text x="590" y="389" class="d-muted" text-anchor="middle">广播事件：每实例一条匿名独享队列</text>
+
+      <path d="M590 404 L590 432" class="d-arrow"/>
+      <rect x="450" y="434" width="84" height="44" rx="7" class="d-box"/>
+      <text x="492" y="453" class="d-muted" text-anchor="middle">匿名队列</text>
+      <text x="492" y="470" class="d-muted" text-anchor="middle">实例 A</text>
+      <rect x="548" y="434" width="84" height="44" rx="7" class="d-box"/>
+      <text x="590" y="453" class="d-muted" text-anchor="middle">匿名队列</text>
+      <text x="590" y="470" class="d-muted" text-anchor="middle">实例 B</text>
+      <rect x="646" y="434" width="84" height="44" rx="7" class="d-box"/>
+      <text x="688" y="453" class="d-muted" text-anchor="middle">匿名队列</text>
+      <text x="688" y="470" class="d-muted" text-anchor="middle">实例 C</text>
+      <text x="590" y="500" class="d-label" text-anchor="middle">auto-delete，实例下线即删；每实例都收到一份</text>
+
+      <!-- 右列：消费链路 -->
+      <path d="M730 178 C 790 178, 790 120, 860 120" class="d-arrow-acc"/>
+      <path d="M730 456 C 790 456, 790 120, 860 120" class="d-arrow-acc"/>
+
+      <rect x="862" y="94" width="280" height="52" rx="9" class="d-box"/>
+      <text x="1002" y="115" class="d-text" text-anchor="middle">groupEventConsumer / broadcastEventConsumer</text>
+      <text x="1002" y="135" class="d-muted" text-anchor="middle">Consumer&lt;String&gt; Bean，由 SCS 函数式绑定喂数据</text>
+
+      <path d="M1002 146 L1002 174" class="d-arrow-acc"/>
+
+      <rect x="862" y="176" width="280" height="96" rx="9" class="d-accent"/>
+      <text x="1002" y="199" class="d-text" text-anchor="middle">EventHandler.handle(json)</text>
+      <text x="1002" y="219" class="d-muted" text-anchor="middle">③ SupportAutoType 按 @type 还原事件对象</text>
+      <text x="1002" y="237" class="d-muted" text-anchor="middle">④ hasListeners：本进程无监听器则直接 ACK 丢弃</text>
+      <text x="1002" y="255" class="d-muted" text-anchor="middle">⑤ 可选 SpEL 表达式过滤（#event）</text>
+
+      <path d="M1002 272 L1002 300" class="d-arrow-acc"/>
+      <text x="1012" y="292" class="d-label">异常 @Retryable ×3 → 空 @Recover → ACK 丢弃</text>
+
+      <rect x="862" y="302" width="280" height="76" rx="9" class="d-pool"/>
+      <text x="1002" y="326" class="d-text" text-anchor="middle">EventMulticasterFacade</text>
+      <text x="1002" y="346" class="d-muted" text-anchor="middle">SimpleApplicationEventMulticaster + event- 线程池</text>
+      <text x="1002" y="364" class="d-muted" text-anchor="middle">core 5 / max 10 / queue 20，CallerRunsPolicy</text>
+
+      <path d="M1002 378 L1002 406" class="d-arrow-acc"/>
+
+      <rect x="862" y="408" width="280" height="88" rx="9" class="d-pool"/>
+      <text x="1002" y="432" class="d-text" text-anchor="middle">业务监听器（@EventListener / ApplicationListener）</text>
+      <text x="1002" y="452" class="d-muted" text-anchor="middle">启动时被 EventListenerProcessor 从默认多播器</text>
+      <text x="1002" y="470" class="d-muted" text-anchor="middle">“搬”到这里 —— 这是全机制最魔法的一步（§6）</text>
+      <text x="1002" y="488" class="d-muted" text-anchor="middle">监听器异常由 ErrorHandler 记日志，不影响 ACK</text>
+    </svg>
+    <figcaption>图 1 · 全链路总览：发送（左）→ RabbitMQ 拓扑（中）→ 消费与本地多播（右）</figcaption>
+  </figure>
+</section>
+
+<!-- ================= 1 ================= -->
+<section id="s1">
+  <h2><span class="no">1</span>包结构与加载方式</h2>
+  <p>框架分两层 jar，职责完全不同：</p>
+  <table>
+    <tr><th style="width:220px">包</th><th>职责</th></tr>
+    <tr>
+      <td><code>common-event</code><br><span class="d-muted" style="color:var(--fg-muted);font-size:12.5px">（业务公共依赖）</span></td>
+      <td><b>纯“事件契约包”</b>：只有十几个公共事件类（任务结束、图片上传、告警消息、SSE 消息…），外加一个 pom 依赖把框架引进来。存在的意义：<b>让发送方和消费方的 classpath 上有同一个事件类</b>（§3 讲序列化时你会看到这是硬要求）。</td>
+    </tr>
+    <tr>
+      <td><code>event-starter</code><br><span style="color:var(--fg-muted);font-size:12.5px">（机制本体）</span></td>
+      <td>一共 12 个类的迷你框架。依赖 <code>spring-cloud-stream</code> + rabbit/kafka 两个 binder + fastjson。通过两个注册文件进入 Spring：</td>
+    </tr>
+  </table>
+  <pre><code>META-INF/spring.factories
+  org.springframework.context.ApplicationContextInitializer = EventConfigInitializer
+      ↑ 在容器刷新【之前】把一批绑定属性塞进 Environment（§4.2）
+
+META-INF/spring/.../AutoConfiguration.imports
+  com.xxx.event.EventConfiguration
+      ↑ 自动配置类：提供 EventProducer / EventHandler / 两个 Consumer Bean（§5）</code></pre>
+  <p>时序上：<b>EventConfigInitializer（最早）→ Spring Boot 自动配置加载 EventConfiguration → EventListenerProcessor 收尾搬家（容器刷新末尾）</b>。三个钩子各干一件事，下面逐个拆。</p>
+</section>
+
+<!-- ================= 2 ================= -->
+<section id="s2">
+  <h2><span class="no">2</span>事件模型：三个基类定乾坤</h2>
+
+  <figure class="figure">
+    <svg viewBox="0 0 1140 360" role="img" aria-label="事件继承体系" style="width:100%;height:auto">
+      <rect x="440" y="20" width="260" height="52" rx="9" class="d-box"/>
+      <text x="570" y="41" class="d-text" text-anchor="middle">ApplicationEvent（Spring 原生）</text>
+      <text x="570" y="60" class="d-muted" text-anchor="middle">getTimestamp() 为 final —— 事件字段别叫 timestamp</text>
+
+      <path d="M570 72 L570 100" class="d-arrow"/>
+      <rect x="440" y="102" width="260" height="46" rx="9" class="d-accent"/>
+      <text x="570" y="123" class="d-text" text-anchor="middle">AbstractEvent（框架事件根）</text>
+      <text x="570" y="141" class="d-muted" text-anchor="middle">无业务字段，仅作“身份标记”</text>
+
+      <path d="M520 148 L320 190" class="d-arrow"/>
+      <path d="M620 148 L820 190" class="d-arrow"/>
+      <rect x="180" y="192" width="280" height="66" rx="9" class="d-pool"/>
+      <text x="320" y="214" class="d-text" text-anchor="middle">GroupEvent —— 分布式 · 组事件</text>
+      <text x="320" y="233" class="d-muted" text-anchor="middle">每服务一份；服务内多实例竞争消费</text>
+      <text x="320" y="250" class="d-muted" text-anchor="middle">例：MissionFinishedEvent / AlarmMessageEvent</text>
+
+      <rect x="680" y="192" width="280" height="66" rx="9" class="d-pool"/>
+      <text x="820" y="214" class="d-text" text-anchor="middle">BroadcastEvent —— 分布式 · 广播事件</text>
+      <text x="820" y="233" class="d-muted" text-anchor="middle">每个实例都收到一份</text>
+      <text x="820" y="250" class="d-muted" text-anchor="middle">例：SseMessageEvent / AiChatEvent</text>
+
+      <path d="M460 60 L160 60 L160 300 L320 300 L320 258" class="d-arrow"/>
+      <rect x="40" y="302" width="560" height="40" rx="9" class="d-box"/>
+      <text x="320" y="327" class="d-muted" text-anchor="middle">直接继承 ApplicationEvent 的事件 = 纯进程内本地事件，publishEvent() 同步分发，与分布式机制无关</text>
+    </svg>
+    <figcaption>图 2 · 事件继承体系：选哪个基类，就选了哪种事件语义</figcaption>
+  </figure>
+
+  <div class="callout key"><b>分水岭规则（全文最重要的一句话）</b>
+  继承 <code>AbstractEvent</code>（经 Group/Broadcast）→ 走分布式，<b>只能</b>用 <code>eventProducer.send()</code> 发；直接继承 <code>ApplicationEvent</code> → 纯本地，用 <code>applicationEventPublisher.publishEvent()</code> 发。两套发送口不能混用——混用的后果是事件<b>无声落空</b>（原因见 §6）。</div>
+
+  <table>
+    <tr><th>事件</th><th>基类</th><th>语义</th></tr>
+    <tr><td>MissionFinishedEvent、MissionImageUploadedEvent、AlarmMessageEvent、DeviceBindSiteEvent…</td><td><code>GroupEvent</code></td><td>跨服务，组内竞争消费</td></tr>
+    <tr><td>SseMessageEvent、AiChatEvent</td><td><code>BroadcastEvent</code></td><td>跨服务，全实例广播</td></tr>
+    <tr><td>DockFireAlarmEvent、SceneViewUpdateEvent、DrawGroupCreateEvent…</td><td><code>ApplicationEvent</code></td><td><b>纯进程内</b>，不走 MQ</td></tr>
+  </table>
+</section>
+
+<!-- ================= 3 ================= -->
+<section id="s3">
+  <h2><span class="no">3</span>发送链路：<code>eventProducer.send(event)</code> 之后发生了什么</h2>
+  <pre><code>// EventProducer.java（骨架，逻辑完整保留）
+@Retryable(value = {EventProduceException.class},
+           maxAttemptsExpression = "${event.retry.maxAttempts:3}",
+           backoff = @Backoff(delayExpression = "${event.retry.delay:1000}"))
+public void send(AbstractEvent event) {
+    try {
+        String topic = (event instanceof GroupEvent)
+            ? eventProperties.getGroupEventTopic()        // 默认 "groupEventTopic"
+            : eventProperties.getBroadcastEventTopic();   // 默认 "broadcastEventTopic"
+        String json = JSON.toJSONString(event, SerializerFeature.WriteClassName);
+        streamBridge.send(topic, json);                   // ← 唯一出口
+        log.info("事件发送，主题：{}，事件：{}", topic, json);
+    } catch (Exception e) {
+        log.error("事件发送：{}", event, e);
+        throw new EventProduceException(e);               // 触发上面的重试
+    }
+}
+
+@Recover                                          // 重试耗尽后进入这里
+public void recover(EventProduceException e, AbstractEvent event) {
+    // 空方法：事件被静默丢弃，调用方不会收到任何异常
+}</code></pre>
+
+  <h3>① 路由规则就是“看爹”</h3>
+  <p><code>instanceof GroupEvent</code> → 组主题；<code>instanceof BroadcastEvent</code> → 广播主题。整个平台<b>只有这两条主题</b>，所有业务事件挤在一起，靠 JSON 里的类型字段区分——这就是源码注释里“下游订阅方按 @type 区分”的含义。</p>
+
+  <h3>② 序列化：<code>WriteClassName</code> 与 <code>@type</code></h3>
+  <p>fastjson 的 <code>WriteClassName</code> 会在 JSON 里写入 <code>"@type":"com.xxx.event.MissionFinishedEvent"</code>，消费端靠它还原具体类型。两条硬约束：</p>
+  <ul class="tight">
+    <li><b>消费方 classpath 必须有同名同类路径的事件类</b>——公共事件放契约包，模块私有事件放双方都依赖的公共业务模块；</li>
+    <li>消费端用的是 fastjson <code>SupportAutoType</code>（按类型名实例化对象），依赖其白名单机制，有历史安全包袱。</li>
+  </ul>
+
+  <h3>③ StreamBridge：运行时动态发送</h3>
+  <p><code>StreamBridge.send(topic, json)</code> 是 Spring Cloud Stream 3.x 的动态发送入口：第一个参数当 destination，现场建一条到 binder 的通道，<b>不需要预声明任何输出绑定</b>。（框架里预配置的 <code>groupEventProducer-out-0.*</code> 属性实际是摆设，发送路径不经过它。）</p>
+
+  <div class="callout warn"><b>可靠性账本（发送侧）</b>
+  失败 → 重试 3 次（间隔 1s）→ 全部失败进入<b>空的</b> <code>@Recover</code> → 方法正常返回。<b>调用方完全无感知，事件凭空消失</b>，唯一线索是 catch 块里的 error 日志。</div>
+</section>
+
+<!-- ================= 4 ================= -->
+<section id="s4">
+  <h2><span class="no">4</span>中间层：Spring Cloud Stream 到底在替你做什么</h2>
+  <p>先把 Spring Cloud Stream（SCS）这个最让人迷糊的点讲透：<b>SCS 是消息中间件适配层</b>。你的代码面对“绑定名 / destination / 消费者组”这套抽象，底下由 binder（rabbit binder 或 kafka binder）翻译成具体中间件的操作。框架只用了 SCS 三个能力：</p>
+
+  <h3>4.1 函数式消费绑定</h3>
+  <pre><code>@Bean public Consumer&lt;String&gt; groupEventConsumer(EventHandler h)     { return h::handle; }
+@Bean public Consumer&lt;String&gt; broadcastEventConsumer(EventHandler h) { return h::handle; }</code></pre>
+  <p>SCS 规则：<code>spring.cloud.function.definition</code> 里登记的函数 Bean 自动创建输入绑定，绑定名是 <code>BeanName-in-0</code>（如 <code>groupEventConsumer-in-0</code>），之后从 broker 拉消息喂给这个函数。业务代码里<b>一行绑定配置都不用写</b>。</p>
+
+  <h3>4.2 EventConfigInitializer —— 一切绑定的出生地</h3>
+  <p>它在<b>容器刷新前</b>运行，往 Environment 最前面插一个属性源，等价于替你写下这些配置（每行都是源码原意）：</p>
+  <pre><code>spring.cloud.function.definition = groupEventConsumer;broadcastEventConsumer
+    # 强行插到定义最前，且会保留用户已有的函数定义
+
+# —— 组事件 ——
+spring.cloud.stream.bindings.groupEventConsumer-in-0.destination = groupEventTopic
+spring.cloud.stream.bindings.groupEventConsumer-in-0.group = ${event.group-name:${spring.application.name}}   # ← 关键！
+
+# —— 广播事件 ——
+spring.cloud.stream.bindings.broadcastEventConsumer-in-0.destination = broadcastEventTopic
+# ↑ 注意：广播的 in-0【没有设 group】—— 这就是广播的全部实现手法
+
+spring.cloud.stream.binders.rabbit.type = rabbit     # binder 类型钉死为 RabbitMQ</code></pre>
+
+  <h3>4.3 Group 与 Broadcast 的语义差异 = 两行配置的差别</h3>
+  <p>落到 RabbitMQ 上是两种队列拓扑：</p>
+  <table>
+    <tr><th style="width:110px"></th><th>Group 事件（组 = 应用名）</th><th>Broadcast 事件（不设组）</th></tr>
+    <tr><td><b>队列</b></td><td>每服务一条<b>持久化队列</b>，名为 <code>groupEventTopic.应用名</code>，绑到 exchange</td><td>每实例一条<b>匿名、独享、auto-delete</b> 队列</td></tr>
+    <tr><td><b>投递</b></td><td>同组实例共享队列 → Rabbit 轮询 → <b>一条消息只被一个实例消费</b>（服务内负载均衡）</td><td>每实例自己的队列各得一份 → <b>所有实例都收到</b>；实例下线队列自动删除</td></tr>
+    <tr><td><b>跨服务</b></td><td>不同服务组名不同 → 各有一条队列 → <b>各得一份</b>。准确表述：“每服务一份，服务内竞争”</td><td>天然全量</td></tr>
+    <tr><td><b>适用</b></td><td>业务处理（告警入库、任务状态机流转）</td><td>实例本地持有状态时的推送（SSE 长连接、本地缓存刷新）</td></tr>
+  </table>
+
+  <div class="callout info"><b>一个仓库里看不到的环节</b>
+  starter 同时依赖 rabbit 和 kafka 两个 binder；多 binder 共存时 SCS 需要 <code>spring.cloud.stream.default-binder</code> 才能确定路由。这类开关在配置中心里（本仓库的本地配置文件只有应用名）。从平台侧证（web 服务还有裸 <code>@RabbitListener</code> 的旁路消费者）看，事件链路跑在 <b>RabbitMQ</b> 上。</div>
+</section>
+
+<!-- ================= 5 ================= -->
+<section id="s5">
+  <h2><span class="no">5</span>消费链路：消息如何“变回”本地事件</h2>
+  <p>Rabbit listener 线程收到消息后，依次经过四站（对应图 1 右列）：</p>
+
+  <pre><code>// EventHandler.handle(json)（骨架）
+@Retryable(value = {EventConsumeException.class}, maxAttemptsExpression = "...:3", ...)
+public void handle(String message) {
+    try {
+        AbstractEvent event = JSON.parseObject(message, AbstractEvent.class, Feature.SupportAutoType);
+        if (!this.hasListeners(event)) return;          // 本进程无监听器 → 直接 ACK 丢弃
+        String el = (event instanceof GroupEvent)
+            ? eventProperties.getGroupEventConsumeExpression()      // 可选 SpEL，根变量 #event
+            : eventProperties.getBroadcastEventConsumeExpression();
+        if (!this.matchesExpression(el, event)) return; // 不匹配 → 丢弃
+        eventMulticasterFacade.publishEvent(event);     // → 本地异步多播
+    } catch (JSONException e1) {
+        // 脏消息：无声放过（连日志都没有）
+    } catch (Exception e) {
+        log.error("事件处理：{}", message, e);
+        throw new EventConsumeException(e);             // 触发重试
+    }
+}
+@Recover public void recover(EventConsumeException e, String message) { /* 空：重试耗尽后 ACK 丢弃 */ }</code></pre>
+
+  <h3>① SpEL 过滤：实例级开关</h3>
+  <p>配置了 <code>group-event-consume-expression</code>（如 <code>#event.level == 'HIGH'</code>）就在派发前求值，不匹配即丢；没配则全放行。可以用来做“某些实例只处理某类事件”的灰度。</p>
+
+  <h3>② hasListeners：快速跳过</h3>
+  <p>启动时登记的“本进程监听了哪些事件类”列表里找不到（含子类型匹配）就立刻返回，消息被 ACK 丢弃——这是全平台事件挤两条主题还不至于拖垮每个消费者的第一道闸。</p>
+
+  <h3>③ 线程模型：两段式</h3>
+  <ul class="tight">
+    <li><b>Rabbit listener 容器线程</b>只干“反序列化 + 提交多播”，干完立刻返回去拉下一条；</li>
+    <li><b>业务监听器</b>在框架自定义线程池里跑：<code>event-</code> 前缀，默认 core 5 / max 10 / queue 20，<code>CallerRunsPolicy</code>——池满时退化为 listener 线程自己执行，形成天然背压；</li>
+    <li>监听器抛异常由 <code>EventErrorHandler</code> 接住，<b>只打日志</b>，不影响 ACK。</li>
+  </ul>
+
+  <div class="callout warn"><b>可靠性账本（消费侧）</b>
+  消费失败 → 重试 3 次（同一条消息、同一个线程内）→ 进入<b>空的</b> <code>@Recover</code> → 方法正常返回 → binder 认为消费成功 → <b>消息 ACK 掉。没有死信、没有落库、没有告警</b>。JSONException（反序列化失败）更是被单独 catch 后无声放过。</div>
+</section>
+
+<!-- ================= 6 ================= -->
+<section id="s6">
+  <h2><span class="no">6</span>最“魔法”的一步：为什么写 <code>@EventListener</code> 就能收到远程事件</h2>
+  <p><code>EventListenerProcessor</code>（实现 <code>SmartInitializingSingleton</code>，在所有单例实例化完、容器刷新收尾时执行）干了四件事：</p>
+  <ol class="tight">
+    <li>拿到 Spring <b>默认</b>的 <code>ApplicationEventMulticaster</code>（就是正常 <code>publishEvent()</code> 用的那个）；</li>
+    <li>用<b>反射调它的私有方法</b> <code>getApplicationListeners()</code>，枚举出全部监听器；</li>
+    <li>逐个解析它监听的事件类型：<code>@EventListener</code> 方法 → 反射读 <code>ApplicationListenerMethodAdapter</code> 的私有字段 <code>declaredEventTypes</code>；<code>ApplicationListener&lt;T&gt;</code> 接口 → 解析泛型；</li>
+    <li><b>只要事件类型是 <code>AbstractEvent</code> 的子类，就把该监听器从默认多播器上摘除，挂到框架自定义多播器上</b>；其余监听器原地不动。</li>
+  </ol>
+  <p>于是形成严格分水岭：</p>
+  <table>
+    <tr><th style="width:170px"></th><th>分布式事件（Group / Broadcast 子类）</th><th>本地事件（直接继承 ApplicationEvent）</th></tr>
+    <tr><td><b>监听器挂在哪</b></td><td>仅框架自定义多播器</td><td>仅 Spring 默认多播器</td></tr>
+    <tr><td><b>到达路径</b></td><td>MQ → EventHandler → 自定义多播器（异步）</td><td><code>publishEvent()</code> → 默认多播器（同步）</td></tr>
+    <tr><td><b>用错的后果</b></td><td colspan="2" style="color:var(--warn-fg)">对分布式事件调 <code>publishEvent()</code>：走默认多播器，但监听器已被摘走 → <b>事件无声落空</b>；对本地事件调 <code>send()</code>：类型不对 / 白跑一趟 broker</td></tr>
+  </table>
+
+  <div class="callout key"><b>三个推论</b>
+  ① 分布式 <code>@EventListener</code> <b>永远异步</b>（线程池执行）；② 哪怕同进程自己发给自己，也<b>至少绕 broker 一圈</b>，且发送实例不一定是消费实例（组内轮询）；③ 写成 <code>ApplicationListener&lt;GroupEvent&gt;</code>（监听基类）会收到<b>所有</b>组事件，需自行按类型分发——业务侧的 MissionEventDispatcher 正是这么做的策略分发器。</div>
+</section>
+
+<!-- ================= 7 ================= -->
+<section id="s7">
+  <h2><span class="no">7</span>两条真实链路走读</h2>
+
+  <h3>链路 A · Group 事件：跨服务业务协作</h3>
+  <ol class="tight">
+    <li>admin 服务改设备绑定关系 → <code>eventProducer.send(new DeviceBindSiteEvent(...))</code>；</li>
+    <li>→ <code>groupEventTopic</code> exchange → 路由到持久化队列 <code>groupEventTopic.admin-service</code>（同服务多实例轮询，单实例消费）；</li>
+    <li>→ <code>MissionEventDispatcher</code>（<code>ApplicationListener&lt;GroupEvent&gt;</code>，收到<b>所有</b>组事件）按 <code>getClass()</code> 精确匹配 handlerMap；</li>
+    <li>→ 命中的策略 handler 执行（清理周期任务、调度任务等）。未注册的事件类型打 debug 日志跳过。</li>
+  </ol>
+  <p>另一个典型：<code>MissionImageUploadedEvent</code>（图片回传）被 <b>两个</b> handler 同时注册——“一个事件多订阅者”的常规实现方式。</p>
+
+  <h3>链路 B · Broadcast 事件：为什么必须广播</h3>
+  <ol class="tight">
+    <li>AI 识别流水线产出对话/告警 → <code>send(AiChatEvent)</code>（Broadcast）；</li>
+    <li>→ <code>broadcastEventTopic</code> exchange → <b>每个</b> web 服务实例的匿名队列各得一份；</li>
+    <li>→ 各实例的 <code>@EventListener</code> 各自查<b>自己手上</b>有没有该用户的 SSE 长连接，有就推送。</li>
+  </ol>
+  <p>用广播的原因：SSE 长连接可能连在任意实例上，负载均衡会把同一用户的请求打到不同机器。只有“每个实例都收到、各自查本地连接表”才能保证送达——<b>这正是广播事件的存在意义：消费的是实例本地状态</b>。</p>
+  <p>顺带一提该平台的另一条旁路：web 服务还有一个裸 <code>@RabbitListener</code> 的前端消息消费者，收到消息后再转成 <code>AiChatEvent</code> 走事件框架广播出去——两套机制在同一进程里接力。</p>
+</section>
+
+<!-- ================= 8 ================= -->
+<section id="s8">
+  <h2><span class="no">8</span>坑与边界</h2>
+  <table>
+    <tr><th style="width:36px">#</th><th style="width:170px">坑</th><th>说明</th></tr>
+    <tr><td>1</td><td><b>尽力而为的可靠性</b></td><td>发送端、消费端都是“重试 3 次后空 @Recover 吞掉”。没有死信、没有补偿、调用方无感知。排障只能搜日志关键字（事件发送 / 事件处理）。</td></tr>
+    <tr><td>2</td><td><b>顺序无保证</b></td><td>派发进线程池后乱序执行；组事件在服务多实例间轮询，跨实例也无序。</td></tr>
+    <tr><td>3</td><td><b>单点汇聚</b></td><td>全平台两类事件各挤一条主题。hasListeners 能挡掉无关消费，但监听基类的监听器每条组事件都会进。</td></tr>
+    <tr><td>4</td><td><b>组名 = 应用名</b></td><td>服务改名会让新旧实例分属两个组、事件各消费一份——发版改名要小心。想让两个服务都收到组事件，靠的正是它们应用名不同。</td></tr>
+    <tr><td>5</td><td><b>autoType 既是协议又是风险</b></td><td>事件类的包名是协议的一部分，重命名/挪包会让对端反序列化失败，且以 JSONException 被静默吞掉。</td></tr>
+    <tr><td>6</td><td><b>本地通信也依赖 broker</b></td><td>没有本地短路，自己发给自己也过 MQ；MQ 抖动时同进程通信同样受影响。</td></tr>
+    <tr><td>7</td><td><b>线程池默认偏小</b></td><td>core 5 / max 10 / queue 20，饱和后退化为 listener 线程执行（背压生效，但吞吐受限），需按消费能力调参。</td></tr>
+  </table>
+</section>
+
+<!-- ================= 9 ================= -->
+<section id="s9">
+  <h2><span class="no">9</span>附录：配置速查</h2>
+  <table>
+    <tr><th style="width:420px">配置项</th><th style="width:130px">默认值</th><th>作用</th></tr>
+    <tr><td><code>event.group-event-topic</code></td><td>groupEventTopic</td><td>组事件主题（destination）</td></tr>
+    <tr><td><code>event.broadcast-event-topic</code></td><td>broadcastEventTopic</td><td>广播事件主题（destination）</td></tr>
+    <tr><td><code>event.group-name</code></td><td>spring.application.name</td><td>组事件的消费组名 → 决定 Rabbit 队列名与竞争范围</td></tr>
+    <tr><td><code>event.group-event-consume-expression</code></td><td>（空）</td><td>组事件 SpEL 过滤，根变量 <code>#event</code>，不匹配即丢弃</td></tr>
+    <tr><td><code>event.broadcast-event-consume-expression</code></td><td>（空）</td><td>广播事件 SpEL 过滤，同上</td></tr>
+    <tr><td><code>event.core-pool-size / max-pool-size / queue-capacity</code></td><td>5 / 10 / 20</td><td>监听器执行线程池</td></tr>
+    <tr><td><code>event.retry.maxAttempts / retry.delay</code></td><td>3 / 1000</td><td>发送与消费共用一套重试参数</td></tr>
+  </table>
+
+  <h3>开发者速记</h3>
+  <pre><code>// 发（分布式）—— 继承 GroupEvent 或 BroadcastEvent
+@Autowired EventProducer eventProducer;
+eventProducer.send(new MissionFinishedEvent(missionId));
+
+// 收（分布式）—— 就写普通 @EventListener，别用 publishEvent 发这类事件
+@EventListener
+public void onFinished(MissionFinishedEvent event) { ... }
+
+// 发（纯本地）—— 直接继承 ApplicationEvent
+applicationEventPublisher.publishEvent(new SceneViewUpdateEvent(...));</code></pre>
+
+  <p class="foot">机制剖析基于 event-starter 3.0.x 源码（12 个类全部走读）与业务平台三个模块的实际使用代码核对。文档为去敏分享版，类名 / 包名 / 应用名经过替换，机制描述与源码逐行对应。</p>
+</section>
+
+</div>
+</body>
+</html>

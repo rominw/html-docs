@@ -1,5 +1,11 @@
 [
   {
+    "title": "分布式事件机制详解：Spring Cloud Stream 事件框架刨根问底",
+    "description": "一个基于 Spring Cloud Stream 封装的内部分布式事件框架的源码级深度剖析：发送链路、Rabbit 拓扑、消费链路、监听器迁移魔法与可靠性边界。",
+    "date": "2026-08-28",
+    "url": "documents/distributed-event-mechanism-deep-dive.html"
+  },
+  {
     "title": "Goose Agent 架构设计与内核深度解析",
     "description": "基于 Block 开源 Goose（v1.45.0）源码的架构深度解析：分层架构、状态机内核与 14 个 Operation、StateEffect 副作用、MCP 扩展系统、三层安全防护、Provider 抽象、上下文压缩与二开切入点。",
     "date": "2026-08-10",
