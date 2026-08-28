@@ -100,8 +100,6 @@
   </div>
 </header>
 
-<div class="notice">📌 <b>去敏说明</b>：本文为对外分享版。公司 / 项目标识、真实包名与配置前缀（<code>com.xxx.*</code>、<code>event.*</code> 为占位）、应用名（<code>admin-service</code> / <code>web-service</code> 为占位）、人名与本机路径均已替换或移除；个别业务类名在保留可读性的前提下做了轻度改名。机制与代码逻辑均为原始内容。</div>
-
 <nav class="toc">
   <b>目录</b>
   <ol>
@@ -246,7 +244,7 @@
     <tr><th style="width:220px">包</th><th>职责</th></tr>
     <tr>
       <td><code>common-event</code><br><span class="d-muted" style="color:var(--fg-muted);font-size:12.5px">（业务公共依赖）</span></td>
-      <td><b>纯“事件契约包”</b>：只有十几个公共事件类（任务结束、图片上传、告警消息、SSE 消息…），外加一个 pom 依赖把框架引进来。存在的意义：<b>让发送方和消费方的 classpath 上有同一个事件类</b>（§3 讲序列化时你会看到这是硬要求）。</td>
+      <td><b>纯“事件契约包”</b>：只有十几个公共事件类（状态变更、消息通知、实时推送等…），外加一个 pom 依赖把框架引进来。存在的意义：<b>让发送方和消费方的 classpath 上有同一个事件类</b>（§3 讲序列化时你会看到这是硬要求）。</td>
     </tr>
     <tr>
       <td><code>event-starter</code><br><span style="color:var(--fg-muted);font-size:12.5px">（机制本体）</span></td>
@@ -283,12 +281,12 @@ META-INF/spring/.../AutoConfiguration.imports
       <rect x="180" y="192" width="280" height="66" rx="9" class="d-pool"/>
       <text x="320" y="214" class="d-text" text-anchor="middle">GroupEvent —— 分布式 · 组事件</text>
       <text x="320" y="233" class="d-muted" text-anchor="middle">每服务一份；服务内多实例竞争消费</text>
-      <text x="320" y="250" class="d-muted" text-anchor="middle">例：MissionFinishedEvent / AlarmMessageEvent</text>
+      <text x="320" y="250" class="d-muted" text-anchor="middle">例：OrderFinishedEvent / NoticeMessageEvent</text>
 
       <rect x="680" y="192" width="280" height="66" rx="9" class="d-pool"/>
       <text x="820" y="214" class="d-text" text-anchor="middle">BroadcastEvent —— 分布式 · 广播事件</text>
       <text x="820" y="233" class="d-muted" text-anchor="middle">每个实例都收到一份</text>
-      <text x="820" y="250" class="d-muted" text-anchor="middle">例：SseMessageEvent / AiChatEvent</text>
+      <text x="820" y="250" class="d-muted" text-anchor="middle">例：PushMessageEvent</text>
 
       <path d="M460 60 L160 60 L160 300 L320 300 L320 258" class="d-arrow"/>
       <rect x="40" y="302" width="560" height="40" rx="9" class="d-box"/>
@@ -302,9 +300,9 @@ META-INF/spring/.../AutoConfiguration.imports
 
   <table>
     <tr><th>事件</th><th>基类</th><th>语义</th></tr>
-    <tr><td>MissionFinishedEvent、MissionImageUploadedEvent、AlarmMessageEvent、DeviceBindSiteEvent…</td><td><code>GroupEvent</code></td><td>跨服务，组内竞争消费</td></tr>
-    <tr><td>SseMessageEvent、AiChatEvent</td><td><code>BroadcastEvent</code></td><td>跨服务，全实例广播</td></tr>
-    <tr><td>DockFireAlarmEvent、SceneViewUpdateEvent、DrawGroupCreateEvent…</td><td><code>ApplicationEvent</code></td><td><b>纯进程内</b>，不走 MQ</td></tr>
+    <tr><td>OrderFinishedEvent、OrderPaidEvent、NoticeMessageEvent、BindingChangedEvent…</td><td><code>GroupEvent</code></td><td>跨服务，组内竞争消费</td></tr>
+    <tr><td>PushMessageEvent</td><td><code>BroadcastEvent</code></td><td>跨服务，全实例广播</td></tr>
+    <tr><td>ConfigChangedEvent、ViewRefreshEvent、StatsUpdatedEvent…</td><td><code>ApplicationEvent</code></td><td><b>纯进程内</b>，不走 MQ</td></tr>
   </table>
 </section>
 
@@ -338,7 +336,7 @@ public void recover(EventProduceException e, AbstractEvent event) {
   <p><code>instanceof GroupEvent</code> → 组主题；<code>instanceof BroadcastEvent</code> → 广播主题。整个平台<b>只有这两条主题</b>，所有业务事件挤在一起，靠 JSON 里的类型字段区分——这就是源码注释里“下游订阅方按 @type 区分”的含义。</p>
 
   <h3>② 序列化：<code>WriteClassName</code> 与 <code>@type</code></h3>
-  <p>fastjson 的 <code>WriteClassName</code> 会在 JSON 里写入 <code>"@type":"com.xxx.event.MissionFinishedEvent"</code>，消费端靠它还原具体类型。两条硬约束：</p>
+  <p>fastjson 的 <code>WriteClassName</code> 会在 JSON 里写入 <code>"@type":"com.xxx.event.OrderFinishedEvent"</code>，消费端靠它还原具体类型。两条硬约束：</p>
   <ul class="tight">
     <li><b>消费方 classpath 必须有同名同类路径的事件类</b>——公共事件放契约包，模块私有事件放双方都依赖的公共业务模块；</li>
     <li>消费端用的是 fastjson <code>SupportAutoType</code>（按类型名实例化对象），依赖其白名单机制，有历史安全包袱。</li>
@@ -383,7 +381,7 @@ spring.cloud.stream.binders.rabbit.type = rabbit     # binder 类型钉死为 Ra
     <tr><td><b>队列</b></td><td>每服务一条<b>持久化队列</b>，名为 <code>groupEventTopic.应用名</code>，绑到 exchange</td><td>每实例一条<b>匿名、独享、auto-delete</b> 队列</td></tr>
     <tr><td><b>投递</b></td><td>同组实例共享队列 → Rabbit 轮询 → <b>一条消息只被一个实例消费</b>（服务内负载均衡）</td><td>每实例自己的队列各得一份 → <b>所有实例都收到</b>；实例下线队列自动删除</td></tr>
     <tr><td><b>跨服务</b></td><td>不同服务组名不同 → 各有一条队列 → <b>各得一份</b>。准确表述：“每服务一份，服务内竞争”</td><td>天然全量</td></tr>
-    <tr><td><b>适用</b></td><td>业务处理（告警入库、任务状态机流转）</td><td>实例本地持有状态时的推送（SSE 长连接、本地缓存刷新）</td></tr>
+    <tr><td><b>适用</b></td><td>业务处理（数据落库、状态机流转）</td><td>实例本地持有状态时的推送（SSE 长连接、本地缓存刷新）</td></tr>
   </table>
 
   <div class="callout info"><b>一个仓库里看不到的环节</b>
@@ -451,7 +449,7 @@ public void handle(String message) {
   </table>
 
   <div class="callout key"><b>三个推论</b>
-  ① 分布式 <code>@EventListener</code> <b>永远异步</b>（线程池执行）；② 哪怕同进程自己发给自己，也<b>至少绕 broker 一圈</b>，且发送实例不一定是消费实例（组内轮询）；③ 写成 <code>ApplicationListener&lt;GroupEvent&gt;</code>（监听基类）会收到<b>所有</b>组事件，需自行按类型分发——业务侧的 MissionEventDispatcher 正是这么做的策略分发器。</div>
+  ① 分布式 <code>@EventListener</code> <b>永远异步</b>（线程池执行）；② 哪怕同进程自己发给自己，也<b>至少绕 broker 一圈</b>，且发送实例不一定是消费实例（组内轮询）；③ 写成 <code>ApplicationListener&lt;GroupEvent&gt;</code>（监听基类）会收到<b>所有</b>组事件，需自行按类型分发——业务侧普遍用「分发器 + 策略 handler 表」来承接（见 §7 链路 A）。</div>
 </section>
 
 <!-- ================= 7 ================= -->
@@ -460,21 +458,21 @@ public void handle(String message) {
 
   <h3>链路 A · Group 事件：跨服务业务协作</h3>
   <ol class="tight">
-    <li>admin 服务改设备绑定关系 → <code>eventProducer.send(new DeviceBindSiteEvent(...))</code>；</li>
+    <li>admin 服务处理一次绑定关系变更 → <code>eventProducer.send(new BindingChangedEvent(...))</code>；</li>
     <li>→ <code>groupEventTopic</code> exchange → 路由到持久化队列 <code>groupEventTopic.admin-service</code>（同服务多实例轮询，单实例消费）；</li>
-    <li>→ <code>MissionEventDispatcher</code>（<code>ApplicationListener&lt;GroupEvent&gt;</code>，收到<b>所有</b>组事件）按 <code>getClass()</code> 精确匹配 handlerMap；</li>
-    <li>→ 命中的策略 handler 执行（清理周期任务、调度任务等）。未注册的事件类型打 debug 日志跳过。</li>
+    <li>→ 事件分发器 <code>BizEventDispatcher</code>（<code>ApplicationListener&lt;GroupEvent&gt;</code>，收到<b>所有</b>组事件）按 <code>getClass()</code> 精确匹配 handlerMap；</li>
+    <li>→ 命中的策略 handler 执行（清理关联的周期任务与派生数据）。未注册的事件类型打 debug 日志跳过。</li>
   </ol>
-  <p>另一个典型：<code>MissionImageUploadedEvent</code>（图片回传）被 <b>两个</b> handler 同时注册——“一个事件多订阅者”的常规实现方式。</p>
+  <p>另一个典型：<code>OrderPaidEvent</code>（支付完成）被 <b>两个</b> handler 同时注册（开票、积分）——“一个事件多订阅者”的常规实现方式。</p>
 
   <h3>链路 B · Broadcast 事件：为什么必须广播</h3>
   <ol class="tight">
-    <li>AI 识别流水线产出对话/告警 → <code>send(AiChatEvent)</code>（Broadcast）；</li>
+    <li>某个业务服务为在线用户产出一条实时消息 → <code>send(PushMessageEvent)</code>（Broadcast）；</li>
     <li>→ <code>broadcastEventTopic</code> exchange → <b>每个</b> web 服务实例的匿名队列各得一份；</li>
     <li>→ 各实例的 <code>@EventListener</code> 各自查<b>自己手上</b>有没有该用户的 SSE 长连接，有就推送。</li>
   </ol>
   <p>用广播的原因：SSE 长连接可能连在任意实例上，负载均衡会把同一用户的请求打到不同机器。只有“每个实例都收到、各自查本地连接表”才能保证送达——<b>这正是广播事件的存在意义：消费的是实例本地状态</b>。</p>
-  <p>顺带一提该平台的另一条旁路：web 服务还有一个裸 <code>@RabbitListener</code> 的前端消息消费者，收到消息后再转成 <code>AiChatEvent</code> 走事件框架广播出去——两套机制在同一进程里接力。</p>
+  <p>顺带一提该平台的另一条旁路：web 服务还有一个裸 <code>@RabbitListener</code> 的前端消息消费者，收到消息后再转成广播事件走事件框架分发出去——两套机制在同一进程里接力。</p>
 </section>
 
 <!-- ================= 8 ================= -->
@@ -509,16 +507,16 @@ public void handle(String message) {
   <h3>开发者速记</h3>
   <pre><code>// 发（分布式）—— 继承 GroupEvent 或 BroadcastEvent
 @Autowired EventProducer eventProducer;
-eventProducer.send(new MissionFinishedEvent(missionId));
+eventProducer.send(new OrderFinishedEvent(orderId));
 
 // 收（分布式）—— 就写普通 @EventListener，别用 publishEvent 发这类事件
 @EventListener
-public void onFinished(MissionFinishedEvent event) { ... }
+public void onFinished(OrderFinishedEvent event) { ... }
 
 // 发（纯本地）—— 直接继承 ApplicationEvent
-applicationEventPublisher.publishEvent(new SceneViewUpdateEvent(...));</code></pre>
+applicationEventPublisher.publishEvent(new ViewRefreshEvent(...));</code></pre>
 
-  <p class="foot">机制剖析基于 event-starter 3.0.x 源码（12 个类全部走读）与业务平台三个模块的实际使用代码核对。文档为去敏分享版，类名 / 包名 / 应用名经过替换，机制描述与源码逐行对应。</p>
+  <p class="foot">机制剖析基于 event-starter 3.0.x 源码（12 个类全部走读）与业务平台三个模块的实际使用代码核对，机制描述与源码逐行对应；文中示例类名与应用名均为演示占位。</p>
 </section>
 
 </div>
