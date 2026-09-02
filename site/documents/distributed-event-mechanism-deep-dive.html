@@ -71,6 +71,7 @@
   .figure figcaption{text-align:center;color:var(--fg-muted);font-size:13px;padding:8px 0 6px}
   svg text{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
   .d-box{fill:var(--panel);stroke:var(--border)}
+  .d-lane{fill:var(--diagram-bg);stroke:var(--border)}
   .d-accent{fill:var(--accent-soft);stroke:var(--accent)}
   .d-broker{stroke:var(--warn-border);fill:var(--warn-bg)}
   .d-pool{stroke:var(--key-border);fill:var(--key-bg)}
@@ -112,7 +113,8 @@
     <li><a href="#s6">最“魔法”的一步：监听器迁移</a></li>
     <li><a href="#s7">两条真实链路走读</a></li>
     <li><a href="#s8">坑与边界</a></li>
-    <li><a href="#s9">附录：配置速查</a></li>
+    <li><a href="#s9">追问与排障 FAQ</a></li>
+    <li><a href="#s10">附录：配置速查</a></li>
   </ol>
 </nav>
 
@@ -347,6 +349,20 @@ public void recover(EventProduceException e, AbstractEvent event) {
 
   <div class="callout warn"><b>可靠性账本（发送侧）</b>
   失败 → 重试 3 次（间隔 1s）→ 全部失败进入<b>空的</b> <code>@Recover</code> → 方法正常返回。<b>调用方完全无感知，事件凭空消失</b>，唯一线索是 catch 块里的 error 日志。</div>
+
+  <h3>④ 一个 @type 字段，两条硬约束</h3>
+  <p>先回答“为什么要有 @type”：全平台所有事件挤在同一条主题上，消费端从 MQ 拿到的只是一个 <code>String</code>（SCS 绑定声明的是 <code>Consumer&lt;String&gt;</code>）。要把字符串还原成具体事件对象，类型信息只有两个来源——消息外的元数据（header / topic），或者<b>消息自己携带类型</b>。框架选了后者：类型的说明书跟着消息走。这一选择直接决定了两条绕不开的约束。</p>
+
+  <p><b>硬约束一：消费方 classpath 必须有同名同类路径的事件类，否则事件无声丢失。</b>@type 的值只是一个字符串，反序列化时 fastjson 在<b>消费方的 JVM</b> 里执行等价于 <code>Class.forName("...")</code> 的动作——跟发送方无关。这一步要成功，类必须存在、全限定名一模一样（挪过包就对不上）；之后 <code>event.getClass()</code> 精确匹配分发 handler，也要求两边加载到同一个类身份。而失败后果特别隐蔽——看消费端源码：</p>
+  <pre><code>} catch (JSONException e1) {
+    // 消费方没有这个事件类 / JSON 不合法 → 落到这里 → 什么都不做，消息被 ACK 丢弃
+}</code></pre>
+  <p>类缺失不是报错，是<b>凭空消失</b>——连日志都没有。所以事件类的存放位置只有两种合理选择：跨服务共享的事件放独立的契约包（谁用谁依赖）；平台私有的事件放被收发双方共同依赖的公共业务模块。反过来推论：<b>事件类的包名在这个体系里不是内部实现细节，而是线上协议的一部分</b>——挪包、改名、删类都是单方面撕毁协议，且撕毁方式是无声丢消息。</p>
+
+  <p><b>硬约束二：必须在不可信输入上开 fastjson autoType。</b>“让 JSON 自己指定要实例化哪个 Java 类”就是 autoType——fastjson 2017–2020 年一连串反序列化 RCE 漏洞正是这个能力被恶意利用（构造恶意 @type 指向 JNDI gadget 类远程加载恶意代码）。fastjson 的闸门一路演进：默认关闭 + 黑名单（1.2.25 起）→ expectClass 机制（@type 目标必须是指定预期类型的子类）→ safeMode 彻底禁用 @type。本框架必须开 <code>SupportAutoType</code>，安全底气来自一个细节：<code>parseObject(message, AbstractEvent.class, ...)</code> 的第二个参数把 <code>AbstractEvent</code> 设为预期类型，fastjson 会校验 @type 指向的类必须是它的子类才放行——相当于“只准实例化事件子类”的运行时白名单。但这道闸的前提是所用 fastjson 版本没有已知绕过漏洞，安全性押在版本上。</p>
+
+  <div class="callout info"><b>设计取舍</b>
+  单主题 + @type 的收益：发送端一个 send() 通吃所有事件、新增事件零配置。代价：类型以字符串形式在线上流转（类必须两边同名同路径存在），且必须在消息上开 autoType（安全依赖闸门与版本）。若改成“每个事件一条 destination”或“类型放消息头由消费方映射”，两条约束都消失，但加事件要动配置——典型的把灵活性代价转嫁给部署与安全。</div>
 </section>
 
 <!-- ================= 4 ================= -->
@@ -386,6 +402,31 @@ spring.cloud.stream.binders.rabbit.type = rabbit     # binder 类型钉死为 Ra
 
   <div class="callout info"><b>一个仓库里看不到的环节</b>
   starter 同时依赖 rabbit 和 kafka 两个 binder；多 binder 共存时 SCS 需要 <code>spring.cloud.stream.default-binder</code> 才能确定路由。这类开关在配置中心里（本仓库的本地配置文件只有应用名）。从平台侧证（web 服务还有裸 <code>@RabbitListener</code> 的旁路消费者）看，事件链路跑在 <b>RabbitMQ</b> 上。</div>
+
+  <h3>4.4 groupEventConsumer 与 handle() 是怎么对上的：命名约定三重奏</h3>
+  <p>常见追问：<code>groupEventConsumer</code> 是怎么跟 <code>EventHandler.handle()</code> 关联起来的？答案是<b>命名约定 + 方法引用</b>，没有任何显式注册。三样东西靠同一个名字串起来：</p>
+  <table>
+    <tr><th style="width:150px">东西</th><th>值</th><th style="width:300px">谁提供的</th></tr>
+    <tr><td>函数 Bean</td><td><code>groupEventConsumer</code>（<code>Consumer&lt;String&gt;</code>，Bean 的值是 <code>eventHandler::handle</code> 方法引用）</td><td>EventConfiguration 的 @Bean 方法名</td></tr>
+    <tr><td>输入绑定名</td><td><code>groupEventConsumer-in-0</code></td><td>SCS 按「BeanName + "-in-0"」约定拼出</td></tr>
+    <tr><td>绑定属性 key</td><td><code>bindings.groupEventConsumer-in-0.destination=groupEventTopic</code></td><td>EventConfigInitializer 按<b>同一条约定</b>拼出</td></tr>
+  </table>
+  <p>属性 key 里的绑定名和 SCS 从 Bean 名推导出的绑定名<b>字面相等</b>，SCS 由此知道“这条 destination 的消息要喂给这个 Bean”。运行时一条消息进来后的调用链：</p>
+  <pre><code>RabbitMQ 队列 groupEventTopic.&lt;应用名&gt;
+  │  rabbit binder 的 listener container 线程拉到一条消息
+  ▼
+SCS 找到绑定对应的函数 Bean：groupEventConsumer
+  │  按绑定的 content-type=application/json 把 payload 转成 String
+  ▼
+groupEventConsumer.accept(json)      ← Consumer&lt;String&gt; 的唯一方法
+  │  这个 Bean 的值就是 eventHandler::handle 方法引用
+  ▼
+eventHandler.handle(json)            ← Bean 被 @EnableRetry 代理，@Retryable 在此生效</code></pre>
+  <p>两个容易忽略的点：</p>
+  <ul class="tight">
+    <li><b>组/广播的区分不在 handler 层。</b>groupEventConsumer 与 broadcastEventConsumer 两个 Bean 指向<b>同一个</b> handle()。handle() 不知道消息来自哪条队列，反序列化后 instanceof 只用来选该用哪条 SpEL 过滤表达式；“组消费还是广播”完全由绑定层的队列拓扑决定，handler 只是所有消息的公共漏斗。</li>
+    <li><b>重试发生在 Rabbit listener 线程上。</b>@Retryable 是同步阻塞重试（同线程试 3 次），一条毒消息最坏占用 listener 线程约 3 秒；@Recover 空方法兜底保证 accept() 总是正常返回、消息照常 ACK，队列不会堵死——代价是静默丢弃。</li>
+  </ul>
 </section>
 
 <!-- ================= 5 ================= -->
@@ -425,6 +466,62 @@ public void handle(String message) {
     <li><b>业务监听器</b>在框架自定义线程池里跑：<code>event-</code> 前缀，默认 core 5 / max 10 / queue 20，<code>CallerRunsPolicy</code>——池满时退化为 listener 线程自己执行，形成天然背压；</li>
     <li>监听器抛异常由 <code>EventErrorHandler</code> 接住，<b>只打日志</b>，不影响 ACK。</li>
   </ul>
+
+  <figure class="figure">
+    <svg viewBox="0 0 1140 372" role="img" aria-label="线程视角" style="width:100%;height:auto">
+      <rect x="20" y="46" width="1100" height="118" rx="12" class="d-lane"/>
+      <text x="40" y="72" class="d-title">Rabbit listener 容器线程（消费线程）—— 只负责搬运与派发，不执行业务</text>
+
+      <rect x="40" y="88" width="158" height="62" rx="8" class="d-box"/>
+      <text x="119" y="110" class="d-text" text-anchor="middle">从队列拉取消息</text>
+      <text x="119" y="128" class="d-muted" text-anchor="middle">listener container</text>
+      <text x="119" y="144" class="d-muted" text-anchor="middle">线程</text>
+
+      <rect x="210" y="88" width="158" height="62" rx="8" class="d-box"/>
+      <text x="289" y="110" class="d-text" text-anchor="middle">payload 转换</text>
+      <text x="289" y="128" class="d-muted" text-anchor="middle">content-type=json</text>
+      <text x="289" y="144" class="d-muted" text-anchor="middle">→ String</text>
+
+      <rect x="380" y="88" width="158" height="62" rx="8" class="d-accent"/>
+      <text x="459" y="110" class="d-text" text-anchor="middle">accept(json)</text>
+      <text x="459" y="128" class="d-muted" text-anchor="middle">＝ handle(json)</text>
+      <text x="459" y="144" class="d-muted" text-anchor="middle">@Retryable×3 同步重试</text>
+
+      <rect x="550" y="88" width="158" height="62" rx="8" class="d-accent"/>
+      <text x="629" y="110" class="d-text" text-anchor="middle">反序列化＋过滤</text>
+      <text x="629" y="128" class="d-muted" text-anchor="middle">@type 还原 / hasListeners</text>
+      <text x="629" y="144" class="d-muted" text-anchor="middle">/ SpEL</text>
+
+      <rect x="720" y="88" width="158" height="62" rx="8" class="d-box"/>
+      <text x="799" y="110" class="d-text" text-anchor="middle">提交多播</text>
+      <text x="799" y="128" class="d-muted" text-anchor="middle">facade.publishEvent</text>
+      <text x="799" y="144" class="d-muted" text-anchor="middle">（提交即返回）</text>
+
+      <rect x="890" y="88" width="158" height="62" rx="8" class="d-box"/>
+      <text x="969" y="110" class="d-text" text-anchor="middle">ACK</text>
+      <text x="969" y="128" class="d-muted" text-anchor="middle">拉下一条</text>
+
+      <path d="M198 119 L208 119" class="d-arrow"/>
+      <path d="M368 119 L378 119" class="d-arrow"/>
+      <path d="M538 119 L548 119" class="d-arrow"/>
+      <path d="M708 119 L718 119" class="d-arrow"/>
+      <path d="M878 119 L888 119" class="d-arrow"/>
+
+      <path d="M799 164 L799 288" class="d-arrow-acc"/>
+      <text x="810" y="228" class="d-label">提交任务（池不满时立即返回）</text>
+
+      <rect x="20" y="250" width="1100" height="112" rx="12" class="d-lane"/>
+      <text x="40" y="276" class="d-title">event- 线程池（core 5 / max 10 / queue 20）—— 业务监听器在这里执行</text>
+
+      <rect x="330" y="292" width="480" height="54" rx="9" class="d-pool"/>
+      <text x="570" y="314" class="d-text" text-anchor="middle">业务 @EventListener 执行（异步）</text>
+      <text x="570" y="333" class="d-muted" text-anchor="middle">异常由 EventErrorHandler 只记日志，不影响 ACK</text>
+
+      <path d="M470 292 C 400 240, 560 200, 622 154" class="d-arrow" stroke-dasharray="5 4"/>
+      <text x="300" y="222" class="d-label">池满 CallerRuns：退化为 listener 线程亲自执行（背压）</text>
+    </svg>
+    <figcaption>图 3 · 线程视角：一条消息跨两个线程域——消费线程只搬运，业务在线程池执行</figcaption>
+  </figure>
 
   <div class="callout warn"><b>可靠性账本（消费侧）</b>
   消费失败 → 重试 3 次（同一条消息、同一个线程内）→ 进入<b>空的</b> <code>@Recover</code> → 方法正常返回 → binder 认为消费成功 → <b>消息 ACK 掉。没有死信、没有落库、没有告警</b>。JSONException（反序列化失败）更是被单独 catch 后无声放过。</div>
@@ -492,7 +589,34 @@ public void handle(String message) {
 
 <!-- ================= 9 ================= -->
 <section id="s9">
-  <h2><span class="no">9</span>附录：配置速查</h2>
+  <h2><span class="no">9</span>追问与排障 FAQ</h2>
+
+  <h3>Q1 · 自己发给自己，也要走 MQ 吗？</h3>
+  <p>要。没有本地短路：send() 一定上 broker，消息再从队列回来。而且组事件在同服务多实例间轮询，<b>发送实例自己未必是消费实例</b>。同进程通信用组事件，成本 = 一趟 broker 往返；MQ 抖动时同进程通信同样受影响。</p>
+
+  <h3>Q2 · 我的 @EventListener 收不到事件，按什么顺序查？</h3>
+  <ol class="tight">
+    <li><b>事件基类对吗？</b>必须继承 GroupEvent / BroadcastEvent（经 AbstractEvent）。直接继承 ApplicationEvent 的是本地事件，永远收不到 MQ 来的消息。</li>
+    <li><b>发送方式对吗？</b>分布式事件必须 eventProducer.send()。对它调 publishEvent() 会走默认多播器，而监听器已被迁走 → 无声落空（§6 分水岭）。</li>
+    <li><b>消费方 classpath 有这个类吗？</b>没有的话反序列化抛 JSONException 被静默吞掉、消息 ACK 丢弃，连日志都没有（§3 ④）。</li>
+    <li><b>监听器类型能匹配吗？</b>hasListeners 按“监听类型与事件类可赋值”判断；监听具体类的监听器收不到兄弟类型事件。</li>
+    <li><b>SpEL 过滤配了吗？</b>配了 consume-expression 且不匹配会被丢弃（表达式求值异常也按不匹配处理）。</li>
+    <li><b>组名对吗？</b>消费组默认 = spring.application.name，服务改名会让新旧实例分属两组、各消费一份。</li>
+  </ol>
+
+  <h3>Q3 · 怎么确认事件有没有发出去 / 有没有被消费？</h3>
+  <p>两头都有 info 日志：发送成功打「事件发送，主题：…，事件：…」；进入派发打「事件处理：…」。发送失败是 error「事件发送：…」，消费异常是 error「事件处理：…」。注意反序列化失败（类缺失 / 脏消息）<b>没有任何日志</b>。队列情况看 Rabbit 管理台：组队列名 = groupEventTopic.应用名；广播队列是每实例一条匿名队列，实例下线即消失。</p>
+
+  <h3>Q4 · 广播事件在实例离线时会不会丢？</h3>
+  <p>会。广播队列是匿名的 auto-delete 队列，实例不在线就没有这条队列，消息自然错过，且不补偿——广播语义只保证“在线实例都收到”。需要离线补投的场景应该用组事件（持久化队列）。</p>
+
+  <h3>Q5 · 有顺序保证吗？</h3>
+  <p>没有。消费侧派发进线程池后乱序执行；组事件在多实例间轮询，跨实例也无序。同一业务键需要顺序时，要么在监听器里按业务键串行化，要么换用带分区键的机制。</p>
+</section>
+
+<!-- ================= 10 ================= -->
+<section id="s10">
+  <h2><span class="no">10</span>附录：配置速查</h2>
   <table>
     <tr><th style="width:420px">配置项</th><th style="width:130px">默认值</th><th>作用</th></tr>
     <tr><td><code>event.group-event-topic</code></td><td>groupEventTopic</td><td>组事件主题（destination）</td></tr>
