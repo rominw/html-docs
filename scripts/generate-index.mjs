@@ -19,35 +19,93 @@ function match(html, pattern) {
   return result ? decodeEntities(result[1].trim()) : "";
 }
 
+function parseFrontMatter(text) {
+  const block = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!block) return {};
+  const data = {};
+  for (const line of block[1].split(/\r?\n/)) {
+    const kv = line.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
+    if (kv) data[kv[1].toLowerCase()] = kv[2].replace(/^["']|["']$/g, "").trim();
+  }
+  return data;
+}
+
+function stripMarkdown(text) {
+  return text
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[*_`>#~|-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function markdownMeta(text) {
+  const data = parseFrontMatter(text);
+  const body = text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+
+  let title = data.title || "";
+  if (!title) {
+    const heading = body.match(/^#\s+(.+)$/m);
+    if (heading) title = heading[1].trim();
+  }
+
+  let description = data.description || "";
+  if (!description) {
+    const plain = stripMarkdown(body.replace(/^#\s+.+$/m, ""));
+    const paragraph = plain.split(/\n\s*\n/)[0] || plain;
+    description = paragraph.slice(0, 110).trim();
+    if (paragraph.length > 110) description += "……";
+  }
+
+  return {
+    title,
+    description,
+    date: data.date || "",
+  };
+}
+
 const files = (await readdir(documentsDir))
-  .filter((file) => file.toLowerCase().endsWith(".html"))
+  .filter((file) => /\.(html|md)$/i.test(file))
   .sort((a, b) => b.localeCompare(a, "zh-CN"));
 
 const documents = await Promise.all(
   files.map(async (file) => {
-    const html = await readFile(path.join(documentsDir, file), "utf8");
+    const encoded = encodeURIComponent(file);
+    const text = await readFile(path.join(documentsDir, file), "utf8");
+
+    if (/\.md$/i.test(file)) {
+      const meta = markdownMeta(text);
+      return {
+        title: meta.title || path.parse(file).name,
+        description: meta.description,
+        date: meta.date,
+        url: `viewer.html?src=documents/${encoded}`,
+      };
+    }
+
     const title =
-      match(html, /<title[^>]*>([\s\S]*?)<\/title>/i) ||
-      match(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
+      match(text, /<title[^>]*>([\s\S]*?)<\/title>/i) ||
+      match(text, /<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
       path.parse(file).name;
     const description =
       match(
-        html,
+        text,
         /<meta\s+[^>]*name=["']description["'][^>]*content=["']([^"']*)["'][^>]*>/i,
       ) ||
       match(
-        html,
+        text,
         /<meta\s+[^>]*content=["']([^"']*)["'][^>]*name=["']description["'][^>]*>/i,
       );
     const date =
-      match(html, /<time[^>]*datetime=["']([^"']+)["'][^>]*>/i) ||
-      match(html, /<meta\s+[^>]*name=["']date["'][^>]*content=["']([^"']+)["'][^>]*>/i);
+      match(text, /<time[^>]*datetime=["']([^"']+)["'][^>]*>/i) ||
+      match(text, /<meta\s+[^>]*name=["']date["'][^>]*content=["']([^"']+)["'][^>]*>/i);
 
     return {
       title,
       description,
       date,
-      url: `documents/${encodeURIComponent(file)}`,
+      url: `documents/${encoded}`,
     };
   }),
 );
@@ -69,4 +127,4 @@ await writeFile(
   "utf8",
 );
 
-console.log(`Indexed ${documents.length} HTML document(s).`);
+console.log(`Indexed ${documents.length} document(s) (html + md).`);

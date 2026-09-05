@@ -1,5 +1,11 @@
 [
   {
+    "title": "Markdown 渲染测试文档",
+    "description": "验证站点 viewer 对 front-matter、代码高亮、表格、引用、任务列表与目录生成的完整支持。",
+    "date": "2026-09-04",
+    "url": "viewer.html?src=documents/markdown-viewer-test.md"
+  },
+  {
     "title": "分布式事件机制详解：Spring Cloud Stream 事件框架刨根问底",
     "description": "一个基于 Spring Cloud Stream 封装的内部分布式事件框架的源码级深度剖析：发送链路、Rabbit 拓扑、消费链路、监听器迁移魔法与可靠性边界。",
     "date": "2026-08-28",

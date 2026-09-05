@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>阅读中 · 留页</title>
+    <script>
+      try {
+        document.documentElement.dataset.theme =
+          localStorage.getItem("html-notes-theme") || "paper";
+      } catch (_) {
+        document.documentElement.dataset.theme = "paper";
+      }
+    </script>
+    <link rel="stylesheet" href="assets/style.css" />
+    <style>
+      .doc-hero {
+        padding: clamp(56px, 9vw, 110px) 0 44px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .doc-hero .eyebrow {
+        margin-bottom: 14px;
+      }
+
+      .doc-hero h1 {
+        font-size: clamp(34px, 5.6vw, 62px);
+      }
+
+      .doc-hero .summary {
+        max-width: 640px;
+        margin: 26px 0 0;
+        color: var(--muted);
+        font-size: clamp(15px, 1.7vw, 18px);
+        line-height: 1.85;
+      }
+
+      .doc-meta {
+        display: flex;
+        gap: 18px;
+        align-items: center;
+        margin-top: 22px;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .reading-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 48px;
+        padding: 56px 0 100px;
+      }
+
+      @media (min-width: 980px) {
+        .reading-body {
+          grid-template-columns: 220px minmax(0, 1fr);
+        }
+
+        .toc-wrap {
+          order: -1;
+        }
+      }
+
+      .toc-wrap {
+        align-self: start;
+        position: sticky;
+        top: 32px;
+        max-height: calc(100vh - 64px);
+        overflow: auto;
+      }
+
+      .toc-title {
+        margin: 0 0 14px;
+        color: var(--accent);
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+      }
+
+      .toc {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .toc li {
+        margin: 0;
+      }
+
+      .toc a {
+        display: block;
+        padding: 6px 0 6px 14px;
+        border-left: 1px solid var(--line);
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      .toc a:hover {
+        color: var(--accent);
+      }
+
+      .toc .toc-h3 a {
+        padding-left: 30px;
+        font-size: 12px;
+      }
+
+      .article {
+        max-width: 760px;
+        font-size: 16px;
+        line-height: 1.9;
+      }
+
+      .article > *:first-child {
+        margin-top: 0;
+      }
+
+      .article h2 {
+        margin: 2.6em 0 0.9em;
+        font-family: Georgia, "Noto Serif SC", "Songti SC", serif;
+        font-size: clamp(24px, 3vw, 30px);
+        font-weight: 500;
+        letter-spacing: -0.02em;
+      }
+
+      .article h3 {
+        margin: 2.2em 0 0.7em;
+        font-size: 19px;
+        font-weight: 600;
+      }
+
+      .article h4 {
+        margin: 1.8em 0 0.6em;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .article p {
+        margin: 1em 0;
+      }
+
+      .article a {
+        color: var(--accent);
+        text-underline-offset: 3px;
+      }
+
+      .article a:hover {
+        text-decoration-thickness: 2px;
+      }
+
+      .article strong {
+        font-weight: 600;
+      }
+
+      .article img {
+        max-width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .article blockquote {
+        margin: 1.4em 0;
+        padding: 4px 0 4px 18px;
+        border-left: 3px solid var(--accent);
+        color: var(--muted);
+      }
+
+      .article blockquote p {
+        margin: 0.5em 0;
+      }
+
+      .article code {
+        padding: 2px 6px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: var(--card);
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        font-size: 0.86em;
+      }
+
+      .article pre {
+        overflow-x: auto;
+        margin: 1.5em 0;
+        padding: 18px 20px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--card);
+        line-height: 1.65;
+      }
+
+      .article pre code {
+        padding: 0;
+        border: 0;
+        background: none;
+        font-size: 13.5px;
+      }
+
+      .article table {
+        width: 100%;
+        margin: 1.5em 0;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+
+      .article th,
+      .article td {
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        text-align: left;
+      }
+
+      .article th {
+        font-weight: 600;
+        background: var(--card);
+      }
+
+      .article hr {
+        margin: 2.5em auto;
+        border: 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .article ul,
+      .article ol {
+        padding-left: 1.5em;
+        margin: 1em 0;
+      }
+
+      .article li {
+        margin: 0.4em 0;
+      }
+
+      .article input[type="checkbox"] {
+        margin-right: 6px;
+        accent-color: var(--accent);
+      }
+
+      .viewer-status {
+        margin: 0;
+        padding: 90px 12px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .viewer-status code {
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        font-size: 13px;
+        color: var(--accent);
+      }
+
+      .hljs-comment,
+      .hljs-quote {
+        color: var(--muted);
+        font-style: italic;
+      }
+
+      .hljs-keyword,
+      .hljs-selector-tag,
+      .hljs-literal,
+      .hljs-section,
+      .hljs-doctag,
+      .hljs-type,
+      .hljs-name,
+      .hljs-strong {
+        color: var(--accent);
+      }
+
+      .hljs-string,
+      .hljs-regexp,
+      .hljs-addition,
+      .hljs-attribute,
+      .hljs-meta .hljs-string {
+        color: #3f9c55;
+      }
+
+      .hljs-number,
+      .hljs-symbol,
+      .hljs-bullet,
+      .hljs-variable,
+      .hljs-template-variable,
+      .hljs-link,
+      .hljs-selector-attr {
+        color: #b0761b;
+      }
+
+      .hljs-title,
+      .hljs-title.function_,
+      .hljs-built_in,
+      .hljs-class .hljs-title {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      :root[data-theme="dark"] .hljs-string,
+      :root[data-theme="dark"] .hljs-regexp,
+      :root[data-theme="dark"] .hljs-addition,
+      :root[data-theme="dark"] .hljs-attribute {
+        color: #8fd3a5;
+      }
+
+      :root[data-theme="dark"] .hljs-number,
+      :root[data-theme="dark"] .hljs-symbol,
+      :root[data-theme="dark"] .hljs-bullet,
+      :root[data-theme="dark"] .hljs-variable {
+        color: #d9a95d;
+      }
+
+      @media (max-width: 700px) {
+        .doc-hero {
+          padding-top: 64px;
+        }
+
+        .reading-body {
+          padding-top: 40px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="留页首页">
+        <span class="brand-mark" aria-hidden="true">&lt;/&gt;</span>
+        <span>留页</span>
+      </a>
+      <div class="header-actions">
+        <span class="status"><i aria-hidden="true"></i>公开阅读</span>
+        <button
+          id="theme-toggle"
+          class="theme-toggle"
+          type="button"
+          aria-label="切换主题"
+        >
+          <span aria-hidden="true">◐</span>
+          <span id="theme-label">纸张</span>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <p id="status" class="viewer-status">正在加载文档……</p>
+
+      <article id="article-root" hidden>
+        <div class="doc-hero">
+          <p class="eyebrow" id="doc-eyebrow">MARKDOWN</p>
+          <h1 id="doc-title">无标题</h1>
+          <p class="summary" id="doc-summary" hidden></p>
+          <div class="doc-meta">
+            <span id="doc-date"></span>
+            <span id="doc-tag"></span>
+          </div>
+        </div>
+        <div class="reading-body">
+          <nav class="toc-wrap" id="toc-wrap" aria-label="目录" hidden>
+            <p class="toc-title">目录</p>
+            <ul class="toc" id="toc"></ul>
+          </nav>
+          <div class="article" id="doc-content"></div>
+        </div>
+      </article>
+    </main>
+
+    <footer>
+      <span>留页</span>
+      <span>纯静态 · 由 Cloudflare Workers 托管</span>
+    </footer>
+
+    <script src="assets/marked.min.js"></script>
+    <script src="assets/highlight.min.js"></script>
+    <script>
+      const themes = [
+        { value: "paper", label: "纸张" },
+        { value: "minimal", label: "极简" },
+        { value: "dark", label: "深色" },
+      ];
+
+      function setTheme(value) {
+        const theme = themes.find((item) => item.value === value) || themes[0];
+        document.documentElement.dataset.theme = theme.value;
+        document.getElementById("theme-label").textContent = theme.label;
+        try {
+          localStorage.setItem("html-notes-theme", theme.value);
+        } catch (_) {
+          /* 主题仅当页生效 */
+        }
+      }
+
+      setTheme(document.documentElement.dataset.theme);
+      document
+        .getElementById("theme-toggle")
+        .addEventListener("click", () => {
+          const current = themes.findIndex(
+            (item) => item.value === document.documentElement.dataset.theme,
+          );
+          setTheme(themes[(current + 1) % themes.length].value);
+        });
+
+      function fail(message) {
+        const status = document.getElementById("status");
+        status.innerHTML = message;
+        status.hidden = false;
+        document.getElementById("article-root").hidden = true;
+      }
+
+      function parseFrontMatter(text) {
+        const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+        if (!match) return { data: {}, body: text };
+        const data = {};
+        for (const line of match[1].split(/\r?\n/)) {
+          const kv = line.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
+          if (kv) {
+            data[kv[1].toLowerCase()] = kv[2]
+              .replace(/^["']|["']$/g, "")
+              .trim();
+          }
+        }
+        return { data, body: text.slice(match[0].length) };
+      }
+
+      function stripMarkdown(text) {
+        return text
+          .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+          .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+          .replace(/[*_`>#~|-]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function fallbackMeta(body) {
+        const heading = body.match(/^#\s+(.+)$/m);
+        const title = heading ? heading[1].trim() : "";
+        const rest = title
+          ? body.replace(/^#\s+.+$/m, "")
+          : body;
+        const paragraph = rest
+          .split(/\n\s*\n/)
+          .map((block) => stripMarkdown(block))
+          .find((block) => block.length > 12);
+        const description = paragraph
+          ? paragraph.length > 110
+            ? paragraph.slice(0, 110) + "……"
+            : paragraph
+          : "";
+        return { title, description };
+      }
+
+      function slugify(text) {
+        return text
+          .trim()
+          .toLowerCase()
+          .replace(/[^\p{L}\p{N}\s-]/gu, "")
+          .replace(/\s+/g, "-")
+          .slice(0, 64);
+      }
+
+      function formatDate(value) {
+        if (!value) return "";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return new Intl.DateTimeFormat("zh-CN", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }).format(date);
+      }
+
+      function initMarked() {
+        marked.use({
+          gfm: true,
+          breaks: true,
+          renderer: {
+            heading({ tokens, depth }) {
+              const text = this.parser.parseInline(tokens);
+              const id = slugify(text);
+              return `<h${depth} id="${id}">${text}</h${depth}>`;
+            },
+            code({ text, lang }) {
+              const language = (lang || "").split(/\s+/)[0];
+              let body;
+              if (language && window.hljs && hljs.getLanguage(language)) {
+                body = hljs.highlight(text, { language }).value;
+              } else if (window.hljs && text.length < 5000) {
+                body = hljs.highlightAuto(text).value;
+              } else {
+                body = text
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;");
+              }
+              const label = language ? ` class="language-${language}"` : "";
+              return `<pre><code${label}>${body}</code></pre>`;
+            },
+          },
+        });
+      }
+
+      function buildToc() {
+        const headings = Array.from(
+          document.querySelectorAll("#doc-content h2, #doc-content h3"),
+        );
+        const toc = document.getElementById("toc");
+        if (headings.length < 2) return;
+        toc.innerHTML = headings
+          .map((node) => {
+            if (!node.id) return "";
+            const depth = node.tagName === "H2" ? "toc-h2" : "toc-h3";
+            return `<li class="${depth}"><a href="#${node.id}">${node.textContent}</a></li>`;
+          })
+          .join("");
+        document.getElementById("toc-wrap").hidden = false;
+      }
+
+      function fixRelativeImages(baseUrl) {
+        document.querySelectorAll("#doc-content img").forEach((img) => {
+          const raw = img.getAttribute("src") || "";
+          if (/^(https?:|data:|#)/i.test(raw)) return;
+          try {
+            img.src = new URL(raw, baseUrl).href;
+          } catch (_) {
+            /* 非法路径原样保留 */
+          }
+        });
+      }
+
+      async function load() {
+        const params = new URLSearchParams(location.search);
+        const src = (params.get("src") || "").replace(/^\/+/, "");
+        if (!src) {
+          fail("缺少参数。用法：<code>viewer.html?src=documents/example.md</code>");
+          return;
+        }
+        if (!/^documents\/[\w./%-]+\.md$/i.test(src)) {
+          fail("仅支持读取 <code>documents/</code> 目录下的 Markdown 文件。");
+          return;
+        }
+
+        let response;
+        try {
+          response = await fetch(src);
+        } catch (_) {
+          fail("网络错误，无法读取文档。");
+          return;
+        }
+        if (!response.ok) {
+          fail(
+            `读取失败（HTTP ${response.status}）：<code>${src}</code> 不存在或未发布。`,
+          );
+          return;
+        }
+
+        const raw = await response.text();
+        const { data, body } = parseFrontMatter(raw);
+        const fallback = fallbackMeta(body);
+        const title = data.title || fallback.title || "无标题";
+        const description = data.description || fallback.description;
+        const date = formatDate(data.date || "");
+
+        initMarked();
+        const content = document.getElementById("doc-content");
+        content.innerHTML = marked.parse(body);
+
+        document.getElementById("doc-title").textContent = title;
+        const firstH1 = content.querySelector("h1");
+        if (firstH1 && firstH1.textContent.trim() === title.trim()) {
+          firstH1.remove();
+        }
+        if (data.tags || data.tag) {
+          document.getElementById("doc-tag").textContent =
+            data.tags || data.tag;
+        }
+        if (description) {
+          const summary = document.getElementById("doc-summary");
+          summary.textContent = description;
+          summary.hidden = false;
+        }
+        if (date) document.getElementById("doc-date").textContent = date;
+        document.title = `${title} · 留页`;
+
+        fixRelativeImages(new URL(src, location.href).href);
+        buildToc();
+
+        document.getElementById("status").hidden = true;
+        document.getElementById("article-root").hidden = false;
+      }
+
+      load();
+    </script>
+  </body>
+</html>
