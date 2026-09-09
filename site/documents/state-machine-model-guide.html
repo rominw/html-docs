@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="状态机模型详解：核心概念、状态图与转移表、四种 Java 实现方式，以及生产环境最佳实践（并发 CAS、持久化恢复、幂等、终态封闭、流转审计）。">
+  <meta name="date" content="2026-09-09">
+  <title>状态机模型：从概念到工程最佳实践</title>
+  <style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    pre{margin:14px 0;padding:15px 17px;border:1px solid var(--line);border-radius:12px;
+      background:var(--panel2);overflow:auto;font-size:13px;line-height:1.65}
+    pre code{padding:0;border:0;background:none;color:var(--ink);font-size:13px}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .decision{fill:var(--amber2);stroke:var(--amber);stroke-width:1.6}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    .active{fill:var(--blue2);stroke:var(--blue);stroke-width:1.2}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell">
+      <div class="kicker">STATE MACHINE MODEL</div>
+      <h1>状态机模型：从概念到工程最佳实践</h1>
+      <p class="lead">用一个无人机巡检任务的真实生命周期，讲透状态机的核心概念、四种 Java 实现方式，以及并发、持久化、幂等这些生产环境里的关键问题。</p>
+      <div class="doc-meta">
+        <time datetime="2026-09-09">2026年9月9日</time>
+        <span>设计模式 · 学习笔记</span>
+      </div>
+      <div class="actions">
+        <a class="btn" href="../index.html">返回首页</a>
+        <a class="btn" href="#sec1">开始阅读</a>
+        <button class="btn" id="theme" type="button">切换主题</button>
+        <button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>5</b><span>个核心概念要素</span></div>
+        <div class="stat"><b>4</b><span>种 Java 实现方式</span></div>
+        <div class="stat"><b>1</b><span>张转移表 = 全部流转规则</span></div>
+        <div class="stat"><b>5</b><span>条生产环境铁律</span></div>
+      </div>
+    </div>
+  </header>
+  <nav>
+    <div class="shell">
+      <a href="#sec1">什么是状态机</a><a href="#sec2">核心概念</a><a href="#sec3">状态图与转移表</a><a href="#sec4">反面案例</a><a href="#sec5">Java 实现</a><a href="#sec6">生产最佳实践</a><a href="#sec7">检查清单</a><a href="#sec8">练习</a>
+    </div>
+  </nav>
+  <main class="shell">
+
+    <!-- ================= 1 什么是状态机 ================= -->
+    <section id="sec1">
+      <div class="head"><h2>1. 什么是状态机</h2><p>一句话理解：状态机把"什么状态下允许发生什么"从散落各处的 if/else，收拢成一张事先定义好的表。</p></div>
+      <div class="callout">
+        <p><strong>核心思想：</strong>一个事物在任意时刻，只能处于<em>有限个状态中的一个</em>；当"事件"发生时，按事先定义好的规则从当前状态跳到下一个状态；<strong>除了这些规则，状态不允许以任何其他方式变化</strong>。</p>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">直观例子：红绿灯</h3>
+          <ul class="clean">
+            <li><strong>状态</strong>：红、绿、黄 —— 有限个</li>
+            <li><strong>事件</strong>：计时器到</li>
+            <li><strong>流转规则</strong>：<code>绿 → 黄 → 红 → 绿</code>，循环往复</li>
+          </ul>
+          <p style="color:var(--muted);margin-bottom:0">你永远不会看到"灯同时是红和绿"，也永远不会看到"红灯跳过黄灯直接变绿"——因为规则不允许。把这种<strong>确定性</strong>用到软件里，就是状态机。</p>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">形式化定义（五元组）</h3>
+          <p>教科书上写作 <code>M = (S, Σ, δ, s₀, F)</code>，含义并不神秘：</p>
+          <ul class="clean">
+            <li><code>S</code>：有限状态集（如 待处理/执行中/已完成）</li>
+            <li><code>Σ</code>：事件（输入）集合</li>
+            <li><code>δ</code>：转移函数，<code>当前状态 × 事件 → 下一状态</code></li>
+            <li><code>s₀</code>：初始状态（任务刚创建时是"待处理"）</li>
+            <li><code>F</code>：终态集合（"已完成""已取消"，转出永不发生）</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 2 五个核心概念 ================= -->
+    <section id="sec2">
+      <div class="head"><h2>2. 五个核心概念</h2><p>状态、事件、转移、动作、守卫——所有状态机相关讨论都由这五个词构成。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>概念</th><th>英文</th><th>含义</th><th>巡检任务中的例子</th></tr></thead>
+          <tbody>
+            <tr><td><strong>状态</strong></td><td><code>State</code></td><td>事物当前所处的模式</td><td><code>RUNNING</code> 执行中</td></tr>
+            <tr><td><strong>事件</strong></td><td><code>Event</code></td><td>触发变化的输入</td><td>设备回调"无人机到达起飞点"</td></tr>
+            <tr><td><strong>转移</strong></td><td><code>Transition</code></td><td>状态 + 事件 → 新状态</td><td><code>RUNNING</code> + 到达起飞点 → <code>TAKEOFF</code></td></tr>
+            <tr><td><strong>动作</strong></td><td><code>Action</code></td><td>转移发生时执行的副作用</td><td>转入 <code>RUNNING</code> 时下发任务给机库、推送 WebSocket 通知</td></tr>
+            <tr><td><strong>守卫</strong></td><td><code>Guard</code></td><td>转移的前置条件，不满足则不转移</td><td>电量 &gt; 20% 才允许 <code>WAITING → RUNNING</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="mini">
+          <h3>Mealy 机：动作挂在"转移"上</h3>
+          <p>每次转移时做一次性的事（发一条消息、写一行日志）。工程实践中绝大多数业务状态机都是 Mealy 型。</p>
+        </div>
+        <div class="mini">
+          <h3>Moore 机：动作挂在"状态"上</h3>
+          <p>进入某个状态后持续表现出某种行为（状态对应一个界面、一种输出）。硬件控制（如红绿灯本体）更常见。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 3 状态图与转移表 ================= -->
+    <section id="sec3">
+      <div class="head"><h2>3. 状态图与转移表</h2><p>无论用什么语言实现，第一步永远是先把流转画出来、写成表——图和表就是转移函数 δ 本身。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 336" role="img" aria-labelledby="dTitle dDesc">
+          <title id="dTitle">无人机巡检任务状态图（简化版）</title>
+          <desc id="dDesc">主干流转：待处理到执行中、到达起飞点、到达降落点、飞机落库、图片上传完成、机库复位，最终到已完成（绿色终态）；待处理与执行中可被取消，进入已取消（红色终态）。到达起飞点状态同样可取消，图中省略。</desc>
+          <defs>
+            <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker>
+            <marker id="arr" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--red)"/></marker>
+          </defs>
+          <rect class="lane" x="16" y="14" width="1008" height="308" rx="16"/>
+          <!-- 第一行：主干路径 -->
+          <rect class="node" x="36" y="48" width="132" height="56" rx="10"/><text class="title" x="102" y="72" text-anchor="middle">待处理</text><text class="sub" x="102" y="90" text-anchor="middle">WAITING</text>
+          <rect class="node" x="246" y="48" width="132" height="56" rx="10"/><text class="title" x="312" y="72" text-anchor="middle">执行中</text><text class="sub" x="312" y="90" text-anchor="middle">RUNNING</text>
+          <rect class="node" x="456" y="48" width="132" height="56" rx="10"/><text class="title" x="522" y="72" text-anchor="middle">到达起飞点</text><text class="sub" x="522" y="90" text-anchor="middle">TAKEOFF</text>
+          <rect class="node" x="666" y="48" width="132" height="56" rx="10"/><text class="title" x="732" y="72" text-anchor="middle">到达降落点</text><text class="sub" x="732" y="90" text-anchor="middle">LAND</text>
+          <rect class="node" x="876" y="48" width="132" height="56" rx="10"/><text class="title" x="942" y="72" text-anchor="middle">飞机落库</text><text class="sub" x="942" y="90" text-anchor="middle">DRONE_BACK</text>
+          <!-- 第二行 -->
+          <rect class="node" x="876" y="232" width="132" height="56" rx="10"/><text class="title" x="942" y="256" text-anchor="middle">图片上传完成</text><text class="sub" x="942" y="274" text-anchor="middle">IMAGE_UPLOAD_COMPLETED</text>
+          <rect class="node" x="630" y="232" width="132" height="56" rx="10"/><text class="title" x="696" y="256" text-anchor="middle">机库复位</text><text class="sub" x="696" y="274" text-anchor="middle">DOCK_RESET</text>
+          <rect class="node g" x="430" y="232" width="110" height="56" rx="10"/><text class="title" x="485" y="256" text-anchor="middle">已完成</text><text class="sub" x="485" y="274" text-anchor="middle">FINISH · 终态</text>
+          <rect class="node r" x="60" y="232" width="110" height="56" rx="10"/><text class="title" x="115" y="256" text-anchor="middle">已取消</text><text class="sub" x="115" y="274" text-anchor="middle">CANCEL · 终态</text>
+          <!-- 第一行主干边 -->
+          <path class="edge" d="M168 76 H242" marker-end="url(#ar)"/><text class="sub" x="206" y="66" text-anchor="middle">下发执行</text>
+          <path class="edge" d="M378 76 H452" marker-end="url(#ar)"/><text class="sub" x="415" y="66" text-anchor="middle">到达起飞点</text>
+          <path class="edge" d="M588 76 H662" marker-end="url(#ar)"/><text class="sub" x="625" y="66" text-anchor="middle">到达降落点</text>
+          <path class="edge" d="M798 76 H872" marker-end="url(#ar)"/><text class="sub" x="835" y="66" text-anchor="middle">飞机落库</text>
+          <!-- 第二行边 -->
+          <path class="edge" d="M942 104 V226" marker-end="url(#ar)"/><text class="sub" x="952" y="170" text-anchor="start">图片上传完成</text>
+          <path class="edge" d="M876 260 H768" marker-end="url(#ar)"/><text class="sub" x="821" y="250" text-anchor="middle">机库复位</text>
+          <path class="edge" d="M630 260 H546" marker-end="url(#ar)"/><text class="sub" x="588" y="250" text-anchor="middle">复位完成</text>
+          <path class="edge" d="M900 104 C 860 160, 800 200, 748 226" marker-end="url(#ar)"/><text class="sub" x="826" y="186" text-anchor="start">机库复位</text>
+          <!-- 取消路径 -->
+          <path class="edge r" d="M102 104 C 102 150, 108 190, 112 226" marker-end="url(#arr)"/><text class="sub" x="64" y="170" text-anchor="start">取消</text>
+          <path class="edge r" d="M312 104 C 312 190, 230 250, 176 258" marker-end="url(#arr)"/><text class="sub" x="246" y="182" text-anchor="start">取消</text>
+        </svg>
+      </div>
+      <div class="callout" style="margin-top:15px">
+        <p><strong>看图就能问出关键问题</strong>（这正是状态图的价值）：取消只能从"待处理"进入，还是"执行中"也能取消？<code>FINISH</code> 是终态吗、终态之后还允许任何转出吗？到达起飞点后如果设备故障，走哪条边？<code>WAITING</code> 是初始状态，即任务刚创建时的状态。</p>
+      </div>
+      <div class="card pad table" style="margin-top:15px">
+        <h3 style="margin-top:0">转移表（转移函数 δ 的表格形式）</h3>
+        <table>
+          <thead><tr><th>当前状态 \ 事件</th><th>下发执行</th><th>到达起飞点</th><th>到达降落点</th><th>飞机落库</th><th>图片上传完成</th><th>机库复位完成</th><th>用户取消</th></tr></thead>
+          <tbody>
+            <tr><td><code>WAITING</code> 待处理</td><td><code>RUNNING</code></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><code>CANCEL</code></td></tr>
+            <tr><td><code>RUNNING</code> 执行中</td><td>—</td><td><code>TAKEOFF</code></td><td><code>LAND</code></td><td>—</td><td>—</td><td>—</td><td><code>CANCEL</code></td></tr>
+            <tr><td><code>TAKEOFF</code> 到达起飞点</td><td>—</td><td>—</td><td><code>LAND</code></td><td>—</td><td>—</td><td>—</td><td><code>CANCEL</code></td></tr>
+            <tr><td><code>LAND</code> 到达降落点</td><td>—</td><td>—</td><td>—</td><td><code>DRONE_BACK</code></td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td><code>DRONE_BACK</code> 飞机落库</td><td>—</td><td>—</td><td>—</td><td>—</td><td><code>IMAGE_UPLOAD_COMPLETED</code></td><td><code>DOCK_RESET</code></td><td>—</td></tr>
+            <tr><td><code>IMAGE_UPLOAD_COMPLETED</code></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><code>DOCK_RESET</code></td><td>—</td></tr>
+            <tr><td><code>DOCK_RESET</code> 机库复位</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><code>FINISH</code></td><td>—</td></tr>
+            <tr><td><code>FINISH</code> / <code>CANCEL</code></td><td colspan="7" style="color:var(--muted)">终态：表中不存在任何条目，任何事件都无合法流转</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="color:var(--muted);margin-top:12px">表中"—"表示该组合<strong>非法</strong>：收到该事件应当拒绝、忽略或报警，而不是"顺手改一下状态"。</p>
+    </section>
+
+    <!-- ================= 4 反面案例 ================= -->
+    <section id="sec4">
+      <div class="head"><h2>4. 隐式状态机：最常见的反面形态</h2><p>很多系统"其实已经是状态机"，只是转移规则没有定义在任何地方——它们散落在各个 Service 的 if/else 里。</p></div>
+      <div class="card pad">
+        <h3 style="margin-top:0">症状一：枚举只定义了状态集 S，没有定义转移 δ</h3>
+<pre><code>public enum MissionStatusEnum {
+    WAITING(0, "待处理"),
+    RUNNING(1, "执行中"),
+    TAKEOFF(21, "到达起飞点"),
+    LAND(29, "到达降落点"),
+    DRONE_BACK(4, "飞机落库"),
+    DOCK_RESET(5, "机库复位"),
+    IMAGE_UPLOAD_COMPLETED(6, "图片上传完成"),
+    FINISH(2, "已完成"),
+    CANCEL(3, "已取消");
+    // ……只有状态集合 S，"哪些流转合法"没有定义在任何地方
+}</code></pre>
+        <h3>症状二：判断"处于哪一组状态"的 if 链散落各处</h3>
+<pre><code>// 某个设备回调处理里的典型判断：哪些状态算"已结束"全靠人脑记
+if (config.isFinishExeOdm()
+        &amp;&amp; DRONE_BACK != mission.getStatus()
+        &amp;&amp; DOCK_RESET != mission.getStatus()
+        &amp;&amp; FINISH != mission.getStatus()
+        &amp;&amp; IMAGE_UPLOAD_COMPLETED != mission.getStatus()) {
+    // ……
+}</code></pre>
+      </div>
+      <div class="grid3" style="margin-top:15px">
+        <div class="mini">
+          <h3>问题一：无人能回答全貌</h3>
+          <p>"状态 X 能不能变成状态 Y"的答案散落在几十个文件里，只能靠通读代码或线上踩坑才能知道。</p>
+        </div>
+        <div class="mini">
+          <h3>问题二：加状态要改 N 处</h3>
+          <p>新增一个状态（例如为"断点续飞"增加回补状态），所有判断"任务是否结束"的 if 链都要挨个排查，漏一处就是线上 bug。</p>
+        </div>
+        <div class="mini">
+          <h3>问题三：并发不安全</h3>
+          <p>"取消"和"图片上传完成"两个回调同时到达，都读到旧状态、都判断自己合法、都去更新——已取消的任务又"活"了。</p>
+        </div>
+      </div>
+      <div class="callout warn" style="margin-top:15px">
+        <p><strong>判断标准：</strong>当 <code>status != A &amp;&amp; status != B &amp;&amp; status != C</code> 这种"判断当前是否处于某一组状态"的代码出现超过两处时，就该引入状态机了。状态机的解法就是<strong>把 δ 从代码角落里提出来，显式写成一张表，让非法流转在物理上不可能发生</strong>。</p>
+      </div>
+    </section>
+
+    <!-- ================= 5 Java 实现 ================= -->
+    <section id="sec5">
+      <div class="head"><h2>5. Java 实现的四种姿势</h2><p>由浅入深：枚举内聚 → 表驱动 → 状态模式 → 框架。绝大多数场景前两种就够用。</p></div>
+
+      <div class="card pad">
+        <h3 style="margin-top:0">5.1 枚举内聚式：把"下一步能去哪"放进枚举 <span class="pill g">零依赖 · 首选起步</span></h3>
+        <p style="color:var(--muted)">改动最小，一眼看清全部流转。局限：表达不了"事件"和"守卫"维度。</p>
+<pre><code>public enum MissionStatusEnum {
+
+    //                                          合法的下一步（终态集合为空）
+    WAITING(0, "待处理",        EnumSet.of(RUNNING, CANCEL)),
+    RUNNING(1, "执行中",        EnumSet.of(TAKEOFF, LAND, FINISH, CANCEL)),
+    LAND(29, "到达降落点",      EnumSet.of(DRONE_BACK)),
+    DRONE_BACK(4, "飞机落库",   EnumSet.of(IMAGE_UPLOAD_COMPLETED, DOCK_RESET)),
+    IMAGE_UPLOAD_COMPLETED(6, "图片上传完成", EnumSet.of(DOCK_RESET)),
+    DOCK_RESET(5, "机库复位",   EnumSet.of(FINISH)),
+    FINISH(2, "已完成",         EnumSet.noneOf(MissionStatusEnum.class)),
+    CANCEL(3, "已取消",         EnumSet.noneOf(MissionStatusEnum.class));
+
+    private final int type;
+    private final String desc;
+    private final Set&lt;MissionStatusEnum&gt; nextStates;
+
+    MissionStatusEnum(int type, String desc, Set&lt;MissionStatusEnum&gt; nextStates) {
+        this.type = type;
+        this.desc = desc;
+        this.nextStates = nextStates;
+    }
+
+    /** 状态转移的唯一入口，业务代码必须经过它 */
+    public MissionStatusEnum transferTo(MissionStatusEnum target) {
+        if (!nextStates.contains(target)) {
+            throw new IllegalStateException(
+                desc + " 不允许流转到 " + target.desc);
+        }
+        return target;
+    }
+}</code></pre>
+        <p style="margin-bottom:0">于是第 4 节那条四行 if 链变成一行：<code>mission.transferTo(DOCK_RESET)</code>。非法流转直接抛异常——<strong>在物理上不可能发生，而不是靠程序员记得写判断</strong>。</p>
+      </div>
+
+      <div class="card pad" style="margin-top:15px">
+        <h3 style="margin-top:0">5.2 表驱动式：把 δ 写成数据 <span class="pill g">工程上最实用</span></h3>
+        <p style="color:var(--muted)">引入事件枚举后，转移规则变成一张真正的表：规则与执行彻底分离，看一张表就能评审全部流转逻辑。</p>
+<pre><code>public enum MissionEvent {
+    DISPATCH, REACH_TAKEOFF, REACH_LAND, DRONE_DOCKED,
+    IMAGE_UPLOADED, DOCK_RESET_DONE, USER_CANCEL
+}
+
+public final class MissionStateMachine {
+
+    private static final Map&lt;MissionStatusEnum, Map&lt;MissionEvent, MissionStatusEnum&gt;&gt; TABLE =
+        Map.of(
+            WAITING,    Map.of(DISPATCH, RUNNING, USER_CANCEL, CANCEL),
+            RUNNING,    Map.of(REACH_TAKEOFF, TAKEOFF, REACH_LAND, LAND, USER_CANCEL, CANCEL),
+            LAND,       Map.of(DRONE_DOCKED, DRONE_BACK),
+            DRONE_BACK, Map.of(IMAGE_UPLOADED, IMAGE_UPLOAD_COMPLETED,
+                               DOCK_RESET_DONE, DOCK_RESET),
+            IMAGE_UPLOAD_COMPLETED, Map.of(DOCK_RESET_DONE, DOCK_RESET),
+            DOCK_RESET, Map.of(DOCK_RESET_DONE, FINISH)
+        ); // FINISH / CANCEL 不在表中 = 终态，任何事件都转不出去
+
+    private MissionStateMachine() {}
+
+    /** 返回目标状态；表中不存在即为非法转移 */
+    public static MissionStatusEnum fire(MissionStatusEnum current, MissionEvent event) {
+        MissionStatusEnum next = TABLE
+            .getOrDefault(current, Map.of())
+            .get(event);
+        if (next == null) {
+            throw new IllegalStateException(
+                "状态[" + current + "]收到事件[" + event + "]无合法流转");
+        }
+        return next;
+    }
+}</code></pre>
+      </div>
+
+      <div class="card pad" style="margin-top:15px">
+        <h3 style="margin-top:0">5.3 状态模式（GoF）：每个状态一个类 <span class="pill a">状态行为差异大时</span></h3>
+        <p style="color:var(--muted)">当各状态不只是流转不同，而是<strong>同一操作在不同状态下行为完全不同</strong>时使用。缺点是类多，状态多而行为简单时不划算。</p>
+<pre><code>public interface MissionState {
+    void onEvent(MissionContext ctx, MissionEvent event);
+}
+
+public final class RunningState implements MissionState {
+    @Override
+    public void onEvent(MissionContext ctx, MissionEvent event) {
+        switch (event) {                    // 只需处理本状态关心的事件
+            case REACH_TAKEOFF -&gt; ctx.setState(new TakeoffState());
+            case USER_CANCEL   -&gt; { /* 先召回无人机，再转入取消态（动作） */ }
+            default -&gt; throw new IllegalStateException("执行中不接受事件 " + event);
+        }
+    }
+}
+
+public final class FinishedState implements MissionState {
+    @Override
+    public void onEvent(MissionContext ctx, MissionEvent event) {
+        // 终态：任何事件一律拒绝，任务不可能"复活"
+    }
+}</code></pre>
+      </div>
+
+      <div class="card pad" style="margin-top:15px">
+        <h3 style="margin-top:0">5.4 框架：Spring StateMachine <span class="pill a">超复杂长流程才用</span></h3>
+        <p style="margin-bottom:0">状态多到几十个、出现子状态（如"执行中"内部又分阶段）、或流程横跨数天与多个服务时，才值得引入框架。它提供层次状态、转移监听器、持久化与恢复（<code>StateMachinePersister</code>）等能力。<strong>不建议一上手就用框架</strong>——表驱动能解决八成问题，且人人看得懂。</p>
+      </div>
+
+      <div class="card pad table" style="margin-top:15px">
+        <h3 style="margin-top:0">选型速查</h3>
+        <table>
+          <thead><tr><th>场景特征</th><th>推荐实现</th><th>理由</th></tr></thead>
+          <tbody>
+            <tr><td>流转简单、无事件维度</td><td>枚举内聚</td><td>零依赖、零学习成本，规则跟着枚举走</td></tr>
+            <tr><td>事件多、规则需要集中评审</td><td>表驱动</td><td>规则即数据，一张表覆盖全部流转</td></tr>
+            <tr><td>各状态下行为差异巨大</td><td>状态模式</td><td>面向对象封装，新增状态不改旧状态</td></tr>
+            <tr><td>层次状态 / 超长流程 / 跨服务</td><td>Spring StateMachine</td><td>框架自带持久化恢复、监听器、子状态</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= 6 生产最佳实践 ================= -->
+    <section id="sec6">
+      <div class="head"><h2>6. 生产环境最佳实践</h2><p>写对转移表只是及格线；真正的坑在并发、持久化、幂等这些"写代码之外"的地方。</p></div>
+
+      <div class="card pad">
+        <h3 style="margin-top:0">6.1 并发转移：用条件更新（CAS）兜底 <span class="pill a">最重要</span></h3>
+        <p style="color:var(--muted)">转移表只保证"逻辑上合法"，但两个线程可能都读到 <code>WAITING</code> 然后各自转移。落库时永远用条件更新，这是<strong>分布式环境下最可靠的状态转移方式</strong>：</p>
+<pre><code>-- 条件更新（CAS）：影响行数为 0，说明状态已被并发请求改走
+UPDATE mission
+SET status = #{newStatus}, update_time = NOW()
+WHERE id = #{id} AND status = #{oldStatus};</code></pre>
+<pre><code>int rows = missionDao.compareAndSwap(missionId, current, next);
+if (rows == 0) {
+    // 状态已被别人改走：重查当前状态，再决定重试、忽略还是报错
+    return handleConflict(missionId, event);
+}
+// rows == 1 才继续执行动作：发消息、写日志、推进下游</code></pre>
+        <p style="margin-bottom:0">口诀：<strong>状态机（逻辑合法）+ 条件更新（物理互斥）= 完整方案</strong>，两者缺一不可。</p>
+      </div>
+
+      <div class="grid2" style="margin-top:15px">
+        <div class="mini">
+          <h3>6.2 持久化与恢复</h3>
+          <p>状态必须落库。服务重启后从库里恢复当前状态继续推进，而不是重置。批次表 + 子任务表 + 产物表构成"可恢复的持久化状态机"，是长周期异步任务的标配。</p>
+        </div>
+        <div class="mini">
+          <h3>6.3 幂等</h3>
+          <p>事件可能重复到达（MQ 至少一次投递、设备重发回调）。同一事件第二次到来时，若当前状态已"消化"过它，应安全忽略而不是报错或重复流转——转移表天然帮你判断：重复事件在表中查不到合法流转，走忽略分支即可。</p>
+        </div>
+        <div class="mini">
+          <h3>6.4 终态封闭</h3>
+          <p><code>FINISH</code>、<code>CANCEL</code> 这类终态的 next 集合必须为空，任何事件都转不出去。"已取消的任务又活了"这类事故的根源就是终态没有封闭。</p>
+        </div>
+        <div class="mini">
+          <h3>6.5 流转审计</h3>
+          <p>单独记录每一步流转 (from, event, to, operator, time)。设备回调乱序、重发常态化的场景下，能完整回放问题是救命的能力。</p>
+        </div>
+      </div>
+
+      <div class="card pad" style="margin-top:15px">
+        <h3 style="margin-top:0">流转日志表参考结构</h3>
+<pre><code>CREATE TABLE mission_status_log (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    mission_id  BIGINT      NOT NULL,
+    from_status INT         NOT NULL,
+    event       VARCHAR(32) NOT NULL,
+    to_status   INT         NOT NULL,
+    operator    VARCHAR(64),
+    created_at  DATETIME    NOT NULL
+);</code></pre>
+      </div>
+    </section>
+
+    <!-- ================= 7 检查清单 ================= -->
+    <section id="sec7">
+      <div class="head"><h2>7. 落地检查清单与适用边界</h2><p>引入状态机前先对照这两张清单，避免过度设计，也避免漏掉关键防线。</p></div>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">落地检查清单</h3>
+          <ul class="clean">
+            <li>状态和事件<strong>先画图、写表、评审</strong>，再动手写代码</li>
+            <li>转移规则只有<strong>一处定义</strong>（枚举 next 或转移表），禁止散落 if</li>
+            <li>所有转移经过<strong>唯一入口</strong>（<code>transferTo</code> / <code>fire</code>）</li>
+            <li>落库一律<strong>条件更新（CAS）</strong>，返回 0 行视为冲突处理</li>
+            <li><strong>终态 next 集合为空</strong>，任何事件不可转出</li>
+            <li>重复事件<strong>幂等</strong>：已消化的事件直接忽略</li>
+            <li>状态持久化 + <strong>重启恢复</strong>，不靠内存续命</li>
+            <li>流转写<strong>审计日志</strong>，出问题可回放</li>
+            <li>新增状态时：图 → 表 → 单测三处同步改</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">什么时候不需要状态机</h3>
+          <ul class="clean">
+            <li>状态只有两三个、流转毫无约束（如启用/停用开关）——直接写就行</li>
+            <li>纯 CRUD 的简单字段，没有并发修改与审计诉求</li>
+            <li>取值是连续数据而非离散模式（如温度、进度百分比）——那不是状态机要解决的问题</li>
+          </ul>
+          <div class="callout warn" style="margin-top:14px">
+            <p><strong>适用判断一句话：</strong>状态数有限（通常 &lt; 20）、流转有严格约束、存在并发修改、需要审计回放——满足两条以上，状态机就开始回本了。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 8 练习 ================= -->
+    <section id="sec8">
+      <div class="head"><h2>8. 练习</h2><p>检验是否真正掌握：三道题分别对应画图、实现和守卫/动作。</p></div>
+      <div class="card pad">
+        <ul class="clean">
+          <li><strong>补图</strong>：为"断点续飞"场景新增"任务创建回补"与"已接收"两个状态，它们应该出现在状态图的哪条路径上？画出修改后的完整流转。</li>
+          <li><strong>实现</strong>：用表驱动方式实现 <code>fire()</code>，并为每个状态编写非法转移的单元测试——终态收到任何事件必须抛异常。</li>
+          <li><strong>思考</strong>：用户取消事件在"已到达降落点、无人机还在空中"时应该允许吗？如果允许，取消动作里无人机怎么处理？——这正是守卫（Guard）和动作（Action）的用武之地。</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <footer><div class="shell">状态机模型 · 学习笔记</div></footer>
+  <script>
+    (()=>{const root=document.documentElement,key="state-machine-doc-theme";
+      const saved=localStorage.getItem(key);
+      if(saved)root.dataset.theme=saved;document.getElementById("theme").addEventListener("click",()=>{
+        const next=root.dataset.theme==="dark"?"light":"dark";root.dataset.theme=next;localStorage.setItem(key,next)})})();
+  </script>
+</body>
+</html>
