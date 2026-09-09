@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="状态机模型详解：核心概念、状态图与转移表、四种 Java 实现方式，以及生产环境最佳实践（并发 CAS、持久化恢复、幂等、终态封闭、流转审计）。">
+  <meta name="description" content="状态机模型详解：以音乐播放器入门概念，用电商订单生命周期贯穿状态图、四种 Java 实现方式与生产环境最佳实践（并发 CAS、持久化恢复、幂等、终态封闭、流转审计）。">
   <meta name="date" content="2026-09-09">
   <title>状态机模型：从概念到工程最佳实践</title>
   <style>
@@ -83,7 +83,7 @@
     <div class="shell">
       <div class="kicker">STATE MACHINE MODEL</div>
       <h1>状态机模型：从概念到工程最佳实践</h1>
-      <p class="lead">用一个无人机巡检任务的真实生命周期，讲透状态机的核心概念、四种 Java 实现方式，以及并发、持久化、幂等这些生产环境里的关键问题。</p>
+      <p class="lead">用一个音乐播放器三分钟入门概念，再用一份电商订单的生命周期贯穿全部实现与生产实践——并发、持久化、幂等、终态封闭、流转审计，一次讲透。</p>
       <div class="doc-meta">
         <time datetime="2026-09-09">2026年9月9日</time>
         <span>设计模式 · 学习笔记</span>
@@ -127,13 +127,13 @@
         </div>
         <div class="card pad">
           <h3 style="margin-top:0">形式化定义（五元组）</h3>
-          <p>教科书上写作 <code>M = (S, Σ, δ, s₀, F)</code>，含义并不神秘：</p>
+          <p>教科书上写作 <code>M = (S, Σ, δ, s₀, F)</code>，用音乐播放器一对照就不神秘：</p>
           <ul class="clean">
-            <li><code>S</code>：有限状态集（如 待处理/执行中/已完成）</li>
-            <li><code>Σ</code>：事件（输入）集合</li>
-            <li><code>δ</code>：转移函数，<code>当前状态 × 事件 → 下一状态</code></li>
-            <li><code>s₀</code>：初始状态（任务刚创建时是"待处理"）</li>
-            <li><code>F</code>：终态集合（"已完成""已取消"，转出永不发生）</li>
+            <li><code>S</code>：有限状态集 = { 停止、播放中、已暂停 }</li>
+            <li><code>Σ</code>：事件集 = { 播放、暂停、停止 }</li>
+            <li><code>δ</code>：转移函数（当前状态 × 事件 → 下一状态），下一节展开成 3×3 的表</li>
+            <li><code>s₀</code>：初始状态 = 停止（打开播放器时必然处于这里）</li>
+            <li><code>F</code>：终态集合 = ∅ —— 播放器没有"到此为止"的状态；而业务状态机（如订单的"已完成/已取消"）通常有终态，这是两类状态机最直观的差别</li>
           </ul>
         </div>
       </div>
@@ -141,89 +141,98 @@
 
     <!-- ================= 2 五个核心概念 ================= -->
     <section id="sec2">
-      <div class="head"><h2>2. 五个核心概念</h2><p>状态、事件、转移、动作、守卫——所有状态机相关讨论都由这五个词构成。</p></div>
+      <div class="head"><h2>2. 五个核心概念</h2><p>状态、事件、转移、动作、守卫——所有状态机相关讨论都由这五个词构成。继续用播放器建立直觉。</p></div>
       <div class="card pad table">
         <table>
-          <thead><tr><th>概念</th><th>英文</th><th>含义</th><th>巡检任务中的例子</th></tr></thead>
+          <thead><tr><th>概念</th><th>英文</th><th>含义</th><th>播放器中的例子</th></tr></thead>
           <tbody>
-            <tr><td><strong>状态</strong></td><td><code>State</code></td><td>事物当前所处的模式</td><td><code>RUNNING</code> 执行中</td></tr>
-            <tr><td><strong>事件</strong></td><td><code>Event</code></td><td>触发变化的输入</td><td>设备回调"无人机到达起飞点"</td></tr>
-            <tr><td><strong>转移</strong></td><td><code>Transition</code></td><td>状态 + 事件 → 新状态</td><td><code>RUNNING</code> + 到达起飞点 → <code>TAKEOFF</code></td></tr>
-            <tr><td><strong>动作</strong></td><td><code>Action</code></td><td>转移发生时执行的副作用</td><td>转入 <code>RUNNING</code> 时下发任务给机库、推送 WebSocket 通知</td></tr>
-            <tr><td><strong>守卫</strong></td><td><code>Guard</code></td><td>转移的前置条件，不满足则不转移</td><td>电量 &gt; 20% 才允许 <code>WAITING → RUNNING</code></td></tr>
+            <tr><td><strong>状态</strong></td><td><code>State</code></td><td>事物当前所处的模式</td><td><code>PLAYING</code> 播放中</td></tr>
+            <tr><td><strong>事件</strong></td><td><code>Event</code></td><td>触发变化的输入</td><td>用户按下"暂停"键</td></tr>
+            <tr><td><strong>转移</strong></td><td><code>Transition</code></td><td>状态 + 事件 → 新状态</td><td>播放中 + 按下暂停 → 已暂停</td></tr>
+            <tr><td><strong>动作</strong></td><td><code>Action</code></td><td>转移发生时执行的副作用</td><td>暂停时记住播放进度；恢复播放时从进度续播，而不是从头开始</td></tr>
+            <tr><td><strong>守卫</strong></td><td><code>Guard</code></td><td>转移的前置条件，不满足则不转移</td><td>在线流媒体场景：缓冲就绪，才允许从暂停恢复播放</td></tr>
           </tbody>
         </table>
       </div>
       <div class="grid2" style="margin-top:15px">
-        <div class="mini">
-          <h3>Mealy 机：动作挂在"转移"上</h3>
-          <p>每次转移时做一次性的事（发一条消息、写一行日志）。工程实践中绝大多数业务状态机都是 Mealy 型。</p>
+        <div class="card pad">
+          <h3 style="margin-top:0">播放器的完整转移表（δ）</h3>
+          <table>
+            <thead><tr><th>当前状态 \ 事件</th><th>播放</th><th>暂停</th><th>停止</th></tr></thead>
+            <tbody>
+              <tr><td>停止</td><td>播放中（从头播放）</td><td style="color:var(--red)">非法：没有可暂停的内容</td><td>忽略</td></tr>
+              <tr><td>播放中</td><td>忽略</td><td>已暂停</td><td>停止</td></tr>
+              <tr><td>已暂停</td><td>播放中（从进度续播）</td><td>忽略</td><td>停止</td></tr>
+            </tbody>
+          </table>
+          <p style="color:var(--muted);margin-bottom:0">3 个状态 × 3 个事件，这就是一台<strong>完整</strong>的状态机。注意两种"没有转移"的区别：<strong>忽略</strong>（重复事件，幂等处理）与<strong>非法</strong>（逻辑错误，应当报警）——这个区分第 6 节讲幂等时还要用到。另外注意"播放"事件在停止态和暂停态下<strong>目标状态相同、动作不同</strong>（从头播 vs 续播），这就是 Mealy 机。</p>
         </div>
-        <div class="mini">
-          <h3>Moore 机：动作挂在"状态"上</h3>
-          <p>进入某个状态后持续表现出某种行为（状态对应一个界面、一种输出）。硬件控制（如红绿灯本体）更常见。</p>
+        <div>
+          <div class="mini">
+            <h3>Mealy 机：动作挂在"转移"上</h3>
+            <p>每次转移时做一次性的事：按暂停时"记住进度"，按播放时"从头或续播"。工程实践中绝大多数业务状态机都是 Mealy 型。</p>
+          </div>
+          <div class="mini" style="margin-top:15px">
+            <h3>Moore 机：动作挂在"状态"上</h3>
+            <p>进入状态后持续表现出某种行为："播放中"持续解码出声，"暂停中"持续定格画面。硬件控制（红绿灯本体）更常见。</p>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- ================= 3 状态图与转移表 ================= -->
     <section id="sec3">
-      <div class="head"><h2>3. 状态图与转移表</h2><p>无论用什么语言实现，第一步永远是先把流转画出来、写成表——图和表就是转移函数 δ 本身。</p></div>
+      <div class="head"><h2>3. 状态图与转移表：电商订单</h2><p>播放器太小，承载不了守卫、终态与并发这些真实问题。从本节起换用电商订单生命周期作为贯穿全文的主力例子——先画图、再写成表，图和表就是转移函数 δ 本身。</p></div>
       <div class="card diagram">
         <svg viewBox="0 0 1040 336" role="img" aria-labelledby="dTitle dDesc">
-          <title id="dTitle">无人机巡检任务状态图（简化版）</title>
-          <desc id="dDesc">主干流转：待处理到执行中、到达起飞点、到达降落点、飞机落库、图片上传完成、机库复位，最终到已完成（绿色终态）；待处理与执行中可被取消，进入已取消（红色终态）。到达起飞点状态同样可取消，图中省略。</desc>
+          <title id="dTitle">电商订单状态图（简化版）</title>
+          <desc id="dDesc">主干流转：待支付、已支付、已发货，确认收货后到达已完成（绿色终态）；已发货后可申请退款进入退款中，退款成功到达已退款（琥珀色终态），驳回申请则回到已发货；待支付与已支付（未发货）可取消，进入已取消（红色终态）。</desc>
           <defs>
             <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker>
+            <marker id="arA" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--amber)"/></marker>
             <marker id="arr" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--red)"/></marker>
           </defs>
           <rect class="lane" x="16" y="14" width="1008" height="308" rx="16"/>
           <!-- 第一行：主干路径 -->
-          <rect class="node" x="36" y="48" width="132" height="56" rx="10"/><text class="title" x="102" y="72" text-anchor="middle">待处理</text><text class="sub" x="102" y="90" text-anchor="middle">WAITING</text>
-          <rect class="node" x="246" y="48" width="132" height="56" rx="10"/><text class="title" x="312" y="72" text-anchor="middle">执行中</text><text class="sub" x="312" y="90" text-anchor="middle">RUNNING</text>
-          <rect class="node" x="456" y="48" width="132" height="56" rx="10"/><text class="title" x="522" y="72" text-anchor="middle">到达起飞点</text><text class="sub" x="522" y="90" text-anchor="middle">TAKEOFF</text>
-          <rect class="node" x="666" y="48" width="132" height="56" rx="10"/><text class="title" x="732" y="72" text-anchor="middle">到达降落点</text><text class="sub" x="732" y="90" text-anchor="middle">LAND</text>
-          <rect class="node" x="876" y="48" width="132" height="56" rx="10"/><text class="title" x="942" y="72" text-anchor="middle">飞机落库</text><text class="sub" x="942" y="90" text-anchor="middle">DRONE_BACK</text>
+          <rect class="node" x="36" y="48" width="132" height="56" rx="10"/><text class="title" x="102" y="72" text-anchor="middle">待支付</text><text class="sub" x="102" y="90" text-anchor="middle">PENDING_PAYMENT</text>
+          <rect class="node" x="246" y="48" width="132" height="56" rx="10"/><text class="title" x="312" y="72" text-anchor="middle">已支付</text><text class="sub" x="312" y="90" text-anchor="middle">PAID</text>
+          <rect class="node" x="456" y="48" width="132" height="56" rx="10"/><text class="title" x="522" y="72" text-anchor="middle">已发货</text><text class="sub" x="522" y="90" text-anchor="middle">SHIPPED</text>
+          <rect class="node" x="666" y="48" width="132" height="56" rx="10"/><text class="title" x="732" y="72" text-anchor="middle">退款中</text><text class="sub" x="732" y="90" text-anchor="middle">REFUNDING</text>
+          <rect class="node a" x="876" y="48" width="132" height="56" rx="10"/><text class="title" x="942" y="72" text-anchor="middle">已退款</text><text class="sub" x="942" y="90" text-anchor="middle">REFUNDED · 终态</text>
           <!-- 第二行 -->
-          <rect class="node" x="876" y="232" width="132" height="56" rx="10"/><text class="title" x="942" y="256" text-anchor="middle">图片上传完成</text><text class="sub" x="942" y="274" text-anchor="middle">IMAGE_UPLOAD_COMPLETED</text>
-          <rect class="node" x="630" y="232" width="132" height="56" rx="10"/><text class="title" x="696" y="256" text-anchor="middle">机库复位</text><text class="sub" x="696" y="274" text-anchor="middle">DOCK_RESET</text>
-          <rect class="node g" x="430" y="232" width="110" height="56" rx="10"/><text class="title" x="485" y="256" text-anchor="middle">已完成</text><text class="sub" x="485" y="274" text-anchor="middle">FINISH · 终态</text>
-          <rect class="node r" x="60" y="232" width="110" height="56" rx="10"/><text class="title" x="115" y="256" text-anchor="middle">已取消</text><text class="sub" x="115" y="274" text-anchor="middle">CANCEL · 终态</text>
+          <rect class="node g" x="456" y="232" width="132" height="56" rx="10"/><text class="title" x="522" y="256" text-anchor="middle">已完成</text><text class="sub" x="522" y="274" text-anchor="middle">COMPLETED · 终态</text>
+          <rect class="node r" x="60" y="232" width="110" height="56" rx="10"/><text class="title" x="115" y="256" text-anchor="middle">已取消</text><text class="sub" x="115" y="274" text-anchor="middle">CANCELLED · 终态</text>
           <!-- 第一行主干边 -->
-          <path class="edge" d="M168 76 H242" marker-end="url(#ar)"/><text class="sub" x="206" y="66" text-anchor="middle">下发执行</text>
-          <path class="edge" d="M378 76 H452" marker-end="url(#ar)"/><text class="sub" x="415" y="66" text-anchor="middle">到达起飞点</text>
-          <path class="edge" d="M588 76 H662" marker-end="url(#ar)"/><text class="sub" x="625" y="66" text-anchor="middle">到达降落点</text>
-          <path class="edge" d="M798 76 H872" marker-end="url(#ar)"/><text class="sub" x="835" y="66" text-anchor="middle">飞机落库</text>
-          <!-- 第二行边 -->
-          <path class="edge" d="M942 104 V226" marker-end="url(#ar)"/><text class="sub" x="952" y="170" text-anchor="start">图片上传完成</text>
-          <path class="edge" d="M876 260 H768" marker-end="url(#ar)"/><text class="sub" x="821" y="250" text-anchor="middle">机库复位</text>
-          <path class="edge" d="M630 260 H546" marker-end="url(#ar)"/><text class="sub" x="588" y="250" text-anchor="middle">复位完成</text>
-          <path class="edge" d="M900 104 C 860 160, 800 200, 748 226" marker-end="url(#ar)"/><text class="sub" x="826" y="186" text-anchor="start">机库复位</text>
+          <path class="edge" d="M168 76 H242" marker-end="url(#ar)"/><text class="sub" x="205" y="66" text-anchor="middle">支付成功</text>
+          <path class="edge" d="M378 76 H452" marker-end="url(#ar)"/><text class="sub" x="415" y="66" text-anchor="middle">发货</text>
+          <path class="edge" d="M588 76 H662" marker-end="url(#ar)"/><text class="sub" x="625" y="66" text-anchor="middle">申请退款</text>
+          <path class="edge" d="M798 76 H872" marker-end="url(#ar)"/><text class="sub" x="835" y="66" text-anchor="middle">退款成功</text>
+          <!-- 确认收货：垂直向下 -->
+          <path class="edge" d="M522 104 V226" marker-end="url(#ar)"/><text class="sub" x="532" y="170" text-anchor="start">确认收货</text>
+          <!-- 驳回申请：退款中回退到已发货 -->
+          <path class="edge a" d="M732 104 C 710 165, 600 165, 562 108" marker-end="url(#arA)"/><text class="sub" x="655" y="182" text-anchor="middle">驳回申请</text>
           <!-- 取消路径 -->
           <path class="edge r" d="M102 104 C 102 150, 108 190, 112 226" marker-end="url(#arr)"/><text class="sub" x="64" y="170" text-anchor="start">取消</text>
-          <path class="edge r" d="M312 104 C 312 190, 230 250, 176 258" marker-end="url(#arr)"/><text class="sub" x="246" y="182" text-anchor="start">取消</text>
+          <path class="edge r" d="M312 104 C 312 190, 230 250, 176 258" marker-end="url(#arr)"/><text class="sub" x="200" y="178" text-anchor="start">取消（未发货）</text>
         </svg>
       </div>
       <div class="callout" style="margin-top:15px">
-        <p><strong>看图就能问出关键问题</strong>（这正是状态图的价值）：取消只能从"待处理"进入，还是"执行中"也能取消？<code>FINISH</code> 是终态吗、终态之后还允许任何转出吗？到达起飞点后如果设备故障，走哪条边？<code>WAITING</code> 是初始状态，即任务刚创建时的状态。</p>
+        <p><strong>看图就能问出关键问题</strong>（这正是状态图的价值）：已支付的"取消"带守卫——必须尚未发货；待支付的取消可能来自用户点击，也可能来自<strong>支付超时定时器</strong>，事件不只来自用户操作；<code>COMPLETED</code> 是终态，若产品要求"确认收货后 7 天无理由退货"，就得把"已收货"与"已完成"拆成两个状态——<strong>终态选在哪里，本身就是设计决策</strong>。</p>
       </div>
       <div class="card pad table" style="margin-top:15px">
         <h3 style="margin-top:0">转移表（转移函数 δ 的表格形式）</h3>
         <table>
-          <thead><tr><th>当前状态 \ 事件</th><th>下发执行</th><th>到达起飞点</th><th>到达降落点</th><th>飞机落库</th><th>图片上传完成</th><th>机库复位完成</th><th>用户取消</th></tr></thead>
+          <thead><tr><th>当前状态 \ 事件</th><th>支付成功</th><th>发货</th><th>确认收货</th><th>申请退款</th><th>退款成功</th><th>驳回申请</th><th>取消</th></tr></thead>
           <tbody>
-            <tr><td><code>WAITING</code> 待处理</td><td><code>RUNNING</code></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><code>CANCEL</code></td></tr>
-            <tr><td><code>RUNNING</code> 执行中</td><td>—</td><td><code>TAKEOFF</code></td><td><code>LAND</code></td><td>—</td><td>—</td><td>—</td><td><code>CANCEL</code></td></tr>
-            <tr><td><code>TAKEOFF</code> 到达起飞点</td><td>—</td><td>—</td><td><code>LAND</code></td><td>—</td><td>—</td><td>—</td><td><code>CANCEL</code></td></tr>
-            <tr><td><code>LAND</code> 到达降落点</td><td>—</td><td>—</td><td>—</td><td><code>DRONE_BACK</code></td><td>—</td><td>—</td><td>—</td></tr>
-            <tr><td><code>DRONE_BACK</code> 飞机落库</td><td>—</td><td>—</td><td>—</td><td>—</td><td><code>IMAGE_UPLOAD_COMPLETED</code></td><td><code>DOCK_RESET</code></td><td>—</td></tr>
-            <tr><td><code>IMAGE_UPLOAD_COMPLETED</code></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><code>DOCK_RESET</code></td><td>—</td></tr>
-            <tr><td><code>DOCK_RESET</code> 机库复位</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><code>FINISH</code></td><td>—</td></tr>
-            <tr><td><code>FINISH</code> / <code>CANCEL</code></td><td colspan="7" style="color:var(--muted)">终态：表中不存在任何条目，任何事件都无合法流转</td></tr>
+            <tr><td><code>PENDING_PAYMENT</code> 待支付</td><td><code>PAID</code></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><code>CANCELLED</code></td></tr>
+            <tr><td><code>PAID</code> 已支付</td><td>—</td><td><code>SHIPPED</code></td><td>—</td><td>—</td><td>—</td><td>—</td><td><code>CANCELLED</code>（守卫：未发货）</td></tr>
+            <tr><td><code>SHIPPED</code> 已发货</td><td>—</td><td>—</td><td><code>COMPLETED</code></td><td><code>REFUNDING</code>（守卫：限 N 天内）</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td><code>REFUNDING</code> 退款中</td><td>—</td><td>—</td><td>—</td><td>—</td><td><code>REFUNDED</code></td><td><code>SHIPPED</code>（回退）</td><td>—</td></tr>
+            <tr><td><code>COMPLETED</code> / <code>CANCELLED</code> / <code>REFUNDED</code></td><td colspan="7" style="color:var(--muted)">终态：表中不存在任何条目，任何事件都无合法流转</td></tr>
           </tbody>
         </table>
       </div>
-      <p style="color:var(--muted);margin-top:12px">表中"—"表示该组合<strong>非法</strong>：收到该事件应当拒绝、忽略或报警，而不是"顺手改一下状态"。</p>
+      <p style="color:var(--muted);margin-top:12px">表中"—"表示该组合<strong>非法</strong>：收到该事件应当拒绝、忽略或报警，而不是"顺手改一下状态"。守卫是转移前的附加条件，写在单元格里只是便于评审，工程上由代码在触发转移前校验（见 5.3）。</p>
     </section>
 
     <!-- ================= 4 反面案例 ================= -->
@@ -231,40 +240,36 @@
       <div class="head"><h2>4. 隐式状态机：最常见的反面形态</h2><p>很多系统"其实已经是状态机"，只是转移规则没有定义在任何地方——它们散落在各个 Service 的 if/else 里。</p></div>
       <div class="card pad">
         <h3 style="margin-top:0">症状一：枚举只定义了状态集 S，没有定义转移 δ</h3>
-<pre><code>public enum MissionStatusEnum {
-    WAITING(0, "待处理"),
-    RUNNING(1, "执行中"),
-    TAKEOFF(21, "到达起飞点"),
-    LAND(29, "到达降落点"),
-    DRONE_BACK(4, "飞机落库"),
-    DOCK_RESET(5, "机库复位"),
-    IMAGE_UPLOAD_COMPLETED(6, "图片上传完成"),
-    FINISH(2, "已完成"),
-    CANCEL(3, "已取消");
+<pre><code>public enum OrderStatusEnum {
+    PENDING_PAYMENT(0, "待支付"),
+    PAID(1, "已支付"),
+    SHIPPED(2, "已发货"),
+    COMPLETED(3, "已完成"),
+    CANCELLED(4, "已取消"),
+    REFUNDING(5, "退款中"),
+    REFUNDED(6, "已退款");
     // ……只有状态集合 S，"哪些流转合法"没有定义在任何地方
 }</code></pre>
         <h3>症状二：判断"处于哪一组状态"的 if 链散落各处</h3>
-<pre><code>// 某个设备回调处理里的典型判断：哪些状态算"已结束"全靠人脑记
-if (config.isFinishExeOdm()
-        &amp;&amp; DRONE_BACK != mission.getStatus()
-        &amp;&amp; DOCK_RESET != mission.getStatus()
-        &amp;&amp; FINISH != mission.getStatus()
-        &amp;&amp; IMAGE_UPLOAD_COMPLETED != mission.getStatus()) {
-    // ……
+<pre><code>// 散落在各处的判断：哪些状态算"已完结"、哪些还能退款，全靠人脑记
+if (COMPLETED != order.getStatus()
+        &amp;&amp; CANCELLED != order.getStatus()
+        &amp;&amp; REFUNDED != order.getStatus()) {
+    // ……这里到底允不允许退款？读代码的人不知道，写代码的人过俩月也不知道
 }</code></pre>
       </div>
       <div class="grid3" style="margin-top:15px">
         <div class="mini">
           <h3>问题一：无人能回答全貌</h3>
-          <p>"状态 X 能不能变成状态 Y"的答案散落在几十个文件里，只能靠通读代码或线上踩坑才能知道。</p>
+          <p>"已发货的订单能不能取消"的答案散落在几十个文件里，只能靠通读代码或线上踩坑才能知道。</p>
         </div>
         <div class="mini">
           <h3>问题二：加状态要改 N 处</h3>
-          <p>新增一个状态（例如为"断点续飞"增加回补状态），所有判断"任务是否结束"的 if 链都要挨个排查，漏一处就是线上 bug。</p>
+          <p>新增一个状态（例如"部分退款"），所有判断"订单是否已完结""是否可退款"的 if 链都要挨个排查，漏一处就是线上 bug。</p>
         </div>
         <div class="mini">
           <h3>问题三：并发不安全</h3>
-          <p>"取消"和"图片上传完成"两个回调同时到达，都读到旧状态、都判断自己合法、都去更新——已取消的任务又"活"了。</p>
+          <p>用户点"取消"和支付网关回调几乎同时到达，两个请求都读到"待支付"、都判断自己合法、都去更新——<strong>已取消的订单被改成已支付</strong>。</p>
         </div>
       </div>
       <div class="callout warn" style="margin-top:15px">
@@ -279,30 +284,29 @@ if (config.isFinishExeOdm()
       <div class="card pad">
         <h3 style="margin-top:0">5.1 枚举内聚式：把"下一步能去哪"放进枚举 <span class="pill g">零依赖 · 首选起步</span></h3>
         <p style="color:var(--muted)">改动最小，一眼看清全部流转。局限：表达不了"事件"和"守卫"维度。</p>
-<pre><code>public enum MissionStatusEnum {
+<pre><code>public enum OrderStatusEnum {
 
-    //                                          合法的下一步（终态集合为空）
-    WAITING(0, "待处理",        EnumSet.of(RUNNING, CANCEL)),
-    RUNNING(1, "执行中",        EnumSet.of(TAKEOFF, LAND, FINISH, CANCEL)),
-    LAND(29, "到达降落点",      EnumSet.of(DRONE_BACK)),
-    DRONE_BACK(4, "飞机落库",   EnumSet.of(IMAGE_UPLOAD_COMPLETED, DOCK_RESET)),
-    IMAGE_UPLOAD_COMPLETED(6, "图片上传完成", EnumSet.of(DOCK_RESET)),
-    DOCK_RESET(5, "机库复位",   EnumSet.of(FINISH)),
-    FINISH(2, "已完成",         EnumSet.noneOf(MissionStatusEnum.class)),
-    CANCEL(3, "已取消",         EnumSet.noneOf(MissionStatusEnum.class));
+    //                                        合法的下一步（终态集合为空）
+    PENDING_PAYMENT(0, "待支付",  EnumSet.of(PAID, CANCELLED)),
+    PAID(1, "已支付",             EnumSet.of(SHIPPED, CANCELLED)),
+    SHIPPED(2, "已发货",          EnumSet.of(COMPLETED, REFUNDING)),
+    REFUNDING(3, "退款中",        EnumSet.of(REFUNDED, SHIPPED)),
+    COMPLETED(4, "已完成",        EnumSet.noneOf(OrderStatusEnum.class)),
+    CANCELLED(5, "已取消",        EnumSet.noneOf(OrderStatusEnum.class)),
+    REFUNDED(6, "已退款",         EnumSet.noneOf(OrderStatusEnum.class));
 
     private final int type;
     private final String desc;
-    private final Set&lt;MissionStatusEnum&gt; nextStates;
+    private final Set&lt;OrderStatusEnum&gt; nextStates;
 
-    MissionStatusEnum(int type, String desc, Set&lt;MissionStatusEnum&gt; nextStates) {
+    OrderStatusEnum(int type, String desc, Set&lt;OrderStatusEnum&gt; nextStates) {
         this.type = type;
         this.desc = desc;
         this.nextStates = nextStates;
     }
 
     /** 状态转移的唯一入口，业务代码必须经过它 */
-    public MissionStatusEnum transferTo(MissionStatusEnum target) {
+    public OrderStatusEnum transferTo(OrderStatusEnum target) {
         if (!nextStates.contains(target)) {
             throw new IllegalStateException(
                 desc + " 不允许流转到 " + target.desc);
@@ -310,35 +314,31 @@ if (config.isFinishExeOdm()
         return target;
     }
 }</code></pre>
-        <p style="margin-bottom:0">于是第 4 节那条四行 if 链变成一行：<code>mission.transferTo(DOCK_RESET)</code>。非法流转直接抛异常——<strong>在物理上不可能发生，而不是靠程序员记得写判断</strong>。</p>
+        <p style="margin-bottom:0">于是散落的判断收敛成一行：<code>order.getStatusEnum().transferTo(CANCELLED)</code>。非法流转直接抛异常——<strong>在物理上不可能发生，而不是靠程序员记得写判断</strong>。</p>
       </div>
 
       <div class="card pad" style="margin-top:15px">
         <h3 style="margin-top:0">5.2 表驱动式：把 δ 写成数据 <span class="pill g">工程上最实用</span></h3>
         <p style="color:var(--muted)">引入事件枚举后，转移规则变成一张真正的表：规则与执行彻底分离，看一张表就能评审全部流转逻辑。</p>
-<pre><code>public enum MissionEvent {
-    DISPATCH, REACH_TAKEOFF, REACH_LAND, DRONE_DOCKED,
-    IMAGE_UPLOADED, DOCK_RESET_DONE, USER_CANCEL
+<pre><code>public enum OrderEvent {
+    PAY, SHIP, CONFIRM, APPLY_REFUND, REFUND_APPROVE, REFUND_REJECT, CANCEL
 }
 
-public final class MissionStateMachine {
+public final class OrderStateMachine {
 
-    private static final Map&lt;MissionStatusEnum, Map&lt;MissionEvent, MissionStatusEnum&gt;&gt; TABLE =
+    private static final Map&lt;OrderStatusEnum, Map&lt;OrderEvent, OrderStatusEnum&gt;&gt; TABLE =
         Map.of(
-            WAITING,    Map.of(DISPATCH, RUNNING, USER_CANCEL, CANCEL),
-            RUNNING,    Map.of(REACH_TAKEOFF, TAKEOFF, REACH_LAND, LAND, USER_CANCEL, CANCEL),
-            LAND,       Map.of(DRONE_DOCKED, DRONE_BACK),
-            DRONE_BACK, Map.of(IMAGE_UPLOADED, IMAGE_UPLOAD_COMPLETED,
-                               DOCK_RESET_DONE, DOCK_RESET),
-            IMAGE_UPLOAD_COMPLETED, Map.of(DOCK_RESET_DONE, DOCK_RESET),
-            DOCK_RESET, Map.of(DOCK_RESET_DONE, FINISH)
-        ); // FINISH / CANCEL 不在表中 = 终态，任何事件都转不出去
+            PENDING_PAYMENT, Map.of(PAY, PAID, CANCEL, CANCELLED),
+            PAID,            Map.of(SHIP, SHIPPED, CANCEL, CANCELLED),
+            SHIPPED,         Map.of(CONFIRM, COMPLETED, APPLY_REFUND, REFUNDING),
+            REFUNDING,       Map.of(REFUND_APPROVE, REFUNDED, REFUND_REJECT, SHIPPED)
+        ); // COMPLETED / CANCELLED / REFUNDED 不在表中 = 终态，任何事件都转不出去
 
-    private MissionStateMachine() {}
+    private OrderStateMachine() {}
 
-    /** 返回目标状态；表中不存在即为非法转移 */
-    public static MissionStatusEnum fire(MissionStatusEnum current, MissionEvent event) {
-        MissionStatusEnum next = TABLE
+    /** 返回目标状态；表中不存在即为非法转移。守卫（如"退款限 N 天内"）在调用前校验 */
+    public static OrderStatusEnum fire(OrderStatusEnum current, OrderEvent event) {
+        OrderStatusEnum next = TABLE
             .getOrDefault(current, Map.of())
             .get(event);
         if (next == null) {
@@ -352,33 +352,38 @@ public final class MissionStateMachine {
 
       <div class="card pad" style="margin-top:15px">
         <h3 style="margin-top:0">5.3 状态模式（GoF）：每个状态一个类 <span class="pill a">状态行为差异大时</span></h3>
-        <p style="color:var(--muted)">当各状态不只是流转不同，而是<strong>同一操作在不同状态下行为完全不同</strong>时使用。缺点是类多，状态多而行为简单时不划算。</p>
-<pre><code>public interface MissionState {
-    void onEvent(MissionContext ctx, MissionEvent event);
+        <p style="color:var(--muted)">当各状态不只是流转不同，而是<strong>同一操作在不同状态下行为完全不同</strong>时使用。守卫在这种写法里最自然。缺点是类多，状态多而行为简单时不划算。</p>
+<pre><code>public interface OrderState {
+    void onEvent(OrderContext ctx, OrderEvent event);
 }
 
-public final class RunningState implements MissionState {
+public final class ShippedState implements OrderState {
     @Override
-    public void onEvent(MissionContext ctx, MissionEvent event) {
+    public void onEvent(OrderContext ctx, OrderEvent event) {
         switch (event) {                    // 只需处理本状态关心的事件
-            case REACH_TAKEOFF -&gt; ctx.setState(new TakeoffState());
-            case USER_CANCEL   -&gt; { /* 先召回无人机，再转入取消态（动作） */ }
-            default -&gt; throw new IllegalStateException("执行中不接受事件 " + event);
+            case CONFIRM      -&gt; ctx.setState(new CompletedState());
+            case APPLY_REFUND -&gt; {
+                if (!ctx.withinRefundWindow()) {     // 守卫：发货后 N 天内
+                    throw new IllegalStateException("已超过可退款时限");
+                }
+                ctx.setState(new RefundingState());
+            }
+            default -&gt; throw new IllegalStateException("已发货状态下不接受事件 " + event);
         }
     }
 }
 
-public final class FinishedState implements MissionState {
+public final class CompletedState implements OrderState {
     @Override
-    public void onEvent(MissionContext ctx, MissionEvent event) {
-        // 终态：任何事件一律拒绝，任务不可能"复活"
+    public void onEvent(OrderContext ctx, OrderEvent event) {
+        // 终态：任何事件一律拒绝，订单不可能"复活"
     }
 }</code></pre>
       </div>
 
       <div class="card pad" style="margin-top:15px">
         <h3 style="margin-top:0">5.4 框架：Spring StateMachine <span class="pill a">超复杂长流程才用</span></h3>
-        <p style="margin-bottom:0">状态多到几十个、出现子状态（如"执行中"内部又分阶段）、或流程横跨数天与多个服务时，才值得引入框架。它提供层次状态、转移监听器、持久化与恢复（<code>StateMachinePersister</code>）等能力。<strong>不建议一上手就用框架</strong>——表驱动能解决八成问题，且人人看得懂。</p>
+        <p style="margin-bottom:0">状态多到几十个、出现子状态（如"已发货"内部又分拣货/出库/运输）、或流程横跨数天与多个服务（如订单履约全链路）时，才值得引入框架。它提供层次状态、转移监听器、持久化与恢复（<code>StateMachinePersister</code>）等能力。<strong>不建议一上手就用框架</strong>——表驱动能解决八成问题，且人人看得懂。</p>
       </div>
 
       <div class="card pad table" style="margin-top:15px">
@@ -388,7 +393,7 @@ public final class FinishedState implements MissionState {
           <tbody>
             <tr><td>流转简单、无事件维度</td><td>枚举内聚</td><td>零依赖、零学习成本，规则跟着枚举走</td></tr>
             <tr><td>事件多、规则需要集中评审</td><td>表驱动</td><td>规则即数据，一张表覆盖全部流转</td></tr>
-            <tr><td>各状态下行为差异巨大</td><td>状态模式</td><td>面向对象封装，新增状态不改旧状态</td></tr>
+            <tr><td>各状态下行为差异巨大、守卫多</td><td>状态模式</td><td>面向对象封装，新增状态不改旧状态</td></tr>
             <tr><td>层次状态 / 超长流程 / 跨服务</td><td>Spring StateMachine</td><td>框架自带持久化恢复、监听器、子状态</td></tr>
           </tbody>
         </table>
@@ -401,44 +406,45 @@ public final class FinishedState implements MissionState {
 
       <div class="card pad">
         <h3 style="margin-top:0">6.1 并发转移：用条件更新（CAS）兜底 <span class="pill a">最重要</span></h3>
-        <p style="color:var(--muted)">转移表只保证"逻辑上合法"，但两个线程可能都读到 <code>WAITING</code> 然后各自转移。落库时永远用条件更新，这是<strong>分布式环境下最可靠的状态转移方式</strong>：</p>
+        <p style="color:var(--muted)">转移表只保证"逻辑上合法"，但用户点"取消"和支付网关回调几乎同时到达时，两个请求都读到"待支付"、都判断自己合法。落库时永远用条件更新，这是<strong>分布式环境下最可靠的状态转移方式</strong>：</p>
 <pre><code>-- 条件更新（CAS）：影响行数为 0，说明状态已被并发请求改走
-UPDATE mission
+UPDATE orders
 SET status = #{newStatus}, update_time = NOW()
 WHERE id = #{id} AND status = #{oldStatus};</code></pre>
-<pre><code>int rows = missionDao.compareAndSwap(missionId, current, next);
+<pre><code>int rows = orderDao.compareAndSwap(orderId, current, next);
 if (rows == 0) {
     // 状态已被别人改走：重查当前状态，再决定重试、忽略还是报错
-    return handleConflict(missionId, event);
+    // 典型场景：取消请求 vs 支付回调赛态，CAS 保证只有一方成功
+    return handleConflict(orderId, event);
 }
-// rows == 1 才继续执行动作：发消息、写日志、推进下游</code></pre>
+// rows == 1 才继续执行动作：扣库存、发短信、推进下游</code></pre>
         <p style="margin-bottom:0">口诀：<strong>状态机（逻辑合法）+ 条件更新（物理互斥）= 完整方案</strong>，两者缺一不可。</p>
       </div>
 
       <div class="grid2" style="margin-top:15px">
         <div class="mini">
           <h3>6.2 持久化与恢复</h3>
-          <p>状态必须落库。服务重启后从库里恢复当前状态继续推进，而不是重置。批次表 + 子任务表 + 产物表构成"可恢复的持久化状态机"，是长周期异步任务的标配。</p>
+          <p>状态必须落库。服务重启后从库里恢复当前状态继续推进，而不是重置。批量退款、批量发货这类长周期异步任务的标准形态：批次表 + 子任务表构成"可恢复的持久化状态机"。</p>
         </div>
         <div class="mini">
           <h3>6.3 幂等</h3>
-          <p>事件可能重复到达（MQ 至少一次投递、设备重发回调）。同一事件第二次到来时，若当前状态已"消化"过它，应安全忽略而不是报错或重复流转——转移表天然帮你判断：重复事件在表中查不到合法流转，走忽略分支即可。</p>
+          <p>支付网关的重复通知（至少一次投递）、用户双击按钮、MQ 重发——同一事件第二次到来时，若当前状态已"消化"过它，应安全忽略而不是重复流转。转移表天然帮你判断：已支付状态再次收到 PAY，表中查不到合法流转，走忽略分支即可。</p>
         </div>
         <div class="mini">
           <h3>6.4 终态封闭</h3>
-          <p><code>FINISH</code>、<code>CANCEL</code> 这类终态的 next 集合必须为空，任何事件都转不出去。"已取消的任务又活了"这类事故的根源就是终态没有封闭。</p>
+          <p><code>COMPLETED</code>、<code>CANCELLED</code>、<code>REFUNDED</code> 这类终态的 next 集合必须为空，任何事件都转不出去。"已取消的订单又变成已支付"这类事故的根源就是终态没有封闭。</p>
         </div>
         <div class="mini">
           <h3>6.5 流转审计</h3>
-          <p>单独记录每一步流转 (from, event, to, operator, time)。设备回调乱序、重发常态化的场景下，能完整回放问题是救命的能力。</p>
+          <p>单独记录每一步流转 (from, event, to, operator, time)。支付回调乱序、重发、运营人工改单常态化的场景下，能完整回放问题是救命的能力。</p>
         </div>
       </div>
 
       <div class="card pad" style="margin-top:15px">
         <h3 style="margin-top:0">流转日志表参考结构</h3>
-<pre><code>CREATE TABLE mission_status_log (
+<pre><code>CREATE TABLE order_status_log (
     id          BIGINT PRIMARY KEY AUTO_INCREMENT,
-    mission_id  BIGINT      NOT NULL,
+    order_id    BIGINT      NOT NULL,
     from_status INT         NOT NULL,
     event       VARCHAR(32) NOT NULL,
     to_status   INT         NOT NULL,
@@ -460,7 +466,7 @@ if (rows == 0) {
             <li>所有转移经过<strong>唯一入口</strong>（<code>transferTo</code> / <code>fire</code>）</li>
             <li>落库一律<strong>条件更新（CAS）</strong>，返回 0 行视为冲突处理</li>
             <li><strong>终态 next 集合为空</strong>，任何事件不可转出</li>
-            <li>重复事件<strong>幂等</strong>：已消化的事件直接忽略</li>
+            <li>重复事件<strong>幂等</strong>：已消化的事件直接忽略，不报错不重放</li>
             <li>状态持久化 + <strong>重启恢复</strong>，不靠内存续命</li>
             <li>流转写<strong>审计日志</strong>，出问题可回放</li>
             <li>新增状态时：图 → 表 → 单测三处同步改</li>
@@ -482,12 +488,12 @@ if (rows == 0) {
 
     <!-- ================= 8 练习 ================= -->
     <section id="sec8">
-      <div class="head"><h2>8. 练习</h2><p>检验是否真正掌握：三道题分别对应画图、实现和守卫/动作。</p></div>
+      <div class="head"><h2>8. 练习</h2><p>检验是否真正掌握：三道题分别对应画图、实现和守卫/并发。</p></div>
       <div class="card pad">
         <ul class="clean">
-          <li><strong>补图</strong>：为"断点续飞"场景新增"任务创建回补"与"已接收"两个状态，它们应该出现在状态图的哪条路径上？画出修改后的完整流转。</li>
-          <li><strong>实现</strong>：用表驱动方式实现 <code>fire()</code>，并为每个状态编写非法转移的单元测试——终态收到任何事件必须抛异常。</li>
-          <li><strong>思考</strong>：用户取消事件在"已到达降落点、无人机还在空中"时应该允许吗？如果允许，取消动作里无人机怎么处理？——这正是守卫（Guard）和动作（Action）的用武之地。</li>
+          <li><strong>补图</strong>：电商常把"确认收货"与"已完成"拆开（已收货 → 待评价 → 已完成，评价完成才终态）。把"已收货""待评价"补进第 3 节的状态图与转移表；想一想：终态从"收货即完成"变成"评价后完成"，哪些已有代码的假设会被打破？</li>
+          <li><strong>实现</strong>：用表驱动方式实现 <code>fire()</code>，并为每个状态编写非法转移的单元测试——终态收到任何事件必须抛异常；<code>PAID</code> 收到取消事件必须先过"未发货"守卫。</li>
+          <li><strong>思考</strong>：用户点"取消"和支付回调几乎同时到达，CAS 之后必有一方失败——失败的那一方该怎么处理？重试、报错还是静默忽略？另外，"退款中"买家主动撤销退款申请，应该回到哪个状态（回退边）？需要定义什么新事件？</li>
         </ul>
       </div>
     </section>
