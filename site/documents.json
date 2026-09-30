@@ -1,5 +1,11 @@
 [
   {
+    "title": "Agent / AI 应用面试题全集：手撕代码与场景题精讲",
+    "description": "Agent/AI 应用面试高频题全集：16 道手撕代码题带参考实现与追问预判，28 道场景题带答题框架，覆盖 RAG、Agent、LLM 工程与系统设计四大方向。",
+    "date": "2026-09-30",
+    "url": "documents/agent-ai-interview-questions.html"
+  },
+  {
     "title": "状态机模型：从概念到工程最佳实践",
     "description": "状态机模型详解：以音乐播放器入门概念，用电商订单生命周期贯穿状态图、四种 Java 实现方式与生产环境最佳实践（并发 CAS、持久化恢复、幂等、终态封闭、流转审计）。",
     "date": "2026-09-09",
