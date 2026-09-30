@@ -85,6 +85,13 @@
   .foot{color:var(--fg-muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px;margin-top:50px}
   @media (max-width:760px){nav.toc ol{columns:1} .wrap{padding:20px 14px 60px} h1{font-size:25px}}
 </style>
+  <style>
+    .dock{position:fixed;right:18px;bottom:18px;z-index:99;display:flex;gap:4px;padding:6px;border-radius:999px;background:rgba(15,23,42,.82);backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(15,23,42,.28)}
+    .dock a{padding:7px 13px;border-radius:999px;color:#fff;text-decoration:none;font:600 13px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+    .dock a:hover{background:rgba(255,255,255,.16)}
+    html{scroll-behavior:smooth}
+    @media print{.dock{display:none}}
+  </style>
 </head>
 <body>
 <div class="wrap">
@@ -645,5 +652,6 @@ applicationEventPublisher.publishEvent(new ViewRefreshEvent(...));</code></pre>
 </section>
 
 </div>
+  <nav class="dock" aria-label="页面快捷导航"><a href="../index.html">首页</a><a href="#">↑ 顶部</a></nav>
 </body>
 </html>

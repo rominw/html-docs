@@ -16,7 +16,7 @@ function setTheme(value) {
   themeLabel.textContent = theme.label;
   themeToggle.title = `当前：${theme.label}主题。点击切换`;
   try {
-    localStorage.setItem("html-notes-theme", theme.value);
+    localStorage.setItem("html-docs-theme", theme.value);
   } catch (_) {
     // 浏览器禁止存储时，主题仍可在当前页面使用。
   }
