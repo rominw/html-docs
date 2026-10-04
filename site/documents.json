@@ -1,5 +1,11 @@
 [
   {
+    "title": "Java 后端与 Agent / AI 应用 · 面试图解手册",
+    "description": "Java 后端与 Agent / AI 应用面试图解手册：110 道深度题、33 幅原理图，覆盖 JVM、并发、Spring、MySQL、RAG、Agent、前端与通信协议。",
+    "date": "2026-10-04",
+    "url": "documents/java-agent-ai-interview-illustrated.html"
+  },
+  {
     "title": "Agent / AI 应用面试题全集：手撕代码与场景题精讲",
     "description": "Agent/AI 应用面试高频题全集：16 道手撕代码题带参考实现与追问预判，28 道场景题带答题框架，覆盖 RAG、Agent、LLM 工程与系统设计四大方向。",
     "date": "2026-09-30",
