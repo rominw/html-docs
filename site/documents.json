@@ -1,5 +1,11 @@
 [
   {
+    "title": "OpenClaw 完整剖析：从 Gateway 到 Agent 执行与恢复",
+    "description": "基于固定源码快照，详细剖析 OpenClaw 的 Gateway、Agent 循环、Pi 关系、模型与工具、SQLite 会话、记忆、插件、调度、安全及恢复机制。",
+    "date": "2026-10-08",
+    "url": "documents/openclaw-complete-analysis.html"
+  },
+  {
     "title": "Java 后端与 Agent / AI 应用 · 面试图解手册",
     "description": "Java 后端与 Agent / AI 应用面试图解手册：172 道深度题、52 幅原理图，覆盖 JVM、并发、Spring、MySQL、RAG、Agent、前端与通信协议。",
     "date": "2026-10-04",
