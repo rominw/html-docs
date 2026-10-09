@@ -1,8 +1,8 @@
 [
   {
     "title": "OpenClaw 完整剖析：从 Gateway 到 Agent 执行与恢复",
-    "description": "基于固定源码快照，详细剖析 OpenClaw 的 Gateway、Agent 循环、Pi 关系、模型与工具、SQLite 会话、记忆、插件、调度、安全及恢复机制。",
-    "date": "2026-10-08",
+    "description": "基于固定源码快照，详细剖析 OpenClaw 的 Gateway、Agent 循环、Pi 关系、模型与工具、SQLite 会话、记忆、插件、调度、安全与恢复，并提供 MCP 接入配置及最佳实践。",
+    "date": "2026-10-09",
     "url": "documents/openclaw-complete-analysis.html"
   },
   {
