@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="Agent/AI 应用面试高频题全集：16 道手撕代码题带参考实现与追问预判，28 道场景题带答题框架，覆盖 RAG、Agent、LLM 工程与系统设计四大方向。">
-  <meta name="date" content="2026-09-30">
+  <meta name="description" content="Agent/AI 应用面试高频题全集：16 道手撕代码题带参考实现与追问预判，31 道场景题带答题框架，覆盖 RAG、Agent、LLM 工程与系统设计四大方向。">
+  <meta name="date" content="2026-10-10">
   <title>Agent / AI 应用面试题全集：手撕代码与场景题精讲</title>
   <style>
     :root {
@@ -92,9 +92,9 @@
     <div class="shell">
       <div class="kicker">AGENT INTERVIEW HANDBOOK</div>
       <h1>Agent / AI 应用面试题全集</h1>
-      <p class="lead">16 道高频手撕题带可运行的参考实现，28 道场景题带答题框架与加分项——覆盖 RAG、Agent、LLM 工程与系统设计四大方向，附答题技巧总纲。既可用于备考，也可直接当作面试官的出题库。</p>
+      <p class="lead">16 道高频手撕题带可运行的参考实现，31 道场景题带答题框架与加分项——覆盖 RAG、Agent、LLM 工程与系统设计四大方向，附答题技巧总纲。既可用于备考，也可直接当作面试官的出题库。</p>
       <div class="doc-meta">
-        <time datetime="2026-09-30">2026年9月30日</time>
+        <time datetime="2026-10-10">2026年10月10日</time>
         <span>面试题库 / Agent 工程</span>
       </div>
       <div class="actions">
@@ -104,7 +104,7 @@
       </div>
       <div class="stats">
         <div class="stat"><b>16 道</b><span>手撕题，全部带参考实现</span></div>
-        <div class="stat"><b>28 道</b><span>场景题，附答题框架与踩坑</span></div>
+        <div class="stat"><b>31 道</b><span>场景题，附答题框架与踩坑</span></div>
         <div class="stat"><b>4 大方向</b><span>RAG / Agent / LLM 工程 / 系统设计</span></div>
         <div class="stat"><b>50+ 追问</b><span>面试官追问方向预判</span></div>
       </div>
@@ -897,6 +897,34 @@ def repair_llm_json(raw: str):
           <li><strong>监控：</strong>按场景/用户维度归集 token 成本，异常用量告警。</li>
         </ul>
       </div>
+
+      <div class="card pad q">
+        <h3>7.10 MCP 是什么？和 Function Calling、REST 什么关系？<span class="pill a">2026 必考</span></h3>
+        <p class="tagline">考察点：工具生态的协议分层理解。答好这题 = 你真的集成过工具生态，而不只是会调 SDK。</p>
+        <ul class="clean">
+          <li><strong>先分层再对比：</strong>Function Calling 是<strong>模型层</strong>能力——模型表达「我想调哪个函数、参数是什么」；MCP（Model Context Protocol）是<strong>协议层</strong>标准——定义工具如何被发现（list tools）、描述（JSON Schema）、调用（call tool）、传输（本地 stdio / 远端 streamable HTTP）与鉴权。两者是配合不是竞争：MCP server 暴露的工具，最终仍要通过 FC 之类的机制让模型表达调用意图。</li>
+          <li><strong>和 REST 的区别：</strong>REST 是每个服务自定义接口，Agent 接 N 个工具要写 N 套适配；MCP 把「发现 + schema + 调用 + 通知」统一成开放协议，工具实现一次、任何 MCP 客户端即插即用。类比：<strong>FC 是指令集，MCP 是 USB-C</strong>。</li>
+          <li><strong>工程要点：</strong>① 工具描述全部进 system prompt——MCP server 挂太多工具 = prefill 成本和选错率暴涨，要按会话动态挂载或做工具检索；② MCP server 是真实进程（尤其本地 stdio），权限沙箱与命令白名单必须收紧，注入面从「API 参数」扩大到「整个进程」；③ 第三方 server 有供应链信任问题，接入前评估来源。</li>
+        </ul>
+        <div class="callout"><p><strong>答题技巧：</strong>最高频的错误答案是「MCP 替代了 Function Calling」。开局一句话分层（模型层 vs 协议层）+ USB-C 类比，这题赢大半；能主动提「工具多了上下文爆炸，要按需挂载」是上过手的标志。</p></div>
+        <ul class="clean">
+          <li><strong>追问 1：</strong>MCP 的传输方式有哪些？——本地 stdio（子进程、低延迟、免网络）与 streamable HTTP（远端、可共享、可鉴权）。</li>
+          <li><strong>追问 2：</strong>已有 REST API 的系统怎么接 MCP？——加一层 MCP server 网关包住现有 API，工具描述就是这层网关的核心资产。</li>
+        </ul>
+      </div>
+
+      <div class="card pad q">
+        <h3>7.11 Agent 暂停恢复：Checkpoint 能保证不重复执行吗？<span class="pill a">高级岗杀手题</span></h3>
+        <p class="tagline">考察点：durable execution 理解。开局就该答「不能」——然后讲为什么、怎么补。</p>
+        <ul class="clean">
+          <li><strong>核心洞察：</strong>checkpoint 保存的是 Agent 内部状态（消息历史、计划、步骤游标），而<strong>外部副作用不在 checkpoint 里</strong>——已发出的退款、已创建的订单、已发的邮件发生在外部世界。恢复后内部状态回到断点，外部世界却可能已经超前，两边天然有时间差。</li>
+          <li><strong>三个典型缺口：</strong>① 工具调用已发出、结果未返回就崩溃——恢复后不知道执行没有，盲目重放 = 重复副作用；② checkpoint 落在调用前还是调用后，各留一半风险（前则可能重放，后则可能丢结果），单靠顺序解决不了；③ 恢复时外部状态已被他人改变（等审批的暂停期间，用户手动取消了订单）。</li>
+          <li><strong>补救框架：</strong>副作用前先持久化「意图 + 幂等键」，调用后持久化「结果」；恢复时先对账（查外部实际状态）再决定跳过还是重做——at-least-once 重放 + 幂等去重，工程上收敛成 effectively-once，别追求真空的 exactly-once。</li>
+          <li><strong>最容易被漏的点：</strong>LLM 是非确定的，恢复重放时<strong>不能重新调 LLM</strong>——历史每步的模型输出必须缓存进 checkpoint，否则重放轨迹漂移、行为不可复现。LangGraph checkpointer、Temporal 的确定性重放都是这个思路。</li>
+          <li><strong>工具分级：</strong>只读工具重放零成本随便试；写工具一律「先查后做」（见 7.7）。human-in-the-loop 暂停是最常见场景：恢复后先重验前提是否仍成立，再继续执行。</li>
+        </ul>
+        <div class="callout"><p><strong>加分项：</strong>报出「checkpoint 存四样东西：消息历史、计划状态、工具结果缓存、步骤游标」；点破根因——「写外部系统和写 checkpoint 无法做成一个事务」，所以只能靠幂等对账弥合。</p></div>
+      </div>
     </section>
 
     <section id="s8">
@@ -977,6 +1005,23 @@ def repair_llm_json(raw: str):
           <li><strong>指标：</strong>技术面（错误率、p95 延迟、首字延迟、结构化合法率）+ 业务面（解决率、点踩率、转人工率、每会话成本）。</li>
           <li><strong>成本归集：</strong>按场景/租户/模型维度拆账，异常用量自动告警（防 bug 烧钱）。</li>
           <li><strong>告警哲学：</strong>供应商错误率突升、平均轮次暴涨（可能是死循环）、单请求 token 爆表——这三个最值得配告警。</li>
+        </ul>
+      </div>
+
+      <div class="card pad q">
+        <h3>8.8 SSE 断线重连：回答文字重复或缺失怎么办？<span class="pill g">高频</span></h3>
+        <p class="tagline">考察点：流式传输的可靠性设计。生产环境的流式一定会断，问题只是什么时候断。</p>
+        <ul class="clean">
+          <li><strong>第一句话先问前提：</strong>生成结果服务端有没有留存？留了（生成过程写进缓冲/存储）→ 可以按游标补发；没留 → 只能整段重新生成。两个方案差一个量级，先确认再设计。</li>
+          <li><strong>补发协议：</strong>服务端每条消息带递增 <code>seq</code>（SSE 的 <code>id:</code> 字段白送这个能力），重连时客户端带 <code>Last-Event-ID</code> 或「已确认游标」，服务端从游标之后续发。</li>
+          <li><strong>重复的根因：</strong>渲染进度落后于接收进度时断线（打字机积压，见 2.4），重连补发把已显示的又推一遍。解法：<strong>渲染游标和确认游标分开</strong>，渲染按「绝对位置」幂等写（写第 N 个字而不是 append），丢弃 seq 不大于已确认值的消息。</li>
+          <li><strong>缺失的根因：</strong>游标只在内存里没持久化（刷新页面即丢）；或重连后服务端整段重放，把客户端已有状态冲掉。</li>
+          <li><strong>防断细节：</strong>心跳注释行（<code>: ping</code>）防中间层空闲超时掐连接；反向代理缓冲要显式关（如 <code>X-Accel-Buffering: no</code>）；fetch 流要自己监听 error/done，只有 EventSource 才有协议级自动重连。</li>
+        </ul>
+        <div class="callout"><p><strong>答题技巧：</strong>关键词按顺序说出来就是满分结构：seq 编号 → 游标确认 → 幂等渲染 → 可重放缓冲。能补一句「多端同步时游标按会话存服务端」更强。</p></div>
+        <ul class="clean">
+          <li><strong>追问 1：</strong>WebSocket 场景怎么办？——协议不白送 id 和重连，seq、ack、重连退避全要自己实现，这正是单向流选 SSE 的理由。</li>
+          <li><strong>追问 2：</strong>补发期间新生成还在继续怎么办？——服务端按会话维护有序缓冲，补发与实时流共用一个序号空间，客户端按 seq 排序消费。</li>
         </ul>
       </div>
     </section>

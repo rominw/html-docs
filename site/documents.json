@@ -1,5 +1,11 @@
 [
   {
+    "title": "Agent / AI 应用面试题全集：手撕代码与场景题精讲",
+    "description": "Agent/AI 应用面试高频题全集：16 道手撕代码题带参考实现与追问预判，31 道场景题带答题框架，覆盖 RAG、Agent、LLM 工程与系统设计四大方向。",
+    "date": "2026-10-10",
+    "url": "documents/agent-ai-interview-questions.html"
+  },
+  {
     "title": "OpenClaw 完整剖析：从 Gateway 到 Agent 执行与恢复",
     "description": "基于固定源码快照，详细剖析 OpenClaw 的 Gateway、Agent 循环、Pi 关系、模型与工具、SQLite 会话、记忆、插件、调度、安全与恢复，并提供 MCP 接入配置及最佳实践。",
     "date": "2026-10-09",
@@ -10,12 +16,6 @@
     "description": "Java 后端与 Agent / AI 应用面试图解手册：172 道深度题、52 幅原理图，覆盖 JVM、并发、Spring、MySQL、RAG、Agent、前端与通信协议。",
     "date": "2026-10-04",
     "url": "documents/java-agent-ai-interview-illustrated.html"
-  },
-  {
-    "title": "Agent / AI 应用面试题全集：手撕代码与场景题精讲",
-    "description": "Agent/AI 应用面试高频题全集：16 道手撕代码题带参考实现与追问预判，28 道场景题带答题框架，覆盖 RAG、Agent、LLM 工程与系统设计四大方向。",
-    "date": "2026-09-30",
-    "url": "documents/agent-ai-interview-questions.html"
   },
   {
     "title": "状态机模型：从概念到工程最佳实践",
