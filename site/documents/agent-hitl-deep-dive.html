@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="深入解析 Agent 领域 Human-in-the-Loop 的机制与架构：中断与恢复的状态机本质、审批策略纯函数、异步持久化执行、MCP elicitation 协议、审批疲劳实证与对策，以及多 Agent 回环与选型决策框架。">
+  <meta name="date" content="2026-10-12">
+  <title>Agent 中的人机回环（HITL）：机制、架构与设计权衡</title>
+  <style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .decision{fill:var(--amber2);stroke:var(--amber);stroke-width:1.6}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    .active{fill:var(--blue2);stroke:var(--blue);stroke-width:1.2}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    .dock{position:fixed;right:18px;bottom:18px;z-index:99;display:flex;gap:4px;padding:6px;border-radius:999px;background:rgba(15,23,42,.82);backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(15,23,42,.28)}
+    .dock a{padding:7px 13px;border-radius:999px;color:#fff;text-decoration:none;font:600 13px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+    .dock a:hover{background:rgba(255,255,255,.16)}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell">
+      <div class="kicker">HUMAN-IN-THE-LOOP · AGENT ARCHITECTURE</div>
+      <h1>Agent 中的人机回环</h1>
+      <p class="lead">把 HITL 从"加个确认弹窗"拆到工程本质：执行模型如何变成可暂停的状态机、审批判定如何成为纯函数、异步审批如何跨天存活、协议如何把"问人"标准化，以及审批疲劳为什么是监督的第一失效点。</p>
+      <div class="doc-meta">
+        <time datetime="2026-10-12">2026年10月12日</time>
+        <span>Agent 架构 / 深度解析</span>
+      </div>
+      <div class="actions">
+        <a class="btn" href="#sec1">开始阅读</a>
+        <button class="btn" id="theme" type="button">切换主题</button>
+        <button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>4 维</b><span>触发 · 呈现 · 恢复 · 审计——HITL 的完整设计面</span></div>
+        <div class="stat"><b>10 级</b><span>Sheridan–Verplank 自动化层级，权限模式的理论坐标系</span></div>
+        <div class="stat"><b>2025-06-18</b><span>MCP elicitation 把"问人"写进协议规范</span></div>
+        <div class="stat"><b>&gt;98%</b><span>经验红线：批准率长期高于此的门就是橡皮图章</span></div>
+      </div>
+    </div>
+  </header>
+  <nav>
+    <div class="shell">
+      <a href="#sec1">问题定义</a><a href="#sec2">理论底座</a><a href="#sec3">中断与恢复</a><a href="#sec4">审批策略层</a><a href="#sec5">异步与持久化</a><a href="#sec6">协议层 MCP</a><a href="#sec7">审批疲劳</a><a href="#sec8">交付边界</a><a href="#sec9">多 Agent</a><a href="#sec10">选型与清单</a>
+    </div>
+  </nav>
+  <main class="shell">
+
+    <!-- ============ 1 问题定义 ============ -->
+    <section id="sec1">
+      <div class="head"><h2>1. 问题定义：HITL 不是 UI，是执行模型</h2><p>先纠正最常见的误解，再给出本文的分析框架。</p></div>
+      <p>Human-in-the-Loop 经常被理解成"危险操作前加个确认弹窗"。这个理解会直接导致错误的设计：弹窗是 UI 层的补丁，而 HITL 真正改变的是<strong>执行模型</strong>——把 agent 从"一次流式跑完的函数调用"改造为<strong>可中断、可跨进程跨天恢复、且在关键节点上把决策权交给人的状态机</strong>。做不做这个改造，决定了后面所有的交互设计是真回环还是装饰品。</p>
+      <p>分析任何 HITL 实现，都可以拆到四个正交维度上。这四维也构成了本文第 3–7 节的行文顺序：</p>
+      <div class="grid2">
+        <div class="mini"><h3>触发（When）</h3><p>什么条件打断人：动作类别、风险分级、沙箱边界、策略规则、模型置信度。触发设计决定打断频率，直接决定监督是否可持续。</p></div>
+        <div class="mini"><h3>呈现（What）</h3><p>打断时给人看什么：diff、计划、理由、影响面、先例。呈现设计决定人能否在数十秒内做出<strong>正确</strong>判断——大多数实现死在这里，而不是死在触发上。</p></div>
+        <div class="mini"><h3>恢复（How）</h3><p>人的决策如何回注执行：resume 值注入、状态重放、前提重校验。恢复设计决定回环能否异步化、能否在生产环境存活。</p></div>
+        <div class="mini"><h3>审计（Why）</h3><p>每次打断与决策留痕：谁、在何时、基于什么信息、批准了什么。这是事故复盘与合规的依据，也是"有意义的控制"能被证明的唯一方式。</p></div>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>一个判断标准：</strong>如果一个系统无法把"等待人类"变成可持久化的状态（进程重启、隔了一夜之后还能继续），那它的 HITL 只能停留在同步弹窗层面——人必须守在屏幕前，回环覆盖不了真实的审批流程。能不能"暂停并跨天恢复"，是 HITL 工程成熟度的分水岭。</p></div>
+    </section>
+
+    <!-- ============ 2 理论底座 ============ -->
+    <section id="sec2">
+      <div class="head"><h2>2. 理论底座：自动化层级与「自动化的讽刺」</h2><p>Agent 领域 2026 年撞上的坑，在四十年的监督控制文献里几乎都有原型。</p></div>
+      <p>人机自动化分工不是新问题。Sheridan 与 Verplank（1978）提出 10 级自动化层级（Levels of Automation），Parasuraman、Sheridan 与 Wickens（2000）进一步把它拆成四个阶段——信息获取、信息分析、决策选择、行动执行——每个阶段可以独立设定自动化程度。这套框架几乎可以直接映射到今天 agent 的权限模式上：</p>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>自动化层级</th><th>语义（谁决策 / 谁执行）</th><th>Agent 领域对应形态</th></tr></thead>
+          <tbody>
+            <tr><td><code>LOA 1–3</code></td><td>系统采集、过滤、提示信息；人决策并执行</td><td>检索与总结型助手：人提问，模型只供信息，不碰执行</td></tr>
+            <tr><td><code>LOA 4–5</code></td><td>系统给出完整方案建议；人拍板并亲自执行</td><td>Copilot 形态：代码补全、计划草稿；plan mode 里"计划已就绪，等人放行"也是此档</td></tr>
+            <tr><td><code>LOA 6–7</code></td><td>系统执行，但须人事先批准，或执行后人可否决</td><td>当前 agent 的主流档位：动作级审批门、acceptEdits、PR review（事后否决权）</td></tr>
+            <tr><td><code>LOA 8–10</code></td><td>系统自主执行，事后告知、选择性告知或不告知</td><td>Full Access / bypassPermissions：全自动 + 沙箱隔离 + 事后审计与抽检</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>这个谱系揭示了一个常被忽略的事实：<strong>permission mode 不是二元开关，而是把系统在 LOA 谱系上整体平移的档位选择器</strong>。而三个经典理论预言了这条谱系两端的失败模式：</p>
+      <div class="grid3">
+        <div class="mini"><h3>自动化的讽刺</h3><p>Bainbridge（1983）：自动化越彻底，剩下的人工环节越难做好——监督者脱离回路、技能退化、警觉性下降。当系统 99% 时间正确，人会在第 100 次审查时睡着。agent 时代的重演就是审批疲劳。</p></div>
+        <div class="mini"><h3>自动化偏见</h3><p>Skitka 等人的实验结论：人系统性地过度信任自动化输出——倾向接受建议、忽略与自动化结论矛盾的独立证据。映射到 agent：模型在审批请求里附带的"理由"本身就是诱导批准的信号，呈现层必须警惕这一点。</p></div>
+        <div class="mini"><h3>有意义的控制</h3><p>Santoni de Sio 与 van den Hoven（2018）提出两个条件：tracking（人的意图能有效体现在结果中）与 tracing（任何结果都能回溯到具体的人及其理由）。直接对应 agent 的审计日志设计——没有 tracing，"有人审核过"只是合规话术。</p></div>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>为什么先讲理论：</strong>2026 年行业对 agent 治理的实证结论——"人工监督是最先失效的一环"——与 1983 年的预言完全同构。HITL 设计不是新发明，而是把监督控制（supervisory control）工程化到 LLM 系统上：挡在人和 agent 之间的每一个环节，都要按"人的注意力是稀缺且会退化的资源"来设计。</p></div>
+    </section>
+
+    <!-- ============ 3 中断与恢复 ============ -->
+    <section id="sec3">
+      <div class="head"><h2>3. 机制一：中断与恢复——把执行物化成状态</h2><p>一切异步 HITL 的技术核心：不保存调用栈，保存每一步的结果。</p></div>
+      <p>函数调用栈活不过进程重启，更活不过"等审批者下班回来"。所以 HITL 的第一步是把执行模型<strong>事件溯源化</strong>：系统持久化的不是执行过程，而是每一步产生的<strong>结果</strong>；恢复时重放这些结果，而不是重新执行产生它们的过程。LangGraph 是这个思想在 LLM 编排层的最佳样本：</p>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 430" role="img" aria-labelledby="d1Title d1Desc">
+          <title id="d1Title">LangGraph 中断与恢复时序</title>
+          <desc id="d1Desc">时序图：agent 节点执行中调用 interrupt 触发暂停，状态快照存入 checkpointer，线程挂起等待人类输入；人类通过 Command resume 重新拉起线程，节点从头重放，interrupt 直接返回 resume 值而不重跑模型，随后写入新快照继续执行。</desc>
+          <defs>
+            <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker>
+            <marker id="arA" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--amber)"/></marker>
+          </defs>
+          <rect class="node" x="60" y="20" width="180" height="48" rx="10"/><text class="title" x="150" y="40" text-anchor="middle">Agent 节点</text><text class="sub" x="150" y="58" text-anchor="middle">图执行单元</text>
+          <rect class="node v" x="400" y="20" width="200" height="48" rx="10"/><text class="title" x="500" y="40" text-anchor="middle">Checkpointer</text><text class="sub" x="500" y="58" text-anchor="middle">线程级状态存储</text>
+          <rect class="node a" x="760" y="20" width="200" height="48" rx="10"/><text class="title" x="860" y="40" text-anchor="middle">人类</text><text class="sub" x="860" y="58" text-anchor="middle">审批者，可离线数小时</text>
+          <path class="life" d="M150 68 V400"/><path class="life" d="M500 68 V400"/><path class="life" d="M860 68 V400"/>
+          <rect class="active" x="135" y="80" width="30" height="300"/>
+          <rect class="active" x="485" y="108" width="30" height="34"/>
+          <rect class="active" x="845" y="180" width="30" height="80"/>
+          <text class="sub" x="320" y="118" text-anchor="middle">每个超步（super-step）后写入快照：只存 channel 写入结果，不存模型调用过程</text>
+          <path class="edge" d="M165 126 H485" marker-end="url(#ar)"/>
+          <rect class="node a" x="210" y="148" width="240" height="48" rx="10"/><text class="title" x="330" y="168" text-anchor="middle">interrupt() 抛出暂停</text><text class="sub" x="330" y="186" text-anchor="middle">框架捕获，节点中断执行</text>
+          <path class="edge" d="M165 172 H210"/>
+          <text class="sub" x="500" y="206" text-anchor="middle">线程挂起，等待人类输入（可闲置数小时甚至数天，状态不丢）</text>
+          <path class="edge a" d="M165 214 H845" marker-end="url(#arA)"/>
+          <text class="sub" x="500" y="246" text-anchor="middle">Command(resume = value)：携带人类的决策重新拉起线程</text>
+          <path class="edge" d="M845 254 H165" marker-end="url(#ar)"/>
+          <rect class="node g" x="210" y="278" width="260" height="48" rx="10"/><text class="title" x="340" y="298" text-anchor="middle">节点从头重放</text><text class="sub" x="340" y="316" text-anchor="middle">interrupt() 直接返回 value，已完成步骤不重跑 LLM</text>
+          <path class="edge" d="M165 302 H210"/>
+          <text class="sub" x="320" y="348" text-anchor="middle">写入新快照，继续下一超步</text>
+          <path class="edge" d="M165 356 H485" marker-end="url(#ar)"/>
+        </svg>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">LangGraph 的具体机制</h3>
+          <ul class="clean">
+            <li><code>checkpointer</code>：每个超步结束后，把整个图状态序列化到 thread。状态由带 reducer 的 channel 组成，恢复即重放 channel 写入。</li>
+            <li><code>interrupt()</code>：节点函数内调用即抛出暂停信号，框架持久化状态并把线程标记为等待；重放时同一调用直接返回 resume 值。</li>
+            <li><code>Command(resume=v)</code>：以人类输入重新拉起线程，<strong>包含 interrupt 的节点从头重新执行</strong>——因此节点在 interrupt 之前的代码必须可重入、幂等（最佳实践：把 interrupt() 放在节点第一行）。</li>
+            <li><code>interrupt_before / interrupt_after</code>：编译期声明的图级粗粒度版本，等价于在指定节点边界强制"快照 + 暂停"。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">为什么不重跑 LLM</h3>
+          <p>快照存的是每个超步的<strong>输出</strong>，不是模型调用序列。恢复 = 重放写入，LLM 只在未完成的节点里被再次调用。这与 Temporal 的事件溯源是同一思想：<strong>把不确定性围堵在已记录结果的边界之内</strong>。代价是任何影响状态的副作用都必须经过持久化通道（channel / event），绕过框架直接改内存状态的代码会在恢复时丢失。</p>
+          <p>换句话说：HITL 对 agent 框架的真正要求，不是"多了一个问人的按钮"，而是<strong>全部状态流动必须可序列化</strong>。这是为什么成熟框架都把状态当作一等公民来设计。</p>
+        </div>
+      </div>
+      <div class="callout warn" style="margin-top:14px"><p><strong>两个高频工程陷阱：</strong>① <strong>世界漂移</strong>——挂起三小时后 PR 基线已变、文件已改，resume 时必须重新校验前提（注入新鲜上下文、重查 precondition），必要时把"已批准"降级为"需重审"；② <strong>副作用重放</strong>——节点重入意味着 interrupt 之前发生的副作用会再来一次，写操作要么幂等，要么放在 interrupt 之后。</p></div>
+    </section>
+
+    <!-- ============ 4 审批策略层 ============ -->
+    <section id="sec4">
+      <div class="head"><h2>4. 机制二：策略层——审批判定是纯函数</h2><p>把"要不要问人"从散落的 if-else 收敛成一个可测试、可评审、可回放的决策函数。</p></div>
+      <p>动作级审批的工程形态，是一个纯函数：<code>decide(tool, args, context) → allow | ask | deny</code>。写成纯函数的意义远超代码整洁：<strong>可以单测</strong>（每个策略规则一组用例）、<strong>可以 diff 评审</strong>（策略变更像代码变更一样走 PR）、<strong>可以全量回放</strong>（拿历史动作样本跑一遍新策略，看拦截率变化，避免策略调整引发意外大面积放行或拦截）。主流 coding agent 的权限系统都是这个函数的不同分层实现：</p>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 330" role="img" aria-labelledby="d2Title d2Desc">
+          <title id="d2Title">动作审批判定流</title>
+          <desc id="d2Desc">流程图：工具调用请求先判断是否在沙箱能力范围内，命中则结构性放行；越出沙箱再匹配规则表，allow 命中放行、deny 或 hook 阻断则拒绝；无规则命中时按审批模式档位决定升级人审或进入计划模式。</desc>
+          <defs>
+            <marker id="ar2" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker>
+            <marker id="ar2r" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--red)"/></marker>
+            <marker id="ar2a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--amber)"/></marker>
+          </defs>
+          <rect class="lane" x="20" y="30" width="1000" height="150" rx="16"/>
+          <text class="sub" x="40" y="52">策略判定层：纯函数，在模型上下文之外的进程内执行</text>
+          <rect class="lane" x="20" y="214" width="1000" height="96" rx="16"/>
+          <text class="sub" x="40" y="236">动作出口</text>
+          <rect class="node" x="40" y="88" width="150" height="52" rx="10"/><text class="title" x="115" y="110" text-anchor="middle">工具调用请求</text><text class="sub" x="115" y="128" text-anchor="middle">tool + args + 上下文</text>
+          <polygon class="decision" points="300,74 360,114 300,154 240,114"/><text class="title" x="300" y="110" text-anchor="middle">沙箱内？</text>
+          <polygon class="decision" points="560,74 620,114 560,154 500,114"/><text class="title" x="560" y="110" text-anchor="middle">规则命中？</text>
+          <polygon class="decision" points="820,74 880,114 820,154 760,114"/><text class="title" x="820" y="110" text-anchor="middle">审批模式？</text>
+          <path class="edge" d="M190 114 H240" marker-end="url(#ar2)"/>
+          <text class="sub" x="428" y="106" text-anchor="middle">否：越出沙箱</text>
+          <path class="edge" d="M360 114 H500" marker-end="url(#ar2)"/>
+          <text class="sub" x="688" y="106" text-anchor="middle">无规则命中</text>
+          <path class="edge" d="M620 114 H760" marker-end="url(#ar2)"/>
+          <rect class="node g" x="210" y="240" width="180" height="52" rx="10"/><text class="title" x="300" y="262" text-anchor="middle">放行</text><text class="sub" x="300" y="280" text-anchor="middle">沙箱内 / allowlist 命中</text>
+          <rect class="node r" x="480" y="240" width="160" height="52" rx="10"/><text class="title" x="560" y="262" text-anchor="middle">拒绝</text><text class="sub" x="560" y="280" text-anchor="middle">deny 规则 / hook 阻断</text>
+          <rect class="node a" x="740" y="240" width="160" height="52" rx="10"/><text class="title" x="820" y="262" text-anchor="middle">升级人审</text><text class="sub" x="820" y="280" text-anchor="middle">呈现 diff 与理由</text>
+          <rect class="node v" x="910" y="88" width="118" height="52" rx="10"/><text class="title" x="969" y="110" text-anchor="middle">计划模式</text><text class="sub" x="969" y="128" text-anchor="middle">先批方案再执行</text>
+          <text class="sub" x="308" y="180">是：结构性安全</text>
+          <path class="edge" d="M300 154 V240" marker-end="url(#ar2)"/>
+          <text class="sub" x="575" y="185">deny / hook 阻断</text>
+          <path class="edge r" d="M560 154 V240" marker-end="url(#ar2r)"/>
+          <path class="edge" d="M500 150 L390 240" marker-end="url(#ar2)"/>
+          <text class="sub" x="462" y="182">allow 命中</text>
+          <text class="sub" x="832" y="180">高危动作</text>
+          <path class="edge a" d="M820 154 V240" marker-end="url(#ar2a)"/>
+          <path class="edge" d="M880 114 H910" marker-end="url(#ar2)"/>
+        </svg>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">Claude Code 的分层实现</h3>
+          <ul class="clean">
+            <li><strong>规则来源有优先级</strong>：组织托管策略 &gt; 命令行参数 &gt; 项目本地 &gt; 项目共享 &gt; 用户级；<code>deny</code> 规则跨层级压倒一切 allow——企业可以一票否决个人放行。</li>
+            <li><strong>规则按参数模式匹配</strong>：<code>Bash(git push:*)</code> 按命令前缀、<code>Edit(//path)</code> 按路径、<code>WebFetch(domain:…)</code> 按域名，粒度到"哪类命令在哪块地盘上"。</li>
+            <li><strong>permission mode 是档位</strong>：default / acceptEdits / plan / bypassPermissions，一次切换整体平移判定输出，而不是逐规则修改。</li>
+            <li><strong>hooks 是强制策略执行点（PEP）</strong>：<code>PreToolUse</code> 钩子读入工具调用 JSON，退出码 2 或输出 block 决策即阻断且原因回传模型。工单校验、密钥扫描、变更窗口检查都挂在这里——策略执行不依赖模型"自觉"。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">沙箱与审批的职责分离</h3>
+          <p>Codex 代表另一条路线：<strong>环境隔离承担结构性安全，审批只处理越出沙箱的例外</strong>。沙箱（Linux 上 Landlock/seccomp、macOS 上 Seatbelt、Windows 上 2026 年出现的基于 Microsoft Execution Containers 的实现）限制文件系统与网络；审批策略（untrusted / on-request / on-failure / never）只对"联网、写沙箱外、装依赖"这类越界动作生效。</p>
+          <p>两个子系统联动后的效果：<strong>需要人批的请求数下降，不是因为规则变松，而是危险动作被机制性消除了</strong>。这是审批疲劳最重要的结构性解药——用人不可绕过的机制安全，替代依赖人注意力的行为安全。</p>
+        </div>
+      </div>
+      <div class="callout warn" style="margin-top:14px"><p><strong>最大威胁是权限提升，不是误操作：</strong>prompt injection 的经典攻击路径就是诱导模型调用"切换到自动批准"的开关，或直接改写 settings 文件。因此判定函数的输入与执行必须完全在模型上下文之外的进程里；模型只能"发起请求"，永远不能"修改判定"。OpenAI Model Spec（2025/2026 版）把权限归入 system / developer 指令层级而不属于对话内容层，是同一思想：权限的修改权本身也要被纳入权限管理。</p></div>
+    </section>
+
+    <!-- ============ 5 异步与持久化 ============ -->
+    <section id="sec5">
+      <div class="head"><h2>5. 机制三：异步审批与持久化执行</h2><p>当审批者从"守在终端前的人"变成"晚些才有空的经理"，等待本身必须成为系统的一等状态。</p></div>
+      <p>同步审批（人在终端、秒级应答）用任何机制都能凑合；但真实组织的审批者不在线、在开会、在睡觉。<strong>异步 HITL 的全部难点可以归结为一句话：把"等人"变成一个不依赖任何进程存活的状态。</strong>长时任务编排引擎（Temporal 为代表）为此提供了最完整的语言级表达：</p>
+      <div class="card pad">
+        <h3 style="margin-top:0">Temporal 的"人审即普通控制流"</h3>
+        <ul class="clean">
+          <li><strong>workflow 代码必须确定性</strong>，一切副作用（发审批卡片、写库、调 API）都通过 activity 执行，activity 结果与外部信号全部进入事件历史。</li>
+          <li><strong>人审 = 提交审批 activity + <code>Workflow.await</code></strong>：await 一个由 signal handler 置位的标志（审批人点了通过）或一个 durable timer 到期，谁先到谁生效——<strong>超时升级链在语言层面就是几个 await 的组合</strong>：30 分钟无响应升级到 backup 审批人，再超时落到默认策略（拒绝或降级只读）。</li>
+          <li><strong>timer 由服务端计时</strong>：等待可以持续数天，worker 全部下线也不丢；恢复时靠事件历史重放重建 workflow 状态，与 LangGraph 的 channel 重放同构。</li>
+        </ul>
+      </div>
+      <div class="card pad table" style="margin-top:15px">
+        <table>
+          <thead><tr><th>维度</th><th>LangGraph（checkpoint / replay 模型）</th><th>Temporal（deterministic replay 模型）</th></tr></thead>
+          <tbody>
+            <tr><td>状态载体</td><td>每个超步后的图状态快照（channel 值集合），存于 thread</td><td>全量事件历史（event history），恢复时重放重建</td></tr>
+            <tr><td>确定性要求</td><td>节点可重入；interrupt() 在重放时返回 resume 值</td><td>workflow 代码整体确定性；副作用必须走 activity</td></tr>
+            <tr><td>"等人"的实现</td><td>线程挂起于 interrupt，等下一次带 resume 值的调用拉起</td><td><code>Workflow.await</code>(signal) + durable timer，任意时长</td></tr>
+            <tr><td>计时与升级</td><td>需外部调度触发超时（自身无长期 timer）</td><td>服务端 durable timer，worker 可全下线；升级链是一等能力</td></tr>
+            <tr><td>适用重心</td><td>LLM 图编排：节点是模型调用与工具，中断点在图语义里</td><td>长时业务流程：审批 SLA、多级升级、补偿事务是日常</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>审批的去向也值得专门设计：<strong>回环应该发生在人已有的工作流里</strong>，而不是要求人盯着 agent 面板。Slack / Teams / 钉钉的消息卡片、Jira 工单、GitHub Environments 的 required reviewers（部署到受保护环境前必须指定人批准）都是这个思路。Cloudflare 在 2026 年的实践文档把 Workflow approvals 与 MCP elicitation 组合起来，代表了这个方向的工程收敛。</p>
+      <div class="callout" style="margin-top:14px"><p><strong>审批对象本身也要安全设计：</strong>一份批准应绑定<strong>动作指纹</strong>（工具名 + 归一化参数的哈希）、带过期时间、单次使用——防止批准被重放或挪用到"看起来相似"的另一个动作上。审批信号要走带外通道（卡片按钮、平台 API），绝不能走模型可读写的文本流，否则注入攻击可以伪造"人已批准"。</p></div>
+    </section>
+
+    <!-- ============ 6 协议层 MCP ============ -->
+    <section id="sec6">
+      <div class="head"><h2>6. 机制四：协议层——MCP 把「问人」标准化</h2><p>从此 HITL 不再是每个客户端的私有 UI，而是可组合的协议原语。</p></div>
+      <p>HITL 长期以来是每个 host 的私有实现：同样的"问用户一次"，每个客户端自己造一遍弹窗。MCP（Model Context Protocol）在两层把它协议化。<code>sampling</code> 是第一个方向：server 请求 host 代为调用一次 LLM，host 对用户保持透明与可控——这解决"人审模型的输出"。2025-06-18 规范新增的 <code>elicitation</code> 是反方向：server 主动向用户<strong>索取结构化输入</strong>——这解决"人给 agent 缺的信息"。</p>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 380" role="img" aria-labelledby="d3Title d3Desc">
+          <title id="d3Title">MCP elicitation 时序</title>
+          <desc id="d3Desc">时序图：MCP server 向 client 发起 elicitation/create 请求，携带 message 与 requestedSchema；client 渲染表单并必须征得用户明确同意；用户填写同意或 decline 或 cancel；client 将 action 与符合 schema 的 content 返回，server 拿到结构化输入后恢复工具执行。</desc>
+          <defs>
+            <marker id="ar3" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker>
+            <marker id="ar3a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--amber)"/></marker>
+          </defs>
+          <rect class="node" x="60" y="18" width="220" height="48" rx="10"/><text class="title" x="170" y="38" text-anchor="middle">MCP Server</text><text class="sub" x="170" y="56" text-anchor="middle">工具提供方</text>
+          <rect class="node v" x="410" y="18" width="220" height="48" rx="10"/><text class="title" x="520" y="38" text-anchor="middle">MCP Host / Client</text><text class="sub" x="520" y="56" text-anchor="middle">IDE、聊天端、应用</text>
+          <rect class="node a" x="770" y="18" width="200" height="48" rx="10"/><text class="title" x="870" y="38" text-anchor="middle">用户</text><text class="sub" x="870" y="56" text-anchor="middle">表单的最终裁决者</text>
+          <path class="life" d="M170 66 V350"/><path class="life" d="M520 66 V350"/><path class="life" d="M870 66 V350"/>
+          <rect class="active" x="155" y="90" width="30" height="240"/>
+          <rect class="active" x="505" y="100" width="30" height="200"/>
+          <rect class="active" x="855" y="160" width="30" height="80"/>
+          <text class="sub" x="345" y="112" text-anchor="middle">elicitation/create：{ message, requestedSchema }</text>
+          <path class="edge" d="M185 120 H505" marker-end="url(#ar3)"/>
+          <text class="sub" x="695" y="162" text-anchor="middle">渲染表单并征求同意（规范：MUST 明确同意）</text>
+          <path class="edge a" d="M535 170 H855" marker-end="url(#ar3a)"/>
+          <text class="sub" x="695" y="212" text-anchor="middle">填写并同意 / decline / cancel</text>
+          <path class="edge a" d="M855 220 H535" marker-end="url(#ar3a)"/>
+          <text class="sub" x="345" y="262" text-anchor="middle">result：{ action: "accept", content: 符合 schema 的对象 }</text>
+          <path class="edge" d="M505 270 H185" marker-end="url(#ar3)"/>
+          <rect class="node g" x="60" y="296" width="260" height="48" rx="10"/><text class="title" x="190" y="316" text-anchor="middle">恢复工具执行</text><text class="sub" x="190" y="334" text-anchor="middle">拿到结构化输入，从暂停点继续</text>
+        </svg>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">elicitation 的关键设计细节</h3>
+          <ul class="clean">
+            <li><strong>schema 刻意收窄</strong>：顶层必须是 object，属性仅允许 string / number / integer / boolean（可带 enum），<strong>禁止嵌套结构</strong>。第一版就这么保守——既保证任何 client 都能渲染成表单，又压缩注入攻击面。</li>
+            <li><strong>三值响应</strong>：<code>accept</code>（带符合 schema 的 content）、<code>decline</code>（用户拒绝本次请求）、<code>cancel</code>（请求本身被撤销）——语义上区分"人说不"和"请求没送达"。</li>
+            <li><strong>同意是规范强制的</strong>：client 在返回 accept 之前 <code>MUST</code> 获得用户明确同意；client 在 initialize 阶段声明 elicitation 能力，不支持就协商不启用。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">与 tool approval 的本质差异</h3>
+          <ul class="clean">
+            <li><strong>tool approval 解决"授权"</strong>：允许不允许 agent 使用某个能力。判定发生在 host 的策略层（第 4 节那个纯函数），人不一定亲自参与。</li>
+            <li><strong>elicitation 解决"咨询"</strong>：agent 缺一个只有人有的信息或决策，回复内容是<strong>数据</strong>而不是许可。</li>
+            <li>一个管权限，一个管知识。把两者混在一个"确认框"里，是大多数粗糙实现共同的问题：用户分不清自己是在授权还是在回答问题，两种决策的认知负荷完全不同。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>协议化的真正收益：</strong>"问人"从私有 UI 变成可组合原语后，任何 MCP host——IDE、桌面聊天客户端、手机推送——都能替 server 履行问人义务；审批界面的质量由 host 层竞争决定，而不是每个工具各自造一个弹窗。这和第 5 节的异步审批正交组合：server 发起 elicitation，host 把它路由成一张卡片，几小时后带着答案回来。</p></div>
+    </section>
+
+    <!-- ============ 7 审批疲劳 ============ -->
+    <section id="sec7">
+      <div class="head"><h2>7. 交互经济学：审批疲劳是第一失效点</h2><p>请求速率超过人的阅读吞吐时，监督塌缩为橡皮图章——这已被反复实证。</p></div>
+      <p>2026 年 agent 治理领域形成的行业共识相当残酷：<strong>人工监督是最先失效的一环（human oversight fails first）</strong>。当审批请求的到来速度快于人能阅读的速度，人的行为退化为习惯性点击同意；安全领域已开始直接度量"批准率与实际核验率的背离"作为橡皮图章指标。这与 Windows UAC 的警告疲劳、自动化偏见（automation bias）完全同构——四十年的老问题换了个界面重演。</p>
+      <div class="grid3">
+        <div class="mini"><h3>第一层：降量</h3><p>allowlist 记忆与跨会话复用；批量审批（一次审一组同类动作）；用一次计划审批替代 N 次动作审批；沙箱结构性消除危险请求。请求越少，每一次越被认真对待。</p></div>
+        <div class="mini"><h3>第二层：提质</h3><p>diff / 变更预览优于原始命令文本；风险分类与理由前置；展示该类决策的历史与先例（"上三次同类请求都批准了"）；默认值按动作类别设定而非全局一刀切。</p></div>
+        <div class="mini"><h3>第三层：换人</h3><p>guardian agent 先按策略与先例过滤多数低风险请求，只把高分歧案例上呈人类；配合对人工批准的抽样复核，校准整条监督链。</p></div>
+      </div>
+      <p>两个被反复验证的设计事实值得单独强调。<strong>其一，审查界面是核心竞争力</strong>：PR review 之所以有效，是因为 git diff 是信息密度极高、噪声极低的人审界面——人扫一眼就知道改了什么、为什么改。好的审批 UI 应该向"展示将要发生的变更的 diff"收敛，而不是让人类解析 shell 命令。<strong>其二，批次大小决定审查质量</strong>：Google 的现代代码审查研究一再显示，小变更、短反馈的审查既快又准；迁移到 agent 审批——每批审的动作组要小到能在一次注意力周期内消化，宁可多批，不要一次倒给人 40 个变更。</p>
+      <p>最后，<strong>审批疲劳必须被度量，不能被感觉到才算数</strong>：</p>
+      <div class="card pad">
+        <ul class="clean">
+          <li><strong>审批延迟分布</strong>：中位数与尾部（P95）——尾部才暴露"卡在某个审批人"的流程问题。</li>
+          <li><strong>批准率</strong>：按动作类别分桶。某道门长期 &gt;98% 批准，它就不再是门，是仪式——删掉或换成自动化检查。</li>
+          <li><strong>被拒动作的重试率</strong>：agent 被拒后换个说法再请求同一操作的比例——提示注入与"磨到批准"的信号。</li>
+          <li><strong>阅读时长</strong>：审批卡片从展示到点击的间隔。中位数趋近于零的批准，就是橡皮图章的直接证据。</li>
+        </ul>
+      </div>
+      <div class="callout warn" style="margin-top:14px"><p><strong>呈现层的隐藏陷阱：</strong>模型在审批请求里自动附带的"理由"会触发自动化偏见——人读的是模型的自我辩护，而不是独立判断的依据。成熟的做法是把"模型的理由"与"客观事实"（diff、影响面、策略匹配结果）在视觉上分区呈现，并明确标注前者只是主张。</p></div>
+    </section>
+
+    <!-- ============ 8 交付边界 ============ -->
+    <section id="sec8">
+      <div class="head"><h2>8. 交付边界模式：事后审查与可逆性矩阵</h2><p>Coding agent 集体收敛到"全自动 + PR review"不是偶然，是可逆性与审查经济学的必然。</p></div>
+      <p>动作级审批把打断次数与动作次数绑成正比，注定撞上审批疲劳。另一条路线把审查点从过程中的 N 个动作，合并到<strong>交付边界的 1 次审查</strong>：agent 在分支上全自动跑完，人审的只是一个 PR diff。它之所以在 coding 领域成立，靠的是两个环境前提——<strong>动作可逆</strong>（分支模型提供天然可丢弃的工作空间，错了 revert 即可）与<strong>过程安全交给沙箱和 CI</strong>（agent 出错也越不了界）。把这组前提一般化，就得到按可逆性与影响面选型的决策矩阵：</p>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>动作类别</th><th>典型示例</th><th>推荐回环设计</th></tr></thead>
+          <tbody>
+            <tr><td>可逆 · 影响局部</td><td>沙箱内文件编辑、分支上的代码改动、临时环境部署</td><td>全自动 + 事后 diff 审查；配合 CI 与抽检</td></tr>
+            <tr><td>可逆 · 影响全局</td><td>合并主干、部署预发环境、批量重构</td><td>计划审批一次（审意图与方案），执行全自动，交付再审 diff</td></tr>
+            <tr><td>不可逆 · 可补偿</td><td>对外发消息、发布文章、调用付费 API</td><td>动作级审批；批准绑定动作指纹与过期时间；预留补偿动作（撤回、退款流程）</td></tr>
+            <tr><td>不可逆 · 不可补偿</td><td>删除生产数据、付款转账、公开发布法务敏感内容</td><td>双人复核 + 冷却期；high-stakes 动作值得最重的流程，不应因麻烦而省略</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>事后审查的隐性成本必须正视：</strong>反馈回路拉长后，错误在被发现前可能已在错误前提上堆叠了多层构建（agent 基于错误假设继续写了三小时代码）。所以成熟形态是混合的：<strong>关键前置假设用计划审批把关（少数几次、高杠杆），中间过程全自动（沙箱内），交付用 diff 审（一次、完整视角）</strong>。三种回环各守一段，而不是用一种回环硬扛全程。</p></div>
+    </section>
+
+    <!-- ============ 9 多 Agent ============ -->
+    <section id="sec9">
+      <div class="head"><h2>9. 多 Agent 编排中的 HITL：升级的作用域</h2><p>一个子代理提问时，停掉的应该是它自己，不是整棵调度树。</p></div>
+      <p>单 agent 里的"暂停"语义是平凡的；多 agent 系统里它是架构决策。<strong>反模式是整树停摆</strong>：任何一个 subagent 需要人，orchestrator 就阻塞，所有无关分支陪等。正确的语义是<strong>升级只挂起发起者</strong>：提问的 subagent park 在那次"问人"的调用上，orchestrator 继续调度其余分支，人回答后作为 tool result 原样送达该 subagent，从断点继续——一次提问的等待成本被限制在单分支内。</p>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">正确做法</h3>
+          <ul class="clean">
+            <li><strong>阻塞范围最小化</strong>：只有提问的 subagent 挂起；编排器把"等待人"当成一种普通的慢 tool call。</li>
+            <li><strong>回答结构化</strong>：选项式回答可校验、可路由、可统计；自由文本在并行分发给多个下游时是注入面。</li>
+            <li><strong>超时与降级路径</strong>：提问带超时，超时后该分支按默认策略收敛（跳过/取保守值），不影响其余分支。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">常见反模式</h3>
+          <ul class="clean">
+            <li><strong>全局闸门</strong>：任何提问都冻结全部并行度，吞吐塌到串行。</li>
+            <li><strong>人当垃圾场</strong>：每个 subagent 都被允许随手问人，问题不聚合、不排序，人面对的是并发轰炸。</li>
+            <li><strong>双层橡皮图章</strong>：guardian agent 预审后，人只是再点一次"同意"——监督链加长一层，却没有增加任何独立判断。</li>
+          </ul>
+        </div>
+      </div>
+      <p>值得展开的是 <strong>guardian（AI 审 AI）模式</strong>：用一个监督 agent 对照策略与历史先例给每个动作打风险分，过滤掉绝大多数低风险请求，只把高分歧案例上呈人类。它把"审批吞吐不足"转化为"监督模型校准"问题——但要警惕：对人类呈现的必须是 guardian 的<strong>判断依据</strong>（命中了哪条先例、分歧在哪），而不只是结论，否则只是把橡皮图章从人手里转移给了模型。这也是 2026 年 agentic 安全产品线（guardian 类工具）的共同设计焦点：policy enforcement + 风险路由 + 完整审计链。</p>
+    </section>
+
+    <!-- ============ 10 选型与清单 ============ -->
+    <section id="sec10">
+      <div class="head"><h2>10. 选型决策框架与落地清单</h2><p>把前九节压成一张对照表和一份可以直接执行 checklist。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>实现</th><th>中断机制</th><th>状态持久化</th><th>审批粒度</th><th>异步支持</th></tr></thead>
+          <tbody>
+            <tr><td>LangGraph</td><td><code>interrupt()</code> / <code>Command(resume)</code> / 图级 before-after</td><td>checkpointer，thread 级快照</td><td>节点 / 图级</td><td>线程挂起，外部拉起恢复</td></tr>
+            <tr><td>Claude Code</td><td>permission mode + <code>PreToolUse</code> hooks</td><td>会话内存 + resume</td><td>规则级（工具 × 参数模式）</td><td>弱（面向同步终端）</td></tr>
+            <tr><td>OpenAI Codex</td><td>approval_policy 与沙箱档位联动</td><td>云端会话</td><td>沙箱越界动作</td><td>云端任务天然异步</td></tr>
+            <tr><td>Temporal</td><td><code>Workflow.await</code> + signal</td><td>事件历史全量日志</td><td>activity 级</td><td>一等能力（durable timer + 升级链）</td></tr>
+            <tr><td>MCP elicitation</td><td><code>elicitation/create</code> 结构化提问</td><td>由 host 决定</td><td>结构化输入（flat schema）</td><td>取决于 host 路由（可接卡片审批）</td></tr>
+            <tr><td>Cloudflare Workflows</td><td>step 挂起 + 外部事件</td><td>durable object</td><td>step 级</td><td>是（与 elicitation 组合实践）</td></tr>
+            <tr><td>GitHub Environments</td><td>deployment protection rules</td><td>平台托管</td><td>部署级（required reviewers）</td><td>是（审批即平台工单）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">自建 Agent 的落地 checklist</h3>
+          <ul class="clean">
+            <li>从 <strong>deny-by-default</strong> 起步，用 allowlist 逐步放行，而非反过来。</li>
+            <li>审批判定写成<strong>纯函数</strong>；策略变更前用历史动作样本跑回归。</li>
+            <li>每份批准绑定<strong>动作指纹 + 过期时间 + 单次使用</strong>，拒绝重放与挪用。</li>
+            <li>审批信号走<strong>带外通道</strong>（卡片按钮 / 平台 API），不走模型可读写的文本流。</li>
+            <li>超时必须有<strong>升级链与默认策略</strong>（升级到 backup、超时默认拒绝或降级只读）。</li>
+            <li>节点 / 步骤<strong>可重入</strong>，副作用幂等；resume 前重验前提（世界已漂移）。</li>
+            <li>审计日志 append-only：<strong>谁、何时、基于什么信息、批准了什么</strong>，可整体回放。</li>
+            <li>度量批准率与阅读时长；长期 &gt;98% 批准的门，删掉或换成机器检查。</li>
+            <li>能交给机制的不要交给人：<strong>沙箱、CI、静态检查先上</strong>，人只留不可逆决策。</li>
+            <li>权限修改权本身入权限：<strong>模型永远不能改判定函数与配置</strong>。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">走向：人在回环中的新位置</h3>
+          <ul class="clean">
+            <li><strong>人审意图与结果，机器审过程</strong>：计划审批守前提，沙箱与 CI 守过程，diff 守交付——人出现在信息密度最高、杠杆最大的两端。</li>
+            <li><strong>审批成为基础设施</strong>：policy as code、MCP elicitation 类协议原语、跨渠道审批中心，HITL 从应用特性下沉为平台能力。</li>
+            <li><strong>confidence-based escalation 前景可期但被有意保持保守</strong>：让模型自评"我该问人吗"仍不可靠，主流生产系统仍用规则而非模型自评触发升级——模型判断何时升级，大概率是下一个范式转移点。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card pad" style="margin-top:15px">
+        <h3 style="margin-top:0">延伸阅读</h3>
+        <ul class="clean">
+          <li>Sheridan &amp; Verplank（1978）；Parasuraman, Sheridan &amp; Wickens（2000），<em>A Model for Types and Levels of Human Interaction with Automation</em></li>
+          <li>Bainbridge（1983），<em>Ironies of Automation</em>, Automatica</li>
+          <li>Santoni de Sio &amp; van den Hoven（2018），<em>Meaningful Human Control over Autonomous Systems</em></li>
+          <li>MCP 规范（modelcontextprotocol.io）：sampling 与 elicitation（2025-06-18 版）</li>
+          <li>LangGraph 文档：Human-in-the-Loop（interrupt / Command / checkpointer）</li>
+          <li>Temporal 文档：Signals、Timers 与 human task 模式</li>
+          <li>Cloudflare Agents 文档：Human-in-the-loop patterns（2026）</li>
+          <li>Sadowski 等（2018），<em>Modern Code Review: A Case Study at Google</em></li>
+        </ul>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>一句话收束：</strong>HITL 的成熟不体现在"问了多少次人"，而体现在<strong>每一次打断都发生在人能做出高质量判断的节点上，且打断之外的一切都被机制安全兜底</strong>。问得多不是负责，问得准才是。</p></div>
+    </section>
+  </main>
+  <footer><div class="shell">Agent 中的人机回环（HITL）：机制、架构与设计权衡</div></footer>
+  <nav class="dock" aria-label="页面快捷导航"><a href="../index.html">首页</a><a href="#">↑ 顶部</a></nav>
+  <script>
+    (()=>{const root=document.documentElement,key="html-docs-theme";/* 全站共享主题 key，值：paper / dark，勿改成文档专属 */
+      const saved=localStorage.getItem(key);
+      if(saved)root.dataset.theme=saved==="dark"?"dark":"paper";document.getElementById("theme").addEventListener("click",()=>{
+        const next=root.dataset.theme==="dark"?"paper":"dark";root.dataset.theme=next;localStorage.setItem(key,next)})})();
+  </script>
+</body>
+</html>
