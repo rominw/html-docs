@@ -13,7 +13,7 @@
   },
   {
     "title": "Agent 中的人机回环（HITL）：机制、架构与设计权衡",
-    "description": "深入解析 Agent 领域 Human-in-the-Loop 的机制与架构：中断与恢复的状态机本质、审批策略纯函数、异步持久化执行、MCP elicitation 协议、审批疲劳实证与对策，以及多 Agent 回环与选型决策框架。",
+    "description": "深入解析 Agent 领域 Human-in-the-Loop 的机制与架构：中断与恢复的状态机本质、审批策略纯函数、异步持久化执行、MCP elicitation 协议、审批疲劳实证与对策，并巡礼 AutoGen、OpenAI Agents SDK、Codex CLI、Claude Agent SDK、smolagents、CrewAI 等经典开源实现与选型决策框架。",
     "date": "2026-10-12",
     "url": "documents/agent-hitl-deep-dive.html"
   },

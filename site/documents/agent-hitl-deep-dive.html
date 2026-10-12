@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="深入解析 Agent 领域 Human-in-the-Loop 的机制与架构：中断与恢复的状态机本质、审批策略纯函数、异步持久化执行、MCP elicitation 协议、审批疲劳实证与对策，以及多 Agent 回环与选型决策框架。">
+  <meta name="description" content="深入解析 Agent 领域 Human-in-the-Loop 的机制与架构：中断与恢复的状态机本质、审批策略纯函数、异步持久化执行、MCP elicitation 协议、审批疲劳实证与对策，并巡礼 AutoGen、OpenAI Agents SDK、Codex CLI、Claude Agent SDK、smolagents、CrewAI 等经典开源实现与选型决策框架。">
   <meta name="date" content="2026-10-12">
   <title>Agent 中的人机回环（HITL）：机制、架构与设计权衡</title>
   <style>
@@ -83,7 +83,7 @@
     <div class="shell">
       <div class="kicker">HUMAN-IN-THE-LOOP · AGENT ARCHITECTURE</div>
       <h1>Agent 中的人机回环</h1>
-      <p class="lead">把 HITL 从"加个确认弹窗"拆到工程本质：执行模型如何变成可暂停的状态机、审批判定如何成为纯函数、异步审批如何跨天存活、协议如何把"问人"标准化，以及审批疲劳为什么是监督的第一失效点。</p>
+      <p class="lead">把 HITL 从"加个确认弹窗"拆到工程本质：执行模型如何变成可暂停的状态机、审批判定如何成为纯函数、异步审批如何跨天存活、协议如何把"问人"标准化、审批疲劳为什么是监督的第一失效点；收尾巡礼 AutoGen、OpenAI Agents SDK、Codex CLI 等经典开源实现，并给出选型决策框架。</p>
       <div class="doc-meta">
         <time datetime="2026-10-12">2026年10月12日</time>
         <span>Agent 架构 / 深度解析</span>
@@ -103,7 +103,7 @@
   </header>
   <nav>
     <div class="shell">
-      <a href="#sec1">问题定义</a><a href="#sec2">理论底座</a><a href="#sec3">中断与恢复</a><a href="#sec4">审批策略层</a><a href="#sec5">异步与持久化</a><a href="#sec6">协议层 MCP</a><a href="#sec7">审批疲劳</a><a href="#sec8">交付边界</a><a href="#sec9">多 Agent</a><a href="#sec10">选型与清单</a>
+      <a href="#sec1">问题定义</a><a href="#sec2">理论底座</a><a href="#sec3">中断与恢复</a><a href="#sec4">审批策略层</a><a href="#sec5">异步与持久化</a><a href="#sec6">协议层 MCP</a><a href="#sec7">审批疲劳</a><a href="#sec8">交付边界</a><a href="#sec9">多 Agent</a><a href="#sec10">开源实现</a><a href="#sec11">选型与清单</a>
     </div>
   </nav>
   <main class="shell">
@@ -402,9 +402,79 @@
       <p>值得展开的是 <strong>guardian（AI 审 AI）模式</strong>：用一个监督 agent 对照策略与历史先例给每个动作打风险分，过滤掉绝大多数低风险请求，只把高分歧案例上呈人类。它把"审批吞吐不足"转化为"监督模型校准"问题——但要警惕：对人类呈现的必须是 guardian 的<strong>判断依据</strong>（命中了哪条先例、分歧在哪），而不只是结论，否则只是把橡皮图章从人手里转移给了模型。这也是 2026 年 agentic 安全产品线（guardian 类工具）的共同设计焦点：policy enforcement + 风险路由 + 完整审计链。</p>
     </section>
 
-    <!-- ============ 10 选型与清单 ============ -->
+    <!-- ============ 10 开源实现巡礼 ============ -->
     <section id="sec10">
-      <div class="head"><h2>10. 选型决策框架与落地清单</h2><p>把前九节压成一张对照表和一份可以直接执行 checklist。</p></div>
+      <div class="head"><h2>10. 经典开源项目的 HITL 实现方案</h2><p>六个有代表性的开源实现：各自的回环抽象、代码级 API 与语义取舍。</p></div>
+      <p>前面各节讲机制原理，这一节看原理如何落地成"默认选项"。LangGraph 与 Temporal 已在第 3、5 节展开，这里巡礼其余六个经典开源项目。它们对最关键的问题——<strong>谁拥有触发回环的权力</strong>——给出了四种不同答案，先看全貌：</p>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>项目</th><th>回环抽象</th><th>核心 API</th><th>触发者</th><th>异步</th></tr></thead>
+          <tbody>
+            <tr><td>AutoGen / AG2</td><td>人即代理：对话拓扑中的固定节点</td><td><code>human_input_mode</code> / <code>input_func</code></td><td>拓扑保证</td><td>0.4 起可外接</td></tr>
+            <tr><td>smolagents</td><td>人即工具：与搜索无异的普通 Tool</td><td><code>HumanInputTool</code></td><td>模型自主</td><td>否（控制台）</td></tr>
+            <tr><td>CrewAI</td><td>任务末反馈循环</td><td>Task <code>human_input=True</code></td><td>拓扑保证（任务边界）</td><td>否</td></tr>
+            <tr><td>OpenAI Agents SDK</td><td>审批即一等运行时中断</td><td><code>requires_approval</code> + <code>ApprovalResponse</code></td><td>程序强制（声明式）</td><td>是</td></tr>
+            <tr><td>Codex CLI</td><td>审批 × 沙箱二维矩阵</td><td><code>approval_policy</code> + <code>sandbox_mode</code></td><td>程序强制（策略矩阵）</td><td>云端任务异步</td></tr>
+            <tr><td>Claude Agent SDK</td><td>hook 即策略执行点</td><td><code>can_use_tool</code> + PreToolUse hooks</td><td>程序强制（回调）</td><td>取决于宿主</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">AutoGen / AG2 —— 人即代理（拓扑端）</h3>
+          <ul class="clean">
+            <li><code>UserProxyAgent</code> 的三档 <code>human_input_mode</code>：<code>ALWAYS</code>（每轮必问人）、<code>TERMINATE</code>（默认自动，人随时可插入——当前事实主流）、<code>NEVER</code>（纯自动）。档位直接对应第 2 节的 LOA 谱系。</li>
+            <li>人是<strong>对话拓扑中的一等 agent</strong>：参与由轮转结构保证，不依赖模型"想起来要问"。</li>
+            <li>代价：粒度是"轮"而不是"动作"。0.4 重构用 <code>input_func</code> 把输入源抽象出来——控制台、Web UI、消息队列都能充当"人的接口"，人不必守在进程旁；也顺带把早期版本混在代理里的"消息转发"与"代码执行确认"两个职责拆开了。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">smolagents 与 CrewAI —— 人即工具 / 任务末反馈（模型自主端）</h3>
+          <ul class="clean">
+            <li>smolagents 的 <code>HumanInputTool</code>：把人封装成普通 Tool，<code>forward()</code> 就是读一行控制台输入——human-as-tool 的教科书实现，agent 像调用搜索一样"调用"人。</li>
+            <li>CrewAI 的 Task 级 <code>human_input=True</code>：任务产出后进入反馈循环，人的反馈作为新输入迭代，放行后才进入下一任务——回环挂在交付边界，天然是第 8 节的 post-hoc 形态。</li>
+            <li>共同的关键取舍：<strong>问不问由模型决定</strong>。灵活但不可强制——模型可以选择不问。适合信息补充与偏好澄清，不能承担安全职责。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">OpenAI Agents SDK —— 审批即一等运行时中断</h3>
+          <ul class="clean">
+            <li>工具注册时声明式标记 <code>requires_approval=True</code>；调用发生时 run 暂停，以 <code>ApprovalRequest</code> 中断项交还宿主处理。</li>
+            <li>应答用 <code>ApprovalResponse</code> 三值语义：<code>approve</code>（执行）/ <code>reject</code>（拒绝并把理由回传模型）/ <code>escalate</code>（上交人工或平台）——把"机器可判的拒绝"与"必须给人的升级"分开。</li>
+            <li>审批是 session 内可持久化的中断：与第 3 节 interrupt/resume 同构，但"哪个工具要批"成了工具的声明式属性，而非散落在代码里的判断；另可经 <code>ApprovalRequestContext</code> 按参数动态决定（如仅对非白名单域名触发）。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">Codex CLI —— 审批与沙箱的二维矩阵</h3>
+          <ul class="clean">
+            <li>开源（Rust）实现里，审批配置是<strong>二维矩阵</strong>：<code>approval_policy</code> ∈ untrusted（只自动跑可信只读命令）/ on-request（模型主动要权时问）/ on-failure（沙箱拒绝后再问）/ never；<code>sandbox_mode</code> ∈ read-only / workspace-write / danger-full-access。</li>
+            <li>经典组合 workspace-write + on-failure：沙箱内自由写，越界动作<strong>先被机制拦下、失败后才升级人审</strong>——审批请求只在机制已经拦截之后发生，天然低频。</li>
+            <li>这是第 4 节"用沙箱降低审批量"最清晰的开源参考实现，配置语义可以直接抄进自家系统。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">Claude Agent SDK —— hook 即策略执行点</h3>
+          <ul class="clean">
+            <li>生产 CLI 权限系统的开源封装：permission mode 四档照搬；<code>can_use_tool</code> 回调把 PreToolUse 判定交给宿主程序——传入工具名与入参，返回 allow / deny。</li>
+            <li>hooks 体系让策略在<strong>模型上下文之外的进程</strong>里执行，退出码或 JSON 决策直接改写回环结果——第 4 节"策略纯函数 + PEP"的官方开源载体。</li>
+            <li>与 Agents SDK 对照很有启发：一个把审批做成<strong>运行时中断</strong>（SDK 暂停等你，利于异步化），一个做成<strong>同步回调</strong>（宿主函数当场判，利于嵌入既有服务）。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">组合范式 —— Cloudflare Workflows + MCP elicitation</h3>
+          <ul class="clean">
+            <li>把第 5、6 节接起来：server 经 elicitation 发起结构化提问（协议层的"问"），durable workflow 的 step 把"等人"变成可跨天的状态（基础设施层的"等"）。</li>
+            <li>等待走持久化、恢复走 step 重放、提问走协议——这是开源参考里最接近生产级异步审批的形态。</li>
+            <li>提示了一个选型事实：<strong>没有一个单一框架能同时把"问、等、审、计"四件事都做到最好</strong>，生产系统几乎必然是组合体。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout warn" style="margin-top:14px"><p><strong>触发权谱系——本节最重要的结论：</strong>把这些实现排在一条谱系上：拓扑保证（AutoGen：人是对话图的固定节点）→ 模型自主（smolagents / CrewAI：模型决定何时问）→ 程序强制（Agents SDK / Codex CLI / Claude Agent SDK：声明、策略或回调决定何时问）。<strong>安全回环必须落在程序强制一端</strong>——只有那里的触发不受模型控制，因而也不受提示注入影响；模型自主端只配承担澄清与偏好收集。另一个耐人寻味的事实：截至 2026 年，主流开源实现无一用"模型自评置信度"触发安全回环，大家不约而同把触发权留在了程序层——这印证了第 11 节对 confidence-based escalation 的保守判断。</p></div>
+    </section>
+
+    <!-- ============ 11 选型与清单 ============ -->
+    <section id="sec11">
+      <div class="head"><h2>11. 选型决策框架与落地清单</h2><p>把前面各节压成一张对照表和一份可以直接执行 checklist。</p></div>
       <div class="card pad table">
         <table>
           <thead><tr><th>实现</th><th>中断机制</th><th>状态持久化</th><th>审批粒度</th><th>异步支持</th></tr></thead>
@@ -412,6 +482,9 @@
             <tr><td>LangGraph</td><td><code>interrupt()</code> / <code>Command(resume)</code> / 图级 before-after</td><td>checkpointer，thread 级快照</td><td>节点 / 图级</td><td>线程挂起，外部拉起恢复</td></tr>
             <tr><td>Claude Code</td><td>permission mode + <code>PreToolUse</code> hooks</td><td>会话内存 + resume</td><td>规则级（工具 × 参数模式）</td><td>弱（面向同步终端）</td></tr>
             <tr><td>OpenAI Codex</td><td>approval_policy 与沙箱档位联动</td><td>云端会话</td><td>沙箱越界动作</td><td>云端任务天然异步</td></tr>
+            <tr><td>OpenAI Agents SDK</td><td><code>requires_approval</code> 触发 ApprovalRequest 中断</td><td>session（可持久化 run）</td><td>工具级（声明式标记）</td><td>是（中断可异步应答）</td></tr>
+            <tr><td>Claude Agent SDK</td><td><code>can_use_tool</code> 回调 + hooks</td><td>宿主进程</td><td>规则级（策略纯函数）</td><td>取决于宿主</td></tr>
+            <tr><td>AutoGen / AG2</td><td>UserProxy 轮转 + <code>human_input_mode</code></td><td>对话内存</td><td>轮次级</td><td>0.4 起经 <code>input_func</code> 外接</td></tr>
             <tr><td>Temporal</td><td><code>Workflow.await</code> + signal</td><td>事件历史全量日志</td><td>activity 级</td><td>一等能力（durable timer + 升级链）</td></tr>
             <tr><td>MCP elicitation</td><td><code>elicitation/create</code> 结构化提问</td><td>由 host 决定</td><td>结构化输入（flat schema）</td><td>取决于 host 路由（可接卡片审批）</td></tr>
             <tr><td>Cloudflare Workflows</td><td>step 挂起 + 外部事件</td><td>durable object</td><td>step 级</td><td>是（与 elicitation 组合实践）</td></tr>
@@ -453,6 +526,7 @@
           <li>MCP 规范（modelcontextprotocol.io）：sampling 与 elicitation（2025-06-18 版）</li>
           <li>LangGraph 文档：Human-in-the-Loop（interrupt / Command / checkpointer）</li>
           <li>Temporal 文档：Signals、Timers 与 human task 模式</li>
+          <li>开源实现源码（GitHub）：<code>microsoft/autogen</code>、<code>openai/openai-agents-python</code>、<code>openai/codex</code>、<code>anthropics/claude-agent-sdk-python</code>、<code>huggingface/smolagents</code>、<code>crewAIInc/crewAI</code>、<code>langchain-ai/langgraph</code>、<code>temporalio/temporal</code></li>
           <li>Cloudflare Agents 文档：Human-in-the-loop patterns（2026）</li>
           <li>Sadowski 等（2018），<em>Modern Code Review: A Case Study at Google</em></li>
         </ul>
