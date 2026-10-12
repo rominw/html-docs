@@ -6,6 +6,12 @@
     "url": "documents/uav-backend-review-handbook.html"
   },
   {
+    "title": "无人机巡检平台后端 · 六周直读复习手册（md 版）",
+    "description": "围绕一个真实无人机巡检平台的自动建模、多机库调度、分布式一致性、AI 工程化、智能体集成与违章停车多轮复核的六周面试复习手册，115 道追问全部有代码级事实支撑。",
+    "date": "2026-10-12",
+    "url": "viewer.html?src=documents/uav-backend-review-handbook.md"
+  },
+  {
     "title": "Agent / AI 应用面试题全集：手撕代码与场景题精讲",
     "description": "Agent/AI 应用面试高频题全集：21 道手撕代码题带参考实现与追问预判，45 道场景与基础题带答题框架，覆盖前端流式渲染、RAG、Agent、LLM 工程、AI 全栈交付与 OS 网络基础六大方向。",
     "date": "2026-10-12",

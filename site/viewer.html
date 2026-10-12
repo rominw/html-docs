@@ -192,6 +192,21 @@
         line-height: 1.65;
       }
 
+      .article figure.mermaid-fig {
+        overflow-x: auto;
+        margin: 1.5em 0;
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #f7f9fa;
+        text-align: center;
+      }
+
+      .article figure.mermaid-fig svg {
+        max-width: none;
+        height: auto;
+      }
+
       .article pre code {
         padding: 0;
         border: 0;
@@ -370,6 +385,7 @@
 
     <script src="assets/marked.min.js"></script>
     <script src="assets/highlight.min.js"></script>
+    <script src="assets/mermaid.min.js"></script>
     <script>
       const themes = [
         { value: "paper", label: "纸张" },
@@ -479,6 +495,13 @@
             },
             code({ text, lang }) {
               const language = (lang || "").split(/\s+/)[0];
+              if (language === "mermaid") {
+                const escaped = text
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;");
+                return `<pre><code class="language-mermaid">${escaped}</code></pre>`;
+              }
               let body;
               if (language && window.hljs && hljs.getLanguage(language)) {
                 body = hljs.highlight(text, { language }).value;
@@ -519,10 +542,41 @@
           if (/^(https?:|data:|#)/i.test(raw)) return;
           try {
             img.src = new URL(raw, baseUrl).href;
-          } catch (_) {
+          } catch (e) {
             /* 非法路径原样保留 */
           }
         });
+      }
+
+      async function renderMermaid() {
+        const blocks = document.querySelectorAll(
+          "#doc-content pre > code.language-mermaid",
+        );
+        if (!blocks.length || !window.mermaid) return;
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: "neutral",
+          flowchart: { htmlLabels: false, useMaxWidth: false },
+          sequence: { useMaxWidth: false },
+          state: { useMaxWidth: false },
+          er: { useMaxWidth: false },
+        });
+        let seq = 0;
+        for (const block of blocks) {
+          const source = block.textContent;
+          try {
+            const { svg } = await mermaid.render(
+              "doc-mermaid-" + ++seq,
+              source,
+            );
+            const figure = document.createElement("figure");
+            figure.className = "mermaid-fig";
+            figure.innerHTML = svg;
+            block.parentElement.replaceWith(figure);
+          } catch (e) {
+            /* 渲染失败时保留原始源码块，便于读者复制到外部工具 */
+          }
+        }
       }
 
       async function load() {
@@ -580,6 +634,7 @@
         document.title = `${title} · 留页`;
 
         fixRelativeImages(new URL(src, location.href).href);
+        await renderMermaid();
         buildToc();
 
         document.getElementById("status").hidden = true;
