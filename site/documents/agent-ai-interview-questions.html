@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="Agent/AI 应用面试高频题全集：21 道手撕代码题带参考实现与追问预判，36 道场景题带答题框架，覆盖前端流式渲染、RAG、Agent、LLM 工程与 AI 全栈交付五大方向。">
+  <meta name="description" content="Agent/AI 应用面试高频题全集：21 道手撕代码题带参考实现与追问预判，45 道场景与基础题带答题框架，覆盖前端流式渲染、RAG、Agent、LLM 工程、AI 全栈交付与 OS 网络基础六大方向。">
   <meta name="date" content="2026-10-12">
   <title>Agent / AI 应用面试题全集：手撕代码与场景题精讲</title>
   <style>
@@ -92,7 +92,7 @@
     <div class="shell">
       <div class="kicker">AGENT INTERVIEW HANDBOOK</div>
       <h1>Agent / AI 应用面试题全集</h1>
-      <p class="lead">21 道高频手撕题带可运行的参考实现，36 道场景题带答题框架与加分项——覆盖前端流式渲染、RAG、Agent、LLM 工程与 AI 全栈交付五大方向，附答题技巧总纲。既可用于备考，也可直接当作面试官的出题库。</p>
+      <p class="lead">21 道高频手撕题带可运行的参考实现，45 道场景与基础题带答题框架与加分项——覆盖前端流式渲染、RAG、Agent、LLM 工程、AI 全栈交付与 OS 网络基础六大方向，附答题技巧总纲。既可用于备考，也可直接当作面试官的出题库。</p>
       <div class="doc-meta">
         <time datetime="2026-10-12">2026年10月12日</time>
         <span>面试题库 / Agent 工程</span>
@@ -104,15 +104,15 @@
       </div>
       <div class="stats">
         <div class="stat"><b>21 道</b><span>手撕题，全部带参考实现</span></div>
-        <div class="stat"><b>36 道</b><span>场景题，附答题框架与踩坑</span></div>
-        <div class="stat"><b>5 大方向</b><span>前端渲染 / RAG / Agent / 工程 / 全栈</span></div>
-        <div class="stat"><b>60+ 追问</b><span>面试官追问方向预判</span></div>
+        <div class="stat"><b>45 道</b><span>场景与基础题，附答题框架</span></div>
+        <div class="stat"><b>6 大方向</b><span>前端 / RAG / Agent / 工程 / 全栈 / 基础</span></div>
+        <div class="stat"><b>70+ 追问</b><span>面试官追问方向预判</span></div>
       </div>
     </div>
   </header>
   <nav>
     <div class="shell">
-      <a href="#s1">导读</a><a href="#s2">手撕 · 异步与流式</a><a href="#s3">手撕 · RAG 检索</a><a href="#s4">手撕 · 工程基础件</a><a href="#s5">手撕 · Agent 题</a><a href="#s-fe">手撕 · 前端渲染</a><a href="#s6">场景 · RAG</a><a href="#s7">场景 · Agent</a><a href="#s8">场景 · 工程稳定性</a><a href="#s-full">场景 · 全栈交付</a><a href="#s9">场景 · 系统设计</a><a href="#s10">答题技巧</a>
+      <a href="#s1">导读</a><a href="#s2">手撕 · 异步与流式</a><a href="#s3">手撕 · RAG 检索</a><a href="#s4">手撕 · 工程基础件</a><a href="#s5">手撕 · Agent 题</a><a href="#s-fe">手撕 · 前端渲染</a><a href="#s6">场景 · RAG</a><a href="#s7">场景 · Agent</a><a href="#s8">场景 · 工程稳定性</a><a href="#s-full">场景 · 全栈交付</a><a href="#s9">场景 · 系统设计</a><a href="#s-cs">基础 · OS与网络</a><a href="#s10">答题技巧</a>
     </div>
   </nav>
   <main class="shell">
@@ -125,8 +125,8 @@
         <div class="mini"><h3>趋势：从八股到真题</h3><p>2025 年后明显转向生产化真题：流式 JSON 修复、多供应商降级、评测集建设，全是真实痛点。</p></div>
       </div>
       <div class="grid3" style="margin-top:15px">
-        <div class="mini"><h3>主线 · AI 全栈</h3><p>手撕按 2 → 6 → 4 章推进（异步流式 → 前端渲染 → 基础件），场景按 9 → 10 → 11 章推进（工程 → 全栈交付 → 系统设计）。这是投入七成精力的主干。</p></div>
-        <div class="mini"><h3>第二曲线 · 后端深度</h3><p>事务、缓存、MQ、连接池这些后端硬功底，见站内《Java 后端与 Agent / AI 应用 · 面试图解手册》，按需选读，不必通读。</p></div>
+        <div class="mini"><h3>主线 · AI 全栈</h3><p>手撕按 2 → 6 → 4 章推进（异步流式 → 前端渲染 → 基础件），场景按 9 → 10 → 11 章推进（工程 → 全栈交付 → 系统设计），12 章 OS/网络做地基（久未复习先过这章）。投入六成精力。</p></div>
+        <div class="mini"><h3>第二主线 · 后端深度</h3><p>面试问深度时的阵地：Java 手册第二/五/六/七章（并发 / MySQL / Redis·MQ / 分布式）+ 本册 12.1、12.2、12.5、12.6。投入三成精力，确保至少两块能下钻两层。</p></div>
         <div class="mini"><h3>加分项 · Agent</h3><p>手撕 5 章 + 场景 8 章，深度已超「加分项」所需，面试前过一遍框架即可，别再投入新增学习时间。</p></div>
       </div>
       <div class="card pad table" style="margin-top:15px">
@@ -1280,8 +1280,116 @@ function renderModelOutput(raw: string): string {
       </div>
     </section>
 
+    <section id="s-cs">
+      <div class="head"><h2>12. 基础 · OS 与网络</h2><p>AI 全栈的地下层：这些题在面试里全部挂在 AI 应用场景上考，纯背八股的答法在这套题里行不通。</p></div>
+
+      <div class="card pad q">
+        <h3>12.1 IO 多路复用：select / poll / epoll <span class="pill g">后端必考</span></h3>
+        <p class="tagline">场景包装：「SSE 网关怎么扛一万条长连接？」——Redis、Netty、Node、Nginx 给的是同一个答案。</p>
+        <ul class="clean">
+          <li><strong>演进一句话：</strong>select 用固定 fd 数组（1024 上限），每次唤醒 O(n) 全量扫；poll 换链表去掉数量限制，仍是 O(n)；epoll 红黑树注册 + 就绪链表，事件回调把就绪 fd 直接挂链表，取用 O(1)。</li>
+          <li><strong>核心思想：</strong>一个线程盯一万条连接不是靠快，是靠<strong>只在 fd 就绪时才干活</strong>——事件驱动，阻塞等待交给内核。</li>
+          <li><strong>LT vs ET：</strong>水平触发没读完下次还通知（宽容）；边缘触发只通知一次，必须配合非阻塞 fd 一次读到 EAGAIN（高性能但易丢事件）。</li>
+          <li><strong>AI 场景落点：</strong>SSE/WS 长连接网关、LLM 代理的并发流转发，底层全是这套。</li>
+        </ul>
+        <div class="callout"><p><strong>答题技巧：</strong>先答「C10K 的本质是阻塞 IO 每连接一线程，内存和上下文切换先爆」，再讲 epoll 怎么把模型变成事件驱动——从问题出发而不是背参数。追问「Java 里对应什么」：NIO/Netty 是 epoll 封装，虚拟线程则是另一种解法（见 12.2）。</p></div>
+      </div>
+
+      <div class="card pad q">
+        <h3>12.2 进程 / 线程 / 协程，与 Node 的事件循环 <span class="pill g">全栈必考</span></h3>
+        <p class="tagline">场景包装：「Node 单线程，为什么不怕数据库慢查询，怕什么？」</p>
+        <ul class="clean">
+          <li><strong>三层区分：</strong>进程是资源分配单位（独立地址空间），线程是调度单位（共享进程内存），协程是用户态调度的轻量执行流（切换不进内核）。</li>
+          <li><strong>Node 的答案：</strong>不怕 IO 慢——异步调用挂起后事件循环继续跑别人；<strong>怕 CPU 密集</strong>——大 JSON 解析、加解密、图片处理会把唯一的主线程卡死，所有请求一起僵。解法：<code>worker_threads</code> / 子进程 / 下沉 Wasm。</li>
+          <li><strong>Java 视角对照：</strong>平台线程贵（栈 MB 级）所以有线程池；JDK 21 虚拟线程 = JVM 层协程，阻塞时自动让出载体线程，百万级并发可行——<strong>SSE「每连接一线程」的写法从奢侈变成合理</strong>。</li>
+          <li><strong>协程为什么便宜：</strong>用户态切换（无系统调用）、栈 KB 级、不污染 CPU 缓存。</li>
+        </ul>
+        <div class="callout"><p><strong>答题技巧：</strong>用「IO 密集 vs CPU 密集」做决策轴：IO 密集选事件循环/虚拟线程都行，CPU 密集必须多进程/线程池。能把 Node 事件循环和 Java 虚拟线程放进同一张图讲，就是全栈的讲法。</p></div>
+      </div>
+
+      <div class="card pad q">
+        <h3>12.3 TCP 握手挥手与 TIME_WAIT <span class="pill g">高频</span></h3>
+        <p class="tagline">场景包装：「流式接口为什么强烈不建议客户端用短连接轮询？」——半道题就是在考 TIME_WAIT。</p>
+        <ul class="clean">
+          <li><strong>三次握手为什么是三次：</strong>双方都要确认「我能发你能收」，两次无法防住历史重复连接请求建起错误连接。</li>
+          <li><strong>四次挥手与 TIME_WAIT：</strong>被动方_fin 后还要等应用关 socket 所以四次；主动关闭方进入 TIME_WAIT 停 2MSL——等迟到的报文自然消亡、保证最后 ACK 可重传。</li>
+          <li><strong>实战链路：</strong>短连接高频轮询 → 客户端大量主动关闭 → TIME_WAIT 堆积 → 本地端口耗尽，连接建立失败。长连接/连接池/SSE 一连到底，一次握手服务全程。</li>
+        </ul>
+        <div class="callout"><p><strong>答题技巧：</strong>记住方向性——<strong>谁主动关闭谁堆积 TIME_WAIT</strong>，排查先看是谁在关。追问「TIME_WAIT 为什么不能调小」：2MSL 是保证网络中旧报文死亡的底线，调小会在长肥网络里收到旧数据。</p></div>
+      </div>
+
+      <div class="card pad q">
+        <h3>12.4 粘包拆包：流式协议怎么定边界</h3>
+        <p class="tagline">场景包装：「自定义一个二进制流式协议，边界怎么定？」——你写过的 SSE 解析器（2.3）就是这题的应用层版本。</p>
+        <ul class="clean">
+          <li><strong>认知先行：</strong>TCP 是<strong>字节流</strong>，天生没有消息边界，「粘包」不是 bug 是常态；UDP 是数据报，边界天然保留。</li>
+          <li><strong>四种定界法：</strong>固定长度（最简单浪费大）/ 分隔符（SSE 的空行、Redis RESP 的换行）/ 长度前缀（最通用，TLV 结构）/ 协议自带结构（WebSocket 分帧）。</li>
+          <li><strong>和手撕题的连接：</strong>2.3 的 SSE 解析器 = 分隔符定界 + 跨 chunk 缓冲；10.2 的事件协议带 seq，本质是给字节流加了应用层消息语义。</li>
+        </ul>
+        <div class="callout"><p><strong>答题技巧：</strong>一句「TCP 不保证消息边界只保证字节有序，定界是应用层的责任」开场，再按四种方案讲取舍，最后落到自己写过的解析器实例——理论和手写代码闭环。</p></div>
+      </div>
+
+      <div class="card pad q">
+        <h3>12.5 零拷贝与 mmap：Kafka 为什么快</h3>
+        <p class="tagline">场景包装：「读文件发网络， traditional 写法有几次拷贝几次切换？怎么省？」——也管大模型文件传输。</p>
+        <ul class="clean">
+          <li><strong>传统路径：</strong>read + write = 4 次拷贝（磁盘→page cache→用户态→socket 缓冲→网卡）+ 4 次内核/用户态切换，数据两进两出用户态纯属搬运。</li>
+          <li><strong>sendfile：</strong>内核内从 page cache 直达网卡（DMA gather 可做到 0 次 CPU 拷贝），切换降到 2 次——静态文件服务、消息队列的标配。</li>
+          <li><strong>mmap：</strong>文件映射进用户态地址空间，省掉「内核→用户」那次拷贝，读写像访问内存——Kafka 日志读取、大索引文件的方案。</li>
+          <li><strong>什么时候不能用：</strong>内容需要加工（加密、改写）时必须进用户态，零拷贝只适合「原样搬运」。</li>
+        </ul>
+        <div class="callout"><p><strong>答题技巧：</strong>先画出 4 次拷贝的路径图再讲怎么省，图比术语值钱。AI 场景钩子：模型权重分发、日志采集、对象存储网关，全是搬运型 IO。</p></div>
+      </div>
+
+      <div class="card pad q">
+        <h3>12.6 虚拟内存与 OOM Killer：容器被杀但堆只用一半 <span class="pill a">实战高频</span></h3>
+        <p class="tagline">场景包装：「容器 OOMKilled，JVM 堆才用了 Xmx 一半，为什么？」（Java 手册 q-160 的原理层展开）</p>
+        <ul class="clean">
+          <li><strong>虚拟内存机制：</strong>每进程独立虚拟地址空间，页表按需映射物理页，malloc 只是预留地址不占物理内存。</li>
+          <li><strong>overcommit 与 OOM Killer：</strong>Linux 默认过度承诺内存，物理耗尽时按 oom_score 杀掉「占得最多且不重要」的进程——容器里就是你。</li>
+          <li><strong>关键认知：</strong>cgroup 内存上限管的是<strong>整个进程 RSS</strong>，不是 JVM 堆——堆外还有 DirectBuffer、线程栈、Metaspace、JIT 代码缓存、GC 自身开销，再加写文件产生的 page cache 也计入 cgroup。Xmx 设成容器上限的一半都被杀，很正常。</li>
+          <li><strong>工程解法：</strong>JVM 容器感知（UseContainerSupport 默认开）、按上限留足余量、NativeMemoryTracking 排堆外去向、排查先看 cgroup memory.stat 而不是 jstat。</li>
+        </ul>
+        <div class="callout"><p><strong>答题技巧：</strong>这题的满分句式：「容器杀的是 RSS 超限，不是堆超限」+「page cache 也算容器内存」——两句都说出来，面试官就知道你真排查过。</p></div>
+      </div>
+
+      <div class="card pad q">
+        <h3>12.7 TLS 握手与流式接口的安全基线</h3>
+        <p class="tagline">场景包装：「LLM API 为什么必须走 HTTPS？握手在做什么？」——顺带考你分层排障思路。</p>
+        <ul class="clean">
+          <li><strong>握手三件事：</strong>证书链验证（身份）、ECDHE 密钥交换（前向安全——私钥泄露也解不开历史流量）、协商对称会话密钥（后续加密）。TLS 1.3 一次 RTT 完成，1.2 要两次；会话复用可到 0-RTT。</li>
+          <li><strong>为什么流式必须 HTTPS：</strong>API Key、对话内容（隐私合规）、完整性——中间网络不可信是前提不是假设。</li>
+          <li><strong>分层排障钩子：</strong>流式连不上先分层查——DNS → TCP 通不通 → TLS 证书校验（过期/私有 CA/代理注入）→ HTTP 层（代理 buffer、超时，见 9.8）。证书问题最常见的表现是 connect 阶段挂起而不是报错。</li>
+          <li><strong>追问预判：</strong>「公司代理为什么能看 HTTPS 明文？」——终端装了代理根证书的中间人解密，这正是 Agent 抓包调试和供应链风险的交界。</li>
+        </ul>
+      </div>
+
+      <div class="card pad q">
+        <h3>12.8 HTTP 版本演进与缓存</h3>
+        <p class="tagline">场景包装：「HTTP/2 对 SSE 有什么影响？聊天页的静态资源和 API 各怎么配缓存？」</p>
+        <ul class="clean">
+          <li><strong>版本三句话：</strong>1.1 keep-alive 复用连接但应用层按序响应（队头阻塞）；HTTP/2 单连接多路复用（流并发，SSE 单流不再被别的请求挤住），但 TCP 层丢包全体阻塞；HTTP/3 底层换 QUIC（UDP），解决传输层队头阻塞 + 连接迁移。</li>
+          <li><strong>缓存两分法：</strong>强缓存（<code>Cache-Control: max-age</code>，不发请求）vs 协商缓存（<code>ETag</code>/304，发请求问一下）。静态资源带 hash 文件名 + 长强缓存；<code>index.html</code> 不缓存或短缓存。</li>
+          <li><strong>AI 应用特例：</strong>流式 API 响应要禁缓存 + 关代理缓冲（<code>no-cache</code>、<code>X-Accel-Buffering: no</code>，见 9.8）——缓存语义对流没有意义，反而是故障源。</li>
+        </ul>
+        <div class="callout"><p><strong>答题技巧：</strong>按「问题→解决→新问题」链条讲版本演进（队头阻塞→多路复用→TCP 层阻塞→QUIC），比背特性表高一个档位。</p></div>
+      </div>
+
+      <div class="card pad q">
+        <h3>12.9 CPU 缓存与伪共享：高性能计数器为什么慢</h3>
+        <p class="tagline">场景包装：「限流器每秒十万次原子更新计数器，吞吐突然腰斩，硬件层面发生了什么？」</p>
+        <ul class="clean">
+          <li><strong>缓存模型：</strong>L1/L2 每核私有、L3 共享，以<strong>缓存行（通常 64B）</strong>为单位加载——空间局部性是所有高性能数据结构的隐性前提。</li>
+          <li><strong>伪共享：</strong>两个线程各写<strong>不同</strong>变量，但它们落在同一缓存行——缓存一致性协议（MESI）让这行在两个核之间乒乓，写自己的变量却互相失效对方的缓存。</li>
+          <li><strong>解法：</strong>按缓存行填充隔开热变量（Java 的 <code>@Contended</code>、手动 padding）；计数器改分片累加（LongAdder 思想：写分散、读时合并）。</li>
+          <li><strong>AI 场景钩子：</strong>限流统计、请求计数、埋点聚合——高频写共享计数器的地方都值得想一下这题。</li>
+        </ul>
+        <div class="callout"><p><strong>答题技巧：</strong>这题属于「说了就是加分」的区分题：能用「缓存行乒乓」把症状讲成机制，直接证明并发功底在硬件层扎过根。追问「怎么定位」：perf c2c / 缓存命中率计数器。</p></div>
+      </div>
+    </section>
+
     <section id="s10">
-      <div class="head"><h2>12. 答题技巧总纲</h2><p>题目会变，套路不变。两套方法论 + 三个加分句式。</p></div>
+      <div class="head"><h2>13. 答题技巧总纲</h2><p>题目会变，套路不变。两套方法论 + 三个加分句式。</p></div>
       <div class="grid2">
         <div class="card pad">
           <h3 style="margin-top:0">手撕题五步法</h3>
