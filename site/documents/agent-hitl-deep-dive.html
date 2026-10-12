@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="深入解析 Agent 领域 Human-in-the-Loop 的机制与架构：中断与恢复的状态机本质、审批策略纯函数、异步持久化执行、MCP elicitation 协议、审批疲劳实证与对策，并巡礼 AutoGen、OpenAI Agents SDK、Codex CLI、Claude Agent SDK、smolagents、CrewAI 等经典开源实现与选型决策框架。">
+  <meta name="description" content="深入解析 Agent 领域 Human-in-the-Loop 的机制与架构：中断与恢复的状态机本质、审批策略纯函数、异步持久化执行、MCP elicitation 协议、审批疲劳实证与对策，并巡礼 AutoGen、OpenAI Agents SDK、Codex CLI、Claude Agent SDK、smolagents、CrewAI、OpenClaw、nanobot、pi、AgentScope 等开源实现与选型决策框架。">
   <meta name="date" content="2026-10-12">
   <title>Agent 中的人机回环（HITL）：机制、架构与设计权衡</title>
   <style>
@@ -83,7 +83,7 @@
     <div class="shell">
       <div class="kicker">HUMAN-IN-THE-LOOP · AGENT ARCHITECTURE</div>
       <h1>Agent 中的人机回环</h1>
-      <p class="lead">把 HITL 从"加个确认弹窗"拆到工程本质：执行模型如何变成可暂停的状态机、审批判定如何成为纯函数、异步审批如何跨天存活、协议如何把"问人"标准化、审批疲劳为什么是监督的第一失效点；收尾巡礼 AutoGen、OpenAI Agents SDK、Codex CLI 等经典开源实现，并给出选型决策框架。</p>
+      <p class="lead">把 HITL 从"加个确认弹窗"拆到工程本质：执行模型如何变成可暂停的状态机、审批判定如何成为纯函数、异步审批如何跨天存活、协议如何把"问人"标准化、审批疲劳为什么是监督的第一失效点；收尾巡礼十余个经典与新生开源实现（AutoGen、OpenAI Agents SDK、Codex CLI、Claude Agent SDK、OpenClaw、nanobot、pi、AgentScope 等），并给出选型决策框架。</p>
       <div class="doc-meta">
         <time datetime="2026-10-12">2026年10月12日</time>
         <span>Agent 架构 / 深度解析</span>
@@ -405,7 +405,7 @@
     <!-- ============ 10 开源实现巡礼 ============ -->
     <section id="sec10">
       <div class="head"><h2>10. 经典开源项目的 HITL 实现方案</h2><p>六个有代表性的开源实现：各自的回环抽象、代码级 API 与语义取舍。</p></div>
-      <p>前面各节讲机制原理，这一节看原理如何落地成"默认选项"。LangGraph 与 Temporal 已在第 3、5 节展开，这里巡礼其余六个经典开源项目。它们对最关键的问题——<strong>谁拥有触发回环的权力</strong>——给出了四种不同答案，先看全貌：</p>
+      <p>前面各节讲机制原理，这一节看原理如何落地成"默认选项"。LangGraph 与 Temporal 已在第 3、5 节展开，这里巡礼十个代表性开源实现：先是框架与 SDK 一派，再补充 2025–2026 年爆发的新生代——常驻个人代理与极简 harness。它们对最关键的问题——<strong>谁拥有触发回环的权力</strong>——给出了从"拓扑保证"到"配置时一次授权"的多种答案，先看全貌：</p>
       <div class="card pad table">
         <table>
           <thead><tr><th>项目</th><th>回环抽象</th><th>核心 API</th><th>触发者</th><th>异步</th></tr></thead>
@@ -416,6 +416,10 @@
             <tr><td>OpenAI Agents SDK</td><td>审批即一等运行时中断</td><td><code>requires_approval</code> + <code>ApprovalResponse</code></td><td>程序强制（声明式）</td><td>是</td></tr>
             <tr><td>Codex CLI</td><td>审批 × 沙箱二维矩阵</td><td><code>approval_policy</code> + <code>sandbox_mode</code></td><td>程序强制（策略矩阵）</td><td>云端任务异步</td></tr>
             <tr><td>Claude Agent SDK</td><td>hook 即策略执行点</td><td><code>can_use_tool</code> + PreToolUse hooks</td><td>程序强制（回调）</td><td>取决于宿主</td></tr>
+            <tr><td>OpenClaw</td><td>常驻授权：配置时一次授权，运行期不问</td><td>per-agent 沙箱 + <code>tools.allow/deny</code> + <code>shell.allowlist</code></td><td>程序强制（配置期）</td><td>常驻运行，人经聊天渠道随时介入</td></tr>
+            <tr><td>nanobot（HKUDS）</td><td>人即渠道 + 极简代码基</td><td>多通道接入（WebUI / 终端 / 聊天应用）</td><td>模型自主 / 拓扑</td><td>常驻运行</td></tr>
+            <tr><td>pi</td><td>人在场即回环（极简 harness）</td><td>极小内核 + 扩展 / skills</td><td>同步会话（人全程在场）</td><td>否</td></tr>
+            <tr><td>AgentScope</td><td>人即代理 + 工具前检查点</td><td><code>UserAgent</code>（Java 版另有 tool 前 checkpoint）</td><td>拓扑 + 程序</td><td>视部署环境</td></tr>
           </tbody>
         </table>
       </div>
@@ -469,7 +473,45 @@
           </ul>
         </div>
       </div>
-      <div class="callout warn" style="margin-top:14px"><p><strong>触发权谱系——本节最重要的结论：</strong>把这些实现排在一条谱系上：拓扑保证（AutoGen：人是对话图的固定节点）→ 模型自主（smolagents / CrewAI：模型决定何时问）→ 程序强制（Agents SDK / Codex CLI / Claude Agent SDK：声明、策略或回调决定何时问）。<strong>安全回环必须落在程序强制一端</strong>——只有那里的触发不受模型控制，因而也不受提示注入影响；模型自主端只配承担澄清与偏好收集。另一个耐人寻味的事实：截至 2026 年，主流开源实现无一用"模型自评置信度"触发安全回环，大家不约而同把触发权留在了程序层——这印证了第 11 节对 confidence-based escalation 的保守判断。</p></div>
+      <p style="margin-top:15px">下面这批是 2025–2026 年才爆发的新生代，与前六个不是同一物种：<strong>常驻个人代理</strong>把回环从"运行时审批"挪到"配置时授权"，<strong>极简 harness</strong> 干脆主张"人在场 + 代码可读"就够了。它们各自把第 2 节 LOA 谱系推到了两端：</p>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">OpenClaw —— 常驻授权的极端与治理回调</h3>
+          <ul class="clean">
+            <li>个人常驻代理网关（经 WhatsApp / Telegram 等渠道接入你的数字生活），代表 LOA 8–10 在个人场景的极端形态：不是"每动作审批"，而是<strong>一次性授予长期代理权</strong>。</li>
+            <li>安全争议后收敛出分层防护：per-agent 沙箱（Off / Non-main / All 三档）+ 每代理工具 allow/deny（<code>agents.list[].tools.allow/deny</code>）+ shell 命令前缀 allowlist + DM policy（谁可以与代理对话）。注意这些 gate 都在<strong>配置期</strong>生效，运行期回环反而弱。</li>
+            <li>每代理独立沙箱与工具策略（full access / read-only / no access）值得借鉴：多 agent 场景按代理分权，而不是全局一刀切——这是第 9 节"升级作用域"在权限维度的对应物。</li>
+            <li>HITL 启示：常驻授权把审批从运行时挪到配置时，第 7 节的疲劳问题被绕过、也被放大——绕过是因为不问了，放大是因为出问题时没人看着，只剩审计与事后介入。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">nanobot（HKUDS）—— 极简代码基作为信任机制</h3>
+          <ul class="clean">
+            <li>超轻量个人代理框架（Python，核心约四千行），WebUI / 终端 / 聊天应用多通道接入，定位 OpenClaw 的极简替代；支持 MCP、Ollama、Docker，自托管。（另有同名 Ruby 前辈——2023 年 icebaker 的极简 agent 框架，思路同源，谈论时注意区分。）</li>
+            <li>回环形态：<strong>人即渠道</strong>——代理常驻在聊天应用里，人随时插话就是介入，无需专门的审批机制。</li>
+            <li>信任模型与 pi 同派：<strong>代码少到能读完，本身就是安全机制</strong>——你审计的是全部代码，而不是一摞配置矩阵和闭源依赖。</li>
+            <li>局限同常驻一派：宽授权 + 运行期审批弱，适合个人与自托管，进组织场景需要外挂策略层。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">pi —— 极简 harness 的反框架立场</h3>
+          <ul class="clean">
+            <li>Mario Zechner（badlogic，libGDX 作者）2025 年底发布的极简终端 coding agent："<strong>harness 而非框架</strong>"——极小内核，一切靠扩展；skills 与 Claude Code / Codex CLI 兼容，生态直接复用。</li>
+            <li>立场：反对把权限、记忆、编排全部内建成黑盒框架；agent 应该小到能读完、贴身可改，用户为自己的工具负责。</li>
+            <li>回环形态：<strong>人在终端旁，同步会话本身就是回环</strong>。极简派认为 coding 场景里"人一直在场"是比权限系统更强的安全条件——这当然只对同步单人场景成立。</li>
+            <li>与框架派构成光谱两端：一端是 LangGraph / Agents SDK 的机制化回环，一端是 pi / nanobot 的"可读代码 + 人在场"信任模型。两端各有其场景，不构成谁对谁错。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">AgentScope —— 人即代理的工程化与检查点</h3>
+          <ul class="clean">
+            <li>阿里通义实验室的多智能体框架（Python 为主，另有 Java 版），1.0 于 2025 年 9 月发布；国内生产采用多——阿里商旅差旅助手、金融智能体底座等案例都跑在它上面。</li>
+            <li>HITL 双层：内置 <code>UserAgent</code> 把人表示为对话中的智能体（与 AutoGen 同派）；Java 版进一步提供<strong>工具调用前的人工审核 checkpoint</strong>——暂停等确认再执行，即 approval gate 形态。</li>
+            <li>社区讨论（issue #926）点出的难点很典型：HITL 的关键不在会话内，而在<strong>不同部署环境如何获取用户输入</strong>——Web、终端、消息渠道的输入管道各自不同。这正是 input_func、MCP elicitation 这类抽象要解决的问题：把"人的接口"从应用代码里解耦出来。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout warn" style="margin-top:14px"><p><strong>触发权谱系——本节最重要的结论：</strong>把这些实现排在一条谱系上：拓扑保证（AutoGen：人是对话图的固定节点）→ 模型自主（smolagents / CrewAI：模型决定何时问）→ 程序强制（Agents SDK / Codex CLI / Claude Agent SDK：声明、策略或回调决定何时问）。<strong>安全回环必须落在程序强制一端</strong>——只有那里的触发不受模型控制，因而也不受提示注入影响；模型自主端只配承担澄清与偏好收集。另一个耐人寻味的事实：截至 2026 年，主流开源实现无一用"模型自评置信度"触发安全回环，大家不约而同把触发权留在了程序层——这印证了第 11 节对 confidence-based escalation 的保守判断。而新生代补上了谱系的第五种答案——<strong>配置时授权</strong>（OpenClaw / nanobot：运行期不问，监督退化为审计与事后介入）：它绕开了审批疲劳，也放弃了运行期防线，适合单人自托管场景；一旦进入组织场景，必须叠回程序强制那一端。</p></div>
     </section>
 
     <!-- ============ 11 选型与清单 ============ -->
@@ -485,6 +527,8 @@
             <tr><td>OpenAI Agents SDK</td><td><code>requires_approval</code> 触发 ApprovalRequest 中断</td><td>session（可持久化 run）</td><td>工具级（声明式标记）</td><td>是（中断可异步应答）</td></tr>
             <tr><td>Claude Agent SDK</td><td><code>can_use_tool</code> 回调 + hooks</td><td>宿主进程</td><td>规则级（策略纯函数）</td><td>取决于宿主</td></tr>
             <tr><td>AutoGen / AG2</td><td>UserProxy 轮转 + <code>human_input_mode</code></td><td>对话内存</td><td>轮次级</td><td>0.4 起经 <code>input_func</code> 外接</td></tr>
+            <tr><td>AgentScope</td><td><code>UserAgent</code> + 工具前人工审核 checkpoint（Java 版）</td><td>框架状态</td><td>轮次 / 工具级</td><td>视部署环境</td></tr>
+            <tr><td>OpenClaw</td><td>配置期 allowlist + per-agent 沙箱分层</td><td>平台配置</td><td>代理级（每代理独立策略）</td><td>常驻运行，人经聊天渠道介入</td></tr>
             <tr><td>Temporal</td><td><code>Workflow.await</code> + signal</td><td>事件历史全量日志</td><td>activity 级</td><td>一等能力（durable timer + 升级链）</td></tr>
             <tr><td>MCP elicitation</td><td><code>elicitation/create</code> 结构化提问</td><td>由 host 决定</td><td>结构化输入（flat schema）</td><td>取决于 host 路由（可接卡片审批）</td></tr>
             <tr><td>Cloudflare Workflows</td><td>step 挂起 + 外部事件</td><td>durable object</td><td>step 级</td><td>是（与 elicitation 组合实践）</td></tr>
@@ -526,7 +570,7 @@
           <li>MCP 规范（modelcontextprotocol.io）：sampling 与 elicitation（2025-06-18 版）</li>
           <li>LangGraph 文档：Human-in-the-Loop（interrupt / Command / checkpointer）</li>
           <li>Temporal 文档：Signals、Timers 与 human task 模式</li>
-          <li>开源实现源码（GitHub）：<code>microsoft/autogen</code>、<code>openai/openai-agents-python</code>、<code>openai/codex</code>、<code>anthropics/claude-agent-sdk-python</code>、<code>huggingface/smolagents</code>、<code>crewAIInc/crewAI</code>、<code>langchain-ai/langgraph</code>、<code>temporalio/temporal</code></li>
+          <li>开源实现源码（GitHub）：<code>microsoft/autogen</code>、<code>openai/openai-agents-python</code>、<code>openai/codex</code>、<code>anthropics/claude-agent-sdk-python</code>、<code>huggingface/smolagents</code>、<code>crewAIInc/crewAI</code>、<code>langchain-ai/langgraph</code>、<code>temporalio/temporal</code>、<code>openclaw/openclaw</code>、<code>HKUDS/nanobot</code>、<code>badlogic/pi-mono</code>、<code>agentscope-ai/agentscope</code></li>
           <li>Cloudflare Agents 文档：Human-in-the-loop patterns（2026）</li>
           <li>Sadowski 等（2018），<em>Modern Code Review: A Case Study at Google</em></li>
         </ul>
