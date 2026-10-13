@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="description" content="按简历技术栈组织的K8S、可观测性与工程交付原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。"><meta name="date" content="2026-10-13"><title>简历技术原理 · K8S、可观测性与工程交付</title><style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .decision{fill:var(--amber2);stroke:var(--amber);stroke-width:1.6}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    .active{fill:var(--blue2);stroke:var(--blue);stroke-width:1.2}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    .dock{position:fixed;right:18px;bottom:18px;z-index:99;display:flex;gap:4px;padding:6px;border-radius:999px;background:rgba(15,23,42,.82);backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(15,23,42,.28)}
+    .dock a{padding:7px 13px;border-radius:999px;color:#fff;text-decoration:none;font:600 13px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+    .dock a:hover{background:rgba(255,255,255,.16)}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+
+    :focus-visible{outline:3px solid var(--blue);outline-offset:4px}
+    html{scroll-padding-top:76px} .diagram{margin:18px 0}.dock{top:auto}
+    .diagram figcaption{margin-top:14px;color:var(--muted);font-size:13px;line-height:1.7}
+    .q{margin-top:16px;scroll-margin-top:78px}.q h3{margin:0 0 14px;font-size:22px;line-height:1.5}
+    .q h4{margin:18px 0 7px;font-size:16px}.q p{margin:10px 0}.q .pill{vertical-align:middle;margin-right:8px}
+    .q .memory-cue{margin:0 0 16px;padding:10px 13px;border-left:3px solid var(--green);border-radius:8px;background:var(--green2);font-size:14px}
+    .memory-cue strong{color:var(--green)}.verify{color:var(--muted);font-size:14px}
+    .sources{margin-top:18px;color:var(--muted);font-size:13px}.sources a{display:inline-block;margin:0 16px 6px 0}
+    .jump-list{display:flex;flex-wrap:wrap;gap:6px 18px;padding:0;list-style:none;font-size:14px;margin:16px 0}
+    p,li,a{overflow-wrap:anywhere}.practice{margin-top:20px}.practice h3{margin-top:0}
+    pre{overflow:auto;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);font:14px/1.75 Consolas,monospace}
+    pre code{padding:0;border:0;border-radius:0;color:var(--ink);background:transparent;font:inherit}
+    .read-map .mini a{display:block;font-weight:700;margin-bottom:6px}
+    @media(max-width:820px){.pad{padding:18px}.q h3{font-size:19px}.diagram{padding:12px}.lead{font-size:17px}}
+
+@page{margin:14mm}@media print{:root,[data-theme=dark]{
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }body{background:var(--panel)}header{padding:0 0 24px}.stats{grid-template-columns:repeat(4,1fr);gap:8px}.stat{padding:12px}.dock{display:none}.diagram svg{min-width:0}.diagram{overflow:visible;padding:10px;break-inside:avoid}.table table{min-width:0}.q h3{break-after:avoid}.head{break-after:avoid}pre{white-space:pre-wrap;overflow:visible}a{color:var(--ink)}}
+
+.column-links a{font-weight:700}.column-links .mini{height:100%}.source-list li{margin:10px 0}.source-list a{overflow-wrap:anywhere}.q p{max-width:100%}
+</style></head>
+<body><header><div class="shell"><div class="kicker">RESUME STACK / PRINCIPLES / FAILURE ANALYSIS</div><h1>K8S、可观测性与工程交付</h1><p class="lead">控制循环、资源预算、在途任务和 AI Coding 的验证证据</p><div class="doc-meta"><time datetime="2026-10-13">2026年10月13日</time><span>按简历技术类别选题</span><span>原理 · 边界 · 故障推演</span></div><div class="actions"><a class="btn" href="#map">开始阅读</a><button class="btn" id="theme" type="button">切换主题</button><button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button></div><div class="stats"><div class="stat"><b>6</b><span>深挖主题</span></div><div class="stat"><b>2</b><span>机制与故障图</span></div><div class="stat"><b>1</b><span>可运行练习</span></div><div class="stat"><b>8</b><span>原始资料入口</span></div></div></div></header>
+<nav aria-label="章节导航"><div class="shell"><a href="#map">阅读地图</a><a href="#topic-1">01 · Kubernetes 的控制循环为什么不等于业务事务？</a><a href="#topic-2">02 · Requests、Limits、线程池和 HPA 怎样形成一个容量模型？</a><a href="#topic-3">03 · Startup、Liveness、Readiness 为什么不能共用一个“查所有依赖”接口？</a><a href="#topic-4">04 · Service、代理和 SSE 长连接为什么会影响负载与恢复？</a><a href="#topic-5">05 · 滚动发布如何保护 MQ、Temporal 和 Action 的在途工作？</a><a href="#topic-6">06 · AI Coding 怎样从“能生成代码”提升到“能证明修改正确”？</a><a href="#practice">练习与故障自测</a><a href="#sources">原始资料与关联阅读</a></div></nav><main class="shell"><section id="map"><div class="head"><h2>1. 从项目线索建立原理地图</h2><p>K8S · Pod · Probe · HPA · 发布恢复 · AI Coding</p></div>
+<p><a href="resume-tech-columns.html">← 技术原理专栏总入口</a> · <a href="foundations-os-network-column.html">操作系统与网络基础</a></p>
+<div class="grid2"><div class="mini"><h3>简历关联</h3><p>简历列出 K8S 与 AI Coding，并强调工作流发版安全、模型部署与异常恢复。本篇为这些技术建立交付和运行原理，不补写未经说明的运维经历。</p></div><div class="mini"><h3>本篇要练成什么</h3><p>能解释 Kubernetes 恢复了哪个对象、服务流量怎样切换，以及一次 AI 辅助修改为什么需要用业务不变量验收。</p></div></div>
+<div class="callout" style="margin-top:16px"><p><strong>阅读方式：</strong>先用记忆关键词复述机制，再推演例子的失败窗口，最后指出验证对象。正文方案是教学分析，不等同于已核对项目源码；具体个人贡献应按真实经历说明。</p></div>
+<p class="verify"><strong>版本与验证范围：</strong>Kubernetes 按所链接官方概念核对，feature gate 和控制器行为需按集群版本确认。练习是资源与探针作用的模型，不运行集群、HPA 或真实发布。</p><figure class="card diagram" id="fig-delivery-flow"><svg viewBox="0 0 1040 370" role="img" aria-labelledby="delivery-flow-title delivery-flow-desc"><title id="delivery-flow-title">机制地图</title><desc id="delivery-flow-desc">Pod 重建恢复运行载体，不自动恢复业务进度、连接缓冲或不可重放的外部动作。</desc><defs><marker id="arrow-delivery-flow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="arrow-delivery-flow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker></defs><g class="diagram-node"><rect x="35" y="55" width="280" height="80" rx="10" class="node "/><text x="175" y="87" text-anchor="middle" class="title">版本化交付物</text><text x="175" y="112" text-anchor="middle" class="sub">代码 / 配置 / 模型 / Schema</text></g><g class="diagram-node"><rect x="380" y="55" width="280" height="80" rx="10" class="node "/><text x="520" y="87" text-anchor="middle" class="title">控制器协调</text><text x="520" y="112" text-anchor="middle" class="sub">期望状态 / Pod 生命周期</text></g><g class="diagram-node"><rect x="725" y="55" width="280" height="80" rx="10" class="node "/><text x="865" y="87" text-anchor="middle" class="title">资源与探针</text><text x="865" y="112" text-anchor="middle" class="sub">CPU/内存预算 / 就绪</text></g><g class="diagram-node"><rect x="725" y="235" width="280" height="80" rx="10" class="node g"/><text x="865" y="267" text-anchor="middle" class="title">服务与长连接</text><text x="865" y="292" text-anchor="middle" class="sub">端点 / 代理 / SSE</text></g><g class="diagram-node"><rect x="380" y="235" width="280" height="80" rx="10" class="node g"/><text x="520" y="267" text-anchor="middle" class="title">在途任务恢复</text><text x="520" y="292" text-anchor="middle" class="sub">动作身份 / ack / 历史</text></g><g class="diagram-node"><rect x="35" y="235" width="280" height="80" rx="10" class="node g"/><text x="175" y="267" text-anchor="middle" class="title">运行证据与回滚</text><text x="175" y="292" text-anchor="middle" class="sub">trace / 队列 / 兼容验证</text></g><path class="edge " d="M315 95H380" marker-end="url(#arrow-delivery-flow-blue)"/><path class="edge " d="M660 95H725" marker-end="url(#arrow-delivery-flow-blue)"/><path class="edge " d="M865 135V235" marker-end="url(#arrow-delivery-flow-blue)"/><path class="edge " d="M725 275H660" marker-end="url(#arrow-delivery-flow-blue)"/><path class="edge " d="M380 275H315" marker-end="url(#arrow-delivery-flow-blue)"/><text x="520" y="185" text-anchor="middle" class="sub">先识别状态、执行者与保证范围，再沿故障窗口追踪事实。</text></svg><figcaption>机制地图。Pod 重建恢复运行载体，不自动恢复业务进度、连接缓冲或不可重放的外部动作。</figcaption></figure></section>
+<section id="topic-1"><div class="head"><h2>2. Kubernetes 的控制循环为什么不等于业务事务？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-1"><p class="memory-cue"><strong>记忆关键词：</strong>期望状态 → 观察 → 协调 → 重建载体 → 业务恢复</p>
+<h3>先这样回答</h3><p>控制器不断比较期望与观测状态并尝试协调。它能补足 Pod 等运行对象，但不知道某个设备动作是否成功、某条消息是否已提交业务效果。</p><h4>拆开机制与保证范围</h4><p>Deployment/ReplicaSet 等控制器维护相应工作负载数量和版本，Pod 可被替换而产生新身份。应用若只把任务、SSE 游标或去重状态放在旧 Pod 内存，重建后这些业务事实不会自动出现。应把需要恢复的状态交给有合适契约的存储和执行协议。</p><p>协调是持续过程，实例创建、调度、拉镜像、启动、探测和端点更新各有时间。配置了三个副本不代表每一时刻都有三个可服务实例；跨故障域、调度约束和依赖故障还会改变可用性。</p><p>业务状态机与平台状态不同：Pod Ready 只说明满足所定义的服务资格，任务 SUCCEEDED 需要业务结果证据。把恢复原则放在动作身份、确认与持久状态上，才能在换实例后解释未知结果，而不是靠进程重启“清零”。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>Pod 在设备已执行、回调未保存时被替换。新 Pod 即使完全健康，也必须查原动作结果；重新创建执行任务会扩大副作用风险。</p></div>
+<p><strong>继续追问：</strong>“多副本就绝不丢任务？”还需任务与确认协议。“StatefulSet 名称稳定就保存所有内存？”身份稳定和数据持久不同。</p><p class="verify"><strong>如何验证：</strong>在隔离环境删除承载在途任务的 Pod，核对新实例恢复同一业务身份；分别观察控制器对象与实际业务结果。</p>
+<p class="sources"><a href="#ref-1">原始资料 01</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-2"><div class="head"><h2>3. Requests、Limits、线程池和 HPA 怎样形成一个容量模型？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-2"><p class="memory-cue"><strong>记忆关键词：</strong>调度预算 · CPU 节流 · 总内存 · 指标时滞 · 下游容量</p>
+<h3>先这样回答</h3><p>requests 参与调度与某些资源指标计算，limits 限制运行资源。线程与队列的预算需适配容器和下游，HPA 增副本也有采样与生效延迟。</p><h4>拆开机制与保证范围</h4><p>Linux 常见路径下 CPU limit 通过 cgroup 限制使用时间，CPU 受限可能表现为节流和尾延迟；memory limit 超过时可能被 OOM 处理。request 不等于永远独占该资源，limit 也不等于预留了足够物理容量。</p><p>Java 堆之外还有线程栈、堆外缓冲、原生模型和其他内存，GPU 也有单独显存预算。单个 Pod 增加 worker 和队列会放大内存与并发，下游数据库或模型服务可能先饱和。所有预算必须以实际计费和测量校准，不能只把 Xmx 填满 limit。</p><p>HPA 的 CPU 利用率等指标常以 request 为基准，并有取样、稳定策略和新 Pod 准备时延。等待 I/O 的服务可能 CPU 不高却队列严重积压；按队列指标扩容也须考虑热点键和下游上限。扩容是反馈控制，不是无限供给。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>CPU 图看起来未满机器总核数，Pod 却频繁节流；同时把线程数翻倍只增加竞争。应先核对容器配额、线程池排队与下游容量。</p></div>
+<p><strong>继续追问：</strong>“OOMKilled 就是 Java 泄漏？”还可能原生/缓冲或总预算不足。“加 Pod 必然降延迟？”启动时间、长连接和共享下游会限制效果。</p><p class="verify"><strong>如何验证：</strong>记录 cgroup 节流与内存事件、队列等待、堆/原生内存和下游占用；分组比较扩容前后，不用单张 CPU 图证明根因。</p>
+<p class="sources"><a href="#ref-4">原始资料 04</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-3"><div class="head"><h2>4. Startup、Liveness、Readiness 为什么不能共用一个“查所有依赖”接口？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-3"><p class="memory-cue"><strong>记忆关键词：</strong>启动资格 · 重启价值 · 接流量资格 · 故障放大</p>
+<h3>先这样回答</h3><p>Startup 保护慢启动阶段，Liveness 判断是否需要重启容器，Readiness 判断是否接收相应流量。它们的失败动作不同，依赖检查要匹配这些动作的价值。</p><h4>拆开机制与保证范围</h4><p>启动模型和建立连接可能耗时，startup 成功前会影响其他探针的启用。把启动延迟误当存活失败会反复重启永远起不来；阈值和周期应基于真实启动分布，而不是复制固定模板。</p><p>liveness 失败达到阈值会触发相应重启行为，适合重启能改善的本地故障。若数据库不可用时所有应用 liveness 都失败，集体重启可能扩大连接洪峰，而不会修好数据库。readiness 可以控制服务资格，但全体摘流也需有明确用户与恢复语义。</p><p>readiness 变化影响匹配 Service 的端点资格，不强行撤销所有已经建立的长连接和业务执行。探针应低成本、有界并有错误分类；它与任务进展、模型质量和端到端业务成功是不同监控。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>新视觉服务加载权重需较长时间；startup 覆盖准备阶段，readiness 在真正能接收推理后通过，liveness 关注本地无法自恢复的失活，避免反复杀掉正常加载进程。</p></div>
+<p><strong>继续追问：</strong>“探针全绿就服务可用？”只证明定义的探测。“readiness 失败会重启吗？”其主要作用与 liveness 不同。</p><p class="verify"><strong>如何验证：</strong>模拟慢启动、本地卡死、共享下游故障和已有长连接，观察重启与端点变化；模型练习只核对不同失败动作。</p>
+<p class="sources"><a href="#ref-3">原始资料 03</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-4"><div class="head"><h2>5. Service、代理和 SSE 长连接为什么会影响负载与恢复？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-4"><p class="memory-cue"><strong>记忆关键词：</strong>端点选择 · 连接复用 · 缓冲 · 超时 · 跨实例游标</p>
+<h3>先这样回答</h3><p>Service 提供面向后端端点的访问抽象，但长连接通常在建立后持续绑定某条路径。扩容、摘流与代理配置会改变新连接，不自动均匀搬迁已有连接。</p><h4>拆开机制与保证范围</h4><p>客户端、代理和 Service 实现可能各有连接复用与负载策略。大量 SSE 长连接集中在旧实例时，新 Pod 可用也未必立刻分担旧连接；按 CPU 总平均衡量容易漏掉单实例缓冲和连接数热点。</p><p>代理缓冲、压缩和闲置超时可能让 token 延后出现或频繁断线，具体配置取决于使用的代理/Ingress/Gateway。没有必要假定所有环境都可用某一 Nginx 响应头。业务心跳、读取 deadline 和任务进展监控应该分别定义。</p><p>重连可能到新实例，所以事件保留与权威结果查询不能只依赖旧实例内存。使用 run/seq 关联与共享或可路由的恢复存储，保证身份与权限；粘性会话可以帮助路由，却不能代替实例失效后的恢复协议。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>滚动发布切断一半连接，客户端重新订阅到新 Pod。如果游标只在旧进程，恢复会丢事件；如果重连时重建执行，则可能重复调用工具。</p></div>
+<p><strong>继续追问：</strong>“加副本能平均分流式会话？”既有连接未必重新分配。“关缓冲就端到端零延迟？”模型、网络和渲染仍有各自等待。</p><p class="verify"><strong>如何验证：</strong>模拟慢读、代理超时、换实例与断线重连，按实例记录连接、缓冲、事件缺口和内存；检查恢复任务身份不变。</p>
+<p class="sources"><a href="#ref-5">原始资料 05</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-5"><div class="head"><h2>6. 滚动发布如何保护 MQ、Temporal 和 Action 的在途工作？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-5"><p class="memory-cue"><strong>记忆关键词：</strong>摘流 · 停止准入 · 有界排空 · 持久边界 · 版本兼容</p>
+<h3>先这样回答</h3><p>发布安全需要应用配合终止与版本协议。先停止新工作，再在可控期限内结束或保留可恢复边界；不能把所有未完成任务都标成失败或已确认。</p><h4>拆开机制与保证范围</h4><p>Pod 终止通常涉及端点变化、终止信号、应用清理与最后强制结束；具体信号、钩子和时间预算按镜像和集群配置核对。摘流与信号不是一个跨全部代理的原子事件，已有连接和旧请求仍可能继续进入清理路径。</p><p>MQ worker 在退出前只确认已安全处理的范围，未完成工作保留重投；Temporal worker 按 SDK shutdown 与历史兼容协议运行；Action 执行器保存身份和已知/未知结果。强杀可能留下外部成功但本地未知，恢复时查证而不是重建新身份。</p><p>新旧版本并存时，数据库 Schema、事件字段、配置、工具返回和工作流命令都要兼容。回滚应用镜像并不回滚已经写出的新数据或新历史 marker。迁移应有前后兼容阶段和受控切换证据，不能只看 deployment rollout 完成。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>新版增加复核步骤，旧历史仍被新 worker 接收；同时新消息字段被旧消费者读到。需要分别验证工作流版本桩和事件兼容，两个问题不是一次镜像回滚能包办。</p></div>
+<p><strong>继续追问：</strong>“preStop 睡几秒就安全？”延迟并不证明工作已排空。“退出统一 ack？”会跳过未完成业务结果。</p><p class="verify"><strong>如何验证：</strong>在确认/提交/回调各阶段滚动升级与强制结束，核对位点、历史和实际副作用；分别验收向前升级与已有新状态后的回滚。</p>
+<p class="sources"><a href="#ref-2">原始资料 02</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-6"><div class="head"><h2>7. AI Coding 怎样从“能生成代码”提升到“能证明修改正确”？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-6"><p class="memory-cue"><strong>记忆关键词：</strong>明确不变量 → 查真实调用 → 最小变更 → 反例 → 证据</p>
+<h3>先这样回答</h3><p>AI 能加快产生候选实现，工程师仍需确认调用路径、依赖版本和可证明的业务行为。编译、单元测试、集成与故障验证提供不同强度的证据。</p><h4>拆开机制与保证范围</h4><p>先明确要保护什么，如旧回调不能覆盖终态、原请求重试不能二次下发、旧工作流历史可回放。阅读实际调用方、配置和现有约定，再让工具提出最小实现。没有源码证据时，不应把模型熟悉的 API 或类名描述成项目事实。</p><p>编译检查语法与部分类型，纯状态模型验证抽象规则，集成测试验证真实代理、数据库与 SDK，故障实验覆盖确认丢失和进程退出。测试如果只是复写实现判断而没有反例，可能和实现一起犯同一个错；每个关键保证至少要有能失败的输入。</p><p>可观测性把 request/message/event/workflow/run/config/model 这些身份按职责关联，记录关键状态转移与耗时。指标发现群体现象，trace 关联一次请求，日志留下具体事实；敏感载荷不必全部记录。交付时保留版本、验证范围和恢复方式，才能把“用了 AI”转成可解释的工程能力。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>AI 生成一个“超时后重试起飞”的补丁，测试只覆盖先失败后成功会通过。增加“设备成功但回包丢失”反例，才能暴露重复副作用。</p></div>
+<p><strong>继续追问：</strong>“所有测试通过就绝对正确？”只对覆盖的契约和环境增加证据。“日志很多就可排查？”身份、状态和时间边界要能关联且不泄露敏感内容。</p><p class="verify"><strong>如何验证：</strong>把每项结论对应到编译、模型、集成、回放或故障证据；明确缺少的环境验证，不把示例自检升级成生产安全声明。</p>
+<p class="sources"><a href="#ref-7">原始资料 07</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="practice"><div class="head"><h2>8. 练习：从能讲到能反驳自己的假设</h2><p>先说预期，再运行；如果结果相反，回到机制与边界。</p></div><figure class="card diagram" id="fig-delivery-sequence"><svg viewBox="0 0 1040 494" role="img" aria-labelledby="delivery-sequence-title delivery-sequence-desc"><title id="delivery-sequence-title">故障窗口与恢复时序</title><desc id="delivery-sequence-desc">摘流、旧连接、终止信号和应用清理并非一个瞬间原子完成；图示是需要验证的交付策略。</desc><defs><marker id="arrow-delivery-sequence-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="arrow-delivery-sequence-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker></defs><text x="135" y="45" text-anchor="middle" class="title">控制器</text><path d="M135 70V459" class="life"/><text x="390" y="45" text-anchor="middle" class="title">旧 Pod</text><path d="M390 70V459" class="life"/><text x="645" y="45" text-anchor="middle" class="title">新 Pod</text><path d="M645 70V459" class="life"/><text x="900" y="45" text-anchor="middle" class="title">任务存储</text><path d="M900 70V459" class="life"/><path class="edge " d="M135 110H645" marker-end="url(#arrow-delivery-sequence-blue)"/><text x="390.0" y="99" text-anchor="middle" class="sub">创建新版本 Pod</text><path class="edge a" d="M645 164H600V182H645" marker-end="url(#arrow-delivery-sequence-amber)"/><text x="520" y="155" text-anchor="middle" class="sub">启动探针与准备就绪</text><path class="edge " d="M135 218H390" marker-end="url(#arrow-delivery-sequence-blue)"/><text x="262.5" y="207" text-anchor="middle" class="sub">旧 Pod 进入终止与摘流</text><path class="edge " d="M390 272H900" marker-end="url(#arrow-delivery-sequence-blue)"/><text x="645.0" y="261" text-anchor="middle" class="sub">保存/确认可恢复任务边界</text><path class="edge a" d="M390 326H345V344H390" marker-end="url(#arrow-delivery-sequence-amber)"/><text x="520" y="317" text-anchor="middle" class="sub">在期限内清理或被终止</text><path class="edge " d="M645 380H900" marker-end="url(#arrow-delivery-sequence-blue)"/><text x="772.5" y="369" text-anchor="middle" class="sub">按原身份接续未完成任务</text></svg><figcaption>故障窗口与恢复时序。摘流、旧连接、终止信号和应用清理并非一个瞬间原子完成；图示是需要验证的交付策略。</figcaption></figure>
+<div class="card pad practice"><h3>预算与探针模型：内存总量和失败动作不能混淆</h3><p>Python 3 标准库，数字是假设的 MiB 预算。探针函数只表达达到阈值后的作用分类，不模拟 Kubelet 时序、启动 gating 或 Service 传播。</p><p class="verify">保存为 practice.py，用 python practice.py 运行。</p>
+<pre><code class="language-python">def memory_fits(limit, heap, native, stacks, buffers):
+    values = (limit, heap, native, stacks, buffers)
+    if any(v &lt; 0 for v in values):
+        raise ValueError(&quot;negative budget&quot;)
+    return heap + native + stacks + buffers &lt;= limit
+
+def failure_action(kind, failures, threshold):
+    if kind not in {&quot;readiness&quot;, &quot;liveness&quot;, &quot;startup&quot;} or threshold &lt; 1:
+        raise ValueError(&quot;invalid probe policy&quot;)
+    if failures &lt; threshold:
+        return &quot;below-threshold&quot;
+    return &quot;remove-from-service&quot; if kind == &quot;readiness&quot; else &quot;restart-container&quot;
+
+assert not memory_fits(512, 300, 120, 60, 70)
+assert memory_fits(512, 260, 100, 50, 50)
+assert failure_action(&quot;readiness&quot;, 3, 3) == &quot;remove-from-service&quot;
+assert failure_action(&quot;liveness&quot;, 3, 3) == &quot;restart-container&quot;
+assert failure_action(&quot;startup&quot;, 3, 3) == &quot;restart-container&quot;
+assert failure_action(&quot;liveness&quot;, 2, 3) == &quot;below-threshold&quot;
+try:
+    memory_fits(512, -1, 100, 20, 20)
+    raise AssertionError(&quot;negative memory accepted&quot;)
+except ValueError:
+    pass
+print(&quot;total memory budget and probe action distinctions passed&quot;)
+</code></pre></div>
+<div class="card pad" style="margin-top:18px"><h3>遮住正文，回答四个问题</h3><ul class="clean"><li>重建的是 Pod 还是已经恢复业务事实？</li><li>资源预算是否覆盖队列、堆外和下游？</li><li>探针失败动作是否真正有助于恢复？</li><li>发布和 AI 辅助修改的结论有哪些实际证据？</li></ul></div></section>
+<section id="sources"><div class="head"><h2>9. 原始资料与关联阅读</h2><p>先定位资料定义的范围，再把它应用到自己的项目。</p></div>
+<div class="card pad"><ol class="source-list"><li id="ref-1"><a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">Kubernetes：Deployment 协调与发布</a></li><li id="ref-2"><a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/">Kubernetes：Pod 生命周期与终止</a></li><li id="ref-3"><a href="https://kubernetes.io/docs/concepts/workloads/pods/probes/">Kubernetes：Liveness、Readiness 与 Startup</a></li><li id="ref-4"><a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">Kubernetes：Requests、Limits 与资源管理</a></li><li id="ref-5"><a href="https://kubernetes.io/docs/concepts/services-networking/service/">Kubernetes：Service 与端点</a></li><li id="ref-6"><a href="https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/">Kubernetes：Horizontal Pod Autoscaling</a></li><li id="ref-7"><a href="https://docs.temporal.io/develop/java/testing-suite">Temporal：Java 测试与历史回放</a></li><li id="ref-8"><a href="https://git-scm.com/docs/git-diff">Git：diff 的检查范围</a></li></ol><p class="verify">规范、实现与文档版本可能不同。引用用于核对机制，例子中的流程和数字为教学推演；真实环境实验与项目源码核对另行进行。</p></div>
+<div class="grid3 column-links" style="margin-top:18px"><div class="mini"><a href="resume-tech-columns.html">技术类别总入口</a><p>沿项目线索切换到其他专栏。</p></div><div class="mini"><a href="java-agent-ai-interview-illustrated.html">Java / AI 图解手册</a><p>把原理转换为面试回答与连续追问。</p></div><div class="mini"><a href="uav-backend-review-handbook.html">六周项目复习手册</a><p>回到项目链路核对实际职责与事实。</p></div></div></section></main>
+<footer><div class="shell">简历技术原理 · K8S、可观测性与工程交付 · 核对日期 2026-10-13 · 原始资料与验证范围见正文</div></footer>
+<nav class="dock" aria-label="页面快捷导航"><a href="../index.html">首页</a><a href="#">↑ 顶部</a></nav>
+<script>(()=>{const root=document.documentElement,key="html-docs-theme";let saved;try{saved=localStorage.getItem(key)}catch{}if(saved)root.dataset.theme=saved==="dark"?"dark":"paper";document.getElementById("theme").addEventListener("click",()=>{const next=root.dataset.theme==="dark"?"paper":"dark";root.dataset.theme=next;try{localStorage.setItem(key,next)}catch{}})})();</script></body></html>

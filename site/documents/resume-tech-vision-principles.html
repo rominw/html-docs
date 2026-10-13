@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="description" content="按简历技术栈组织的Python 与视觉 AI 工程原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。"><meta name="date" content="2026-10-13"><title>简历技术原理 · Python 与视觉 AI 工程</title><style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .decision{fill:var(--amber2);stroke:var(--amber);stroke-width:1.6}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    .active{fill:var(--blue2);stroke:var(--blue);stroke-width:1.2}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    .dock{position:fixed;right:18px;bottom:18px;z-index:99;display:flex;gap:4px;padding:6px;border-radius:999px;background:rgba(15,23,42,.82);backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(15,23,42,.28)}
+    .dock a{padding:7px 13px;border-radius:999px;color:#fff;text-decoration:none;font:600 13px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+    .dock a:hover{background:rgba(255,255,255,.16)}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+
+    :focus-visible{outline:3px solid var(--blue);outline-offset:4px}
+    html{scroll-padding-top:76px} .diagram{margin:18px 0}.dock{top:auto}
+    .diagram figcaption{margin-top:14px;color:var(--muted);font-size:13px;line-height:1.7}
+    .q{margin-top:16px;scroll-margin-top:78px}.q h3{margin:0 0 14px;font-size:22px;line-height:1.5}
+    .q h4{margin:18px 0 7px;font-size:16px}.q p{margin:10px 0}.q .pill{vertical-align:middle;margin-right:8px}
+    .q .memory-cue{margin:0 0 16px;padding:10px 13px;border-left:3px solid var(--green);border-radius:8px;background:var(--green2);font-size:14px}
+    .memory-cue strong{color:var(--green)}.verify{color:var(--muted);font-size:14px}
+    .sources{margin-top:18px;color:var(--muted);font-size:13px}.sources a{display:inline-block;margin:0 16px 6px 0}
+    .jump-list{display:flex;flex-wrap:wrap;gap:6px 18px;padding:0;list-style:none;font-size:14px;margin:16px 0}
+    p,li,a{overflow-wrap:anywhere}.practice{margin-top:20px}.practice h3{margin-top:0}
+    pre{overflow:auto;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);font:14px/1.75 Consolas,monospace}
+    pre code{padding:0;border:0;border-radius:0;color:var(--ink);background:transparent;font:inherit}
+    .read-map .mini a{display:block;font-weight:700;margin-bottom:6px}
+    @media(max-width:820px){.pad{padding:18px}.q h3{font-size:19px}.diagram{padding:12px}.lead{font-size:17px}}
+
+@page{margin:14mm}@media print{:root,[data-theme=dark]{
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }body{background:var(--panel)}header{padding:0 0 24px}.stats{grid-template-columns:repeat(4,1fr);gap:8px}.stat{padding:12px}.dock{display:none}.diagram svg{min-width:0}.diagram{overflow:visible;padding:10px;break-inside:avoid}.table table{min-width:0}.q h3{break-after:avoid}.head{break-after:avoid}pre{white-space:pre-wrap;overflow:visible}a{color:var(--ink)}}
+
+.column-links a{font-weight:700}.column-links .mini{height:100%}.source-list li{margin:10px 0}.source-list a{overflow-wrap:anywhere}.q p{max-width:100%}
+</style></head>
+<body><header><div class="shell"><div class="kicker">RESUME STACK / PRINCIPLES / FAILURE ANALYSIS</div><h1>Python 与视觉 AI 工程</h1><p class="lead">YOLO、SAM、VLM 从模型职责到坐标、评估与部署预算</p><div class="doc-meta"><time datetime="2026-10-13">2026年10月13日</time><span>按简历技术类别选题</span><span>原理 · 边界 · 故障推演</span></div><div class="actions"><a class="btn" href="#map">开始阅读</a><button class="btn" id="theme" type="button">切换主题</button><button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button></div><div class="stats"><div class="stat"><b>6</b><span>深挖主题</span></div><div class="stat"><b>2</b><span>机制与故障图</span></div><div class="stat"><b>1</b><span>可运行练习</span></div><div class="stat"><b>12</b><span>原始资料入口</span></div></div></div></header>
+<nav aria-label="章节导航"><div class="shell"><a href="#map">阅读地图</a><a href="#topic-1">01 · YOLO 检测的输出为什么不是“图里有几个真实对象”？</a><a href="#topic-2">02 · SAM 的 image encoder、prompt encoder 和 mask decoder 如何配合？</a><a href="#topic-3">03 · VLM 二次确认为什么能治理部分误报，却未必提高整体召回？</a><a href="#topic-4">04 · Resize、letterbox、颜色与坐标反变换为何常比换模型更重要？</a><a href="#topic-5">05 · Python 的 asyncio、线程、进程和 GPU 并行如何分工？</a><a href="#topic-6">06 · 导出、量化、batch 和航线级配置怎样做到可复现？</a><a href="#practice">练习与故障自测</a><a href="#sources">原始资料与关联阅读</a></div></nav><main class="shell"><section id="map"><div class="head"><h2>1. 从项目线索建立原理地图</h2><p>Python · YOLO · SAM · VLM · 坐标变换 · 推理部署</p></div>
+<p><a href="resume-tech-columns.html">← 技术原理专栏总入口</a> · <a href="foundations-os-network-column.html">操作系统与网络基础</a></p>
+<div class="grid2"><div class="mini"><h3>简历关联</h3><p>简历提到 Python 编排 YOLO／SAM／VLM 组合方案、吨袋统计与安全帽检测、VLM 二次确认和航线级 AI 配置下发。本篇以这些任务解释模型与工程边界。</p></div><div class="mini"><h3>本篇要练成什么</h3><p>能讲清检测、分割、视觉语言推理各产出什么，组合为何可能改善误报又损失召回，以及模型输出如何变成可靠业务事实。</p></div></div>
+<div class="callout" style="margin-top:16px"><p><strong>阅读方式：</strong>先用记忆关键词复述机制，再推演例子的失败窗口，最后指出验证对象。正文方案是教学分析，不等同于已核对项目源码；具体个人贡献应按真实经历说明。</p></div>
+<p class="verify"><strong>版本与验证范围：</strong>SAM 以经典 Segment Anything 结构为讲解语境；YOLO 的具体头部与 NMS/NMS-free 路径按版本区分；VLM 不绑定某一实现。几何练习使用虚构图像尺寸，不推理真实图片。</p><figure class="card diagram" id="fig-vision-flow"><svg viewBox="0 0 1040 370" role="img" aria-labelledby="vision-flow-title vision-flow-desc"><title id="vision-flow-title">机制地图</title><desc id="vision-flow-desc">框、掩膜和文本判断处在不同任务层；它们不能直接互相替代，也不自动等于真实业务计数。</desc><defs><marker id="arrow-vision-flow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="arrow-vision-flow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker></defs><g class="diagram-node"><rect x="35" y="55" width="280" height="80" rx="10" class="node "/><text x="175" y="87" text-anchor="middle" class="title">采集与配置快照</text><text x="175" y="112" text-anchor="middle" class="sub">场景 / 航线 / 模型版本</text></g><g class="diagram-node"><rect x="380" y="55" width="280" height="80" rx="10" class="node "/><text x="520" y="87" text-anchor="middle" class="title">预处理与变换</text><text x="520" y="112" text-anchor="middle" class="sub">颜色 / resize / padding</text></g><g class="diagram-node"><rect x="725" y="55" width="280" height="80" rx="10" class="node "/><text x="865" y="87" text-anchor="middle" class="title">YOLO 候选</text><text x="865" y="112" text-anchor="middle" class="sub">框 / 类别 / 分数</text></g><g class="diagram-node"><rect x="725" y="235" width="280" height="80" rx="10" class="node g"/><text x="865" y="267" text-anchor="middle" class="title">SAM 与 VLM</text><text x="865" y="292" text-anchor="middle" class="sub">掩膜 / 提示 / 二次判断</text></g><g class="diagram-node"><rect x="380" y="235" width="280" height="80" rx="10" class="node g"/><text x="520" y="267" text-anchor="middle" class="title">身份与业务规则</text><text x="520" y="292" text-anchor="middle" class="sub">跨帧去重 / 证据 / 阈值</text></g><g class="diagram-node"><rect x="35" y="235" width="280" height="80" rx="10" class="node g"/><text x="175" y="267" text-anchor="middle" class="title">结果与运行预算</text><text x="175" y="292" text-anchor="middle" class="sub">版本可追溯 / 队列 / 显存</text></g><path class="edge " d="M315 95H380" marker-end="url(#arrow-vision-flow-blue)"/><path class="edge " d="M660 95H725" marker-end="url(#arrow-vision-flow-blue)"/><path class="edge " d="M865 135V235" marker-end="url(#arrow-vision-flow-blue)"/><path class="edge " d="M725 275H660" marker-end="url(#arrow-vision-flow-blue)"/><path class="edge " d="M380 275H315" marker-end="url(#arrow-vision-flow-blue)"/><text x="520" y="185" text-anchor="middle" class="sub">先识别状态、执行者与保证范围，再沿故障窗口追踪事实。</text></svg><figcaption>机制地图。框、掩膜和文本判断处在不同任务层；它们不能直接互相替代，也不自动等于真实业务计数。</figcaption></figure></section>
+<section id="topic-1"><div class="head"><h2>2. YOLO 检测的输出为什么不是“图里有几个真实对象”？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-1"><p class="memory-cue"><strong>记忆关键词：</strong>特征 → 框/类别候选 → 过滤 → 重叠处理 → 业务身份</p>
+<h3>先这样回答</h3><p>检测器预测候选位置、类别和分数，业务计数还要处理重复、遮挡、跨帧和适用范围。模型阈值与业务错误成本有关，不是分数越高就越接近绝对事实。</p><h4>拆开机制与保证范围</h4><p>YOLO 家族以高效目标检测为主线，但不同版本的特征结构、检测头和训练/后处理不同。常见路径从多尺度特征产生框和类别候选；anchor-based、anchor-free 与端到端方案不能混成统一内部实现。简历未说明模型版本时，应先说明实际使用的模型与输出契约。</p><p>采用 NMS 的路径按分数和重叠阈值抑制部分候选，IoU 衡量几何交并比；密集相邻物体可能被误抑制，低分小目标也可能被阈值过滤。部分版本支持 NMS-free，不能背成所有 YOLO 推理都必须 NMS。</p><p>目标框的分数不是自动校准的业务正确概率。相同物体可在多张巡检图里出现，多框也可能对应同一物体；检测框计数只是一个中间指标。要定义计数的空间/时间单位、对象身份及无法识别的处理方式。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>吨袋在重叠航片中出现三次，逐图累加框数会算成三个。需要按覆盖区域、对象关联和证据规则聚合，不能靠提高 confidence 阈值解决跨图重复。</p></div>
+<p><strong>继续追问：</strong>“检测 mAP 高就计数准确？”指标任务和业务聚合不同。“NMS IoU 越低越好？”会改变误抑制和重复候选，应按数据评估。</p><p class="verify"><strong>如何验证：</strong>按小目标、密集、遮挡、光照与跨帧重复分组，分别量测候选召回、检测精度和业务计数误差；核对实际版本的后处理配置。</p>
+<p class="sources"><a href="#ref-2">原始资料 02</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-2"><div class="head"><h2>3. SAM 的 image encoder、prompt encoder 和 mask decoder 如何配合？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-2"><p class="memory-cue"><strong>记忆关键词：</strong>图像 embedding · 点/框提示 · 掩膜解码 · 多解与边界</p>
+<h3>先这样回答</h3><p>经典 SAM 将图像特征与提示特征结合来生成掩膜。它回答“提示对应的区域怎样分割”，并不天然回答“这个区域是不是目标业务类别”。</p><h4>拆开机制与保证范围</h4><p>图像 encoder 形成可重用的图像表示，prompt encoder 表达点、框等提示，mask decoder 组合这些信息输出掩膜等结果。同一图像多次交互时重用图像特征可以减少部分重复计算，但仍要考虑输入尺寸、缓存生命周期和显存预算。</p><p>检测框可作为提示，连接 YOLO 的候选定位与 SAM 的区域边界。框不准、包含多物体或提示点落在背景时，掩膜可能对应错误区域；模型还可能提供多个候选掩膜，需要按任务规则选择，而不是永远挑第一张。</p><p>像素掩膜面积不直接等于实际地面面积，后者需要相机标定、拍摄几何和误差模型。SAM 也不天然提供业务类别、车牌身份或违停时间条件；SAM 2/3 等后续家族还有不同能力，不能把新版本描述套在经典结构上。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>检测框覆盖两个相邻吨袋，SAM 提示得到一片连通区域；业务需检查提示质量和分离规则，不能因掩膜看起来精细就认定两个对象已正确分开。</p></div>
+<p><strong>继续追问：</strong>“SAM 分割一切就不需要检测器？”类别发现与提示式分割不同。“mask IoU 高就面积准确？”真实空间面积另有几何与尺度问题。</p><p class="verify"><strong>如何验证：</strong>固定提示与图像，测试框偏移、正负点、相邻物体和边界模糊；分别检查像素分割与业务身份，核对缓存后的显存与生命周期。</p>
+<p class="sources"><a href="#ref-4">原始资料 04</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-3"><div class="head"><h2>4. VLM 二次确认为什么能治理部分误报，却未必提高整体召回？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-3"><p class="memory-cue"><strong>记忆关键词：</strong>视觉表示 → 语言条件 → 候选筛选 → 相关错误 → 阈值</p>
+<h3>先这样回答</h3><p>VLM 结合视觉输入和语言条件生成或判定结果，可对候选做语义复核。但候选阶段漏掉的对象通常进不了二次确认，复核又可能额外拒绝真目标。</p><h4>拆开机制与保证范围</h4><p>常见 VLM 路径把视觉表示通过相应连接机制送入语言模型，具体 encoder、分辨率与 token 组织随模型不同。裁剪候选可聚焦目标，却可能丢失安全帽与头部关系、道路环境等上下文；完整图与局部图的选择是需要评估的输入设计。</p><p>对串行检测再复核的管线，整体召回可写为 P(候选通过|真目标) × P(复核通过|真目标且候选通过)。第二项是条件概率，不能假设两模型错误独立后直接相乘各自公开指标。误报是否降低也取决于同一误报在复核中被接受的概率。</p><p>输出应区分 yes/no/uncertain 等业务允许的状态，并留图片、裁剪、模型和提示版本。VLM 可以被图中文字、上下文和提示诱导，结构化 JSON 也不使判断绝对可信；高代价场景可能需要人工复核和可靠证据。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>安全帽检测候选召回假设为 0.9，候选中的真目标复核通过率假设为 0.95，则管线召回为 0.855。这是条件概率演算，不是任何线上指标。</p></div>
+<p><strong>继续追问：</strong>“两个模型投票就更准？”错误可能相关。“只保留 yes 可减少误报？”还需评估被拒绝的真目标和 uncertain 的处置成本。</p><p class="verify"><strong>如何验证：</strong>标注候选漏检、复核错拒和复核误接受三个阶段，按场景做端到端混淆矩阵；对照同一数据上的成本、延迟和不确定比例。</p>
+<p class="sources"><a href="#ref-6">原始资料 06</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-4"><div class="head"><h2>5. Resize、letterbox、颜色与坐标反变换为何常比换模型更重要？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-4"><p class="memory-cue"><strong>记忆关键词：</strong>输入契约 · scale/padding · 轴序 · 原图映射 · 校准</p>
+<h3>先这样回答</h3><p>模型接收的是经预处理的数据，输出坐标属于相应输入空间。预处理和反变换不一致会让检测、裁剪和叠图全部偏移，即使模型预测本身正确。</p><h4>拆开机制与保证范围</h4><p>保持比例缩放并 padding 的 letterbox 可用 scale 与 x/y 偏移描述：u=sx+pad_x，v=sy+pad_y。反变换用 x=(u−pad_x)/s，y=(v−pad_y)/s；实际库还可能有步幅对齐、取整和矩形 padding，必须保存真实变换参数。</p><p>RGB/BGR、0—255 与 0—1、HWC 与 CHW 都是输入语义。形状兼容不代表颜色和数值正确。裁剪传给 VLM 或 SAM 时，要明确坐标所在空间并保留原图关联；对掩膜使用何种插值也会影响边界。</p><p>像素坐标映射到地理位置还需相机内参、外参和场景假设；地形、镜头畸变和姿态误差会改变结果。不能把二维 bbox 中心直接当一个精确经纬度，或把软件数组下标转换误当飞控安全证明。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>1280×720 原图装入 640×640：理想化 scale=0.5，垂直 padding=140。模型点 (100,190) 回到原图为 (200,100)，忘减 padding 会落到错误区域。</p></div>
+<p><strong>继续追问：</strong>“直接乘宽高比例可以吗？”纯拉伸与保比例 padding 的逆变换不同。“掩膜和框同样缩放？”还需正确处理插值与坐标定义。</p><p class="verify"><strong>如何验证：</strong>下方固定几何往返练习验证基本变换；真实验收用可人工核对的图形、实际库参数和不同尺寸，检查裁剪、框和掩膜均对齐。</p>
+<p class="sources"><a href="#ref-7">原始资料 07</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-5"><div class="head"><h2>6. Python 的 asyncio、线程、进程和 GPU 并行如何分工？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-5"><p class="memory-cue"><strong>记忆关键词：</strong>I/O 等待 · GIL 版本 · 原生运算 · 进程成本 · 显存预算</p>
+<h3>先这样回答</h3><p>asyncio 组织可协作的异步等待，线程和进程有不同执行与共享成本；GPU 由原生运行时提交计算。增加 Python 并发数不等于无限增加推理吞吐。</p><h4>拆开机制与保证范围</h4><p>事件循环上的同步 CPU 运算会阻塞其他协程，只有真正让出控制的等待才支持协作调度。传统启用 GIL 的 CPython 对纯 Python CPU 代码的线程并行有限，原生库释放 GIL 与 free-threaded 构建有不同前提，需按 Python 和扩展版本核对。</p><p>多进程隔离状态，但序列化、数据搬运和模型副本都有代价。GPU 初始化与进程启动方式有运行时要求，不能先初始化 CUDA 再随意 fork。每个 worker 各加载一套大模型，可能先耗尽显存而不是提升吞吐。</p><p>队列应控制图片数量、字节和在途推理，任务取消要清理中间图与结果。GPU 工作可能异步提交，量测时要区分 CPU 提交时长和真正完成时间；端到端延迟还包含图片下载、预处理、排队和结果上传。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>把异步下载和同步推理写在同一协程，推理期间所有连接停顿。分离等待与执行预算后再测，不盲目把 worker 数提高到 CPU 核数。</p></div>
+<p><strong>继续追问：</strong>“async 函数里都不阻塞？”同步代码仍会阻塞。“GPU 利用率低就多开进程？”可能瓶颈在预处理、I/O、batch 或排队组织。</p><p class="verify"><strong>如何验证：</strong>分段记录等待/预处理/提交/完成/上传，核对启动方式和模型副本；以相同输入、精度与业务结果比较吞吐和内存。</p>
+<p class="sources"><a href="#ref-10">原始资料 10</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-6"><div class="head"><h2>7. 导出、量化、batch 和航线级配置怎样做到可复现？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-6"><p class="memory-cue"><strong>记忆关键词：</strong>权重版本 · 输入契约 · 校准数据 · 运行时 · 配置快照</p>
+<h3>先这样回答</h3><p>模型部署是权重、预处理、后处理、阈值和运行时的一份完整契约。导出文件可运行不代表结果等价，航线配置也需要确定版本和下发确认。</p><h4>拆开机制与保证范围</h4><p>ONNX、TensorRT 等运行时对算子、动态 shape 和精度的支持不同；某些 INT8 路径需要代表性校准数据。数值变化可能改变阈值附近的框、分数和业务计数，应在目标硬件上验证，不只核对模型能否加载。</p><p>batch 提高某些吞吐，却增加排队、显存和单次失败的影响。warmup 与实际输入分布不同，动态尺寸也可能改变延迟。预算应从首帧、稳态、并发和最坏输入分别看，不能只公布一张图的推理毫秒数。</p><p>航线级配置应绑定场景、模型/提示/阈值版本和生效范围，下发经 IoT 通道后还需受理与应用版本的证据。设备保留旧配置、离线重连或部分下发失败时，结果必须携带实际使用版本，避免把异版本数据混为同一次评估。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>训练侧 FP32 输出与边缘侧量化输出略有差异，某些小目标越过阈值；同航线不同设备又用不同阈值。分组核对版本与输入契约后，才判断模型漂移。</p></div>
+<p><strong>继续追问：</strong>“量化就是一定更快？”取决于硬件和运行时。“配置发送成功就生效？”发送、受理和真正应用有不同边界。</p><p class="verify"><strong>如何验证：</strong>固定标注集做导出前后及目标硬件对照，保留版本清单；模拟配置重复、过期、离线和半成功，核对实际结果版本。</p>
+<p class="sources"><a href="#ref-12">原始资料 12</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="practice"><div class="head"><h2>8. 练习：从能讲到能反驳自己的假设</h2><p>先说预期，再运行；如果结果相反，回到机制与边界。</p></div><figure class="card diagram" id="fig-vision-sequence"><svg viewBox="0 0 1040 494" role="img" aria-labelledby="vision-sequence-title vision-sequence-desc"><title id="vision-sequence-title">故障窗口与恢复时序</title><desc id="vision-sequence-desc">坐标反变换和对象身份影响最终准确性；只测单模型分数无法验收整个巡检链路。</desc><defs><marker id="arrow-vision-sequence-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="arrow-vision-sequence-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker></defs><text x="135" y="45" text-anchor="middle" class="title">图像输入</text><path d="M135 70V459" class="life"/><text x="390" y="45" text-anchor="middle" class="title">预处理</text><path d="M390 70V459" class="life"/><text x="645" y="45" text-anchor="middle" class="title">模型输出</text><path d="M645 70V459" class="life"/><text x="900" y="45" text-anchor="middle" class="title">业务记录</text><path d="M900 70V459" class="life"/><path class="edge " d="M135 110H390" marker-end="url(#arrow-vision-sequence-blue)"/><text x="262.5" y="99" text-anchor="middle" class="sub">原图带尺寸、颜色与配置版本</text><path class="edge " d="M390 164H645" marker-end="url(#arrow-vision-sequence-blue)"/><text x="517.5" y="153" text-anchor="middle" class="sub">缩放与 padding 后推理</text><path class="edge a" d="M645 218H390" marker-end="url(#arrow-vision-sequence-amber)"/><text x="517.5" y="207" text-anchor="middle" class="sub">输出坐标属于模型输入空间</text><path class="edge a" d="M390 272H135" marker-end="url(#arrow-vision-sequence-amber)"/><text x="262.5" y="261" text-anchor="middle" class="sub">反变换到原图并核对范围</text><path class="edge " d="M645 326H900" marker-end="url(#arrow-vision-sequence-blue)"/><text x="772.5" y="315" text-anchor="middle" class="sub">候选经复核与身份聚合</text><path class="edge a" d="M900 380H855V398H900" marker-end="url(#arrow-vision-sequence-amber)"/><text x="520" y="371" text-anchor="middle" class="sub">按图片/对象身份幂等写结果</text></svg><figcaption>故障窗口与恢复时序。坐标反变换和对象身份影响最终准确性；只测单模型分数无法验收整个巡检链路。</figcaption></figure>
+<div class="card pad practice"><h3>几何与指标练习：坐标往返和串行召回的条件概率</h3><p>Python 3 标准库。理想化固定比例 letterbox，不模拟真实库的步幅/取整，也不运行 YOLO、SAM、VLM 或 GPU。所有概率是假设。</p><p class="verify">保存为 practice.py，用 python practice.py 运行。</p>
+<pre><code class="language-python">from math import isclose
+
+width, height, target = 1280, 720, 640
+scale = min(target / width, target / height)
+pad_x = (target - width * scale) / 2
+pad_y = (target - height * scale) / 2
+
+def encode(x, y):
+    if not (0 &lt;= x &lt;= width and 0 &lt;= y &lt;= height):
+        raise ValueError(&quot;outside original image&quot;)
+    return x * scale + pad_x, y * scale + pad_y
+
+def decode(u, v):
+    return (u - pad_x) / scale, (v - pad_y) / scale
+
+assert (scale, pad_x, pad_y) == (0.5, 0.0, 140.0)
+for point in [(0, 0), (200, 100), (600, 500), (1280, 720)]:
+    restored = decode(*encode(*point))
+    assert all(isclose(a, b, abs_tol=1e-9) for a, b in zip(point, restored))
+assert encode(200, 100) == (100, 190)
+assert decode(100, 190) == (200, 100)
+candidate_recall = 0.90
+review_acceptance_given_candidate_true = 0.95
+pipeline_recall = candidate_recall * review_acceptance_given_candidate_true
+assert isclose(pipeline_recall, 0.855)
+print(&quot;coordinate round trips and conditional recall passed&quot;)
+</code></pre></div>
+<div class="card pad" style="margin-top:18px"><h3>遮住正文，回答四个问题</h3><ul class="clean"><li>模型实际版本、输入和后处理是什么？</li><li>漏检是在候选、复核还是业务聚合阶段？</li><li>坐标属于哪个空间、轴序和参考系？</li><li>端到端结果是否绑定实际模型与配置版本？</li></ul></div></section>
+<section id="sources"><div class="head"><h2>9. 原始资料与关联阅读</h2><p>先定位资料定义的范围，再把它应用到自己的项目。</p></div>
+<div class="card pad"><ol class="source-list"><li id="ref-1"><a href="https://arxiv.org/abs/1506.02640">论文：YOLO 原始检测范式</a></li><li id="ref-2"><a href="https://docs.ultralytics.com/modes/predict/">Ultralytics：预测输入、参数与结果</a></li><li id="ref-3"><a href="https://docs.ultralytics.com/models/yolo26/">Ultralytics：YOLO26 的 NMS-free 路径示例</a></li><li id="ref-4"><a href="https://arxiv.org/abs/2304.02643">论文：Segment Anything</a></li><li id="ref-5"><a href="https://github.com/facebookresearch/segment-anything">Meta：经典 SAM 实现</a></li><li id="ref-6"><a href="https://arxiv.org/abs/2304.08485">论文：Visual Instruction Tuning</a></li><li id="ref-7"><a href="https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html">OpenCV：相机模型与标定</a></li><li id="ref-8"><a href="https://docs.python.org/3/library/asyncio-task.html">Python：asyncio 任务</a></li><li id="ref-9"><a href="https://docs.python.org/3.13/howto/free-threading-python.html">Python 3.13：free-threading 的版本边界</a></li><li id="ref-10"><a href="https://docs.pytorch.org/docs/2.9/notes/cuda.html">PyTorch：CUDA 语义</a></li><li id="ref-11"><a href="https://docs.pytorch.org/docs/2.9/notes/multiprocessing.html">PyTorch：多进程最佳实践</a></li><li id="ref-12"><a href="https://docs.ultralytics.com/modes/export/">Ultralytics：模型导出与量化</a></li></ol><p class="verify">规范、实现与文档版本可能不同。引用用于核对机制，例子中的流程和数字为教学推演；真实环境实验与项目源码核对另行进行。</p></div>
+<div class="grid3 column-links" style="margin-top:18px"><div class="mini"><a href="resume-tech-columns.html">技术类别总入口</a><p>沿项目线索切换到其他专栏。</p></div><div class="mini"><a href="java-agent-ai-interview-illustrated.html">Java / AI 图解手册</a><p>把原理转换为面试回答与连续追问。</p></div><div class="mini"><a href="uav-backend-review-handbook.html">六周项目复习手册</a><p>回到项目链路核对实际职责与事实。</p></div></div></section></main>
+<footer><div class="shell">简历技术原理 · Python 与视觉 AI 工程 · 核对日期 2026-10-13 · 原始资料与验证范围见正文</div></footer>
+<nav class="dock" aria-label="页面快捷导航"><a href="../index.html">首页</a><a href="#">↑ 顶部</a></nav>
+<script>(()=>{const root=document.documentElement,key="html-docs-theme";let saved;try{saved=localStorage.getItem(key)}catch{}if(saved)root.dataset.theme=saved==="dark"?"dark":"paper";document.getElementById("theme").addEventListener("click",()=>{const next=root.dataset.theme==="dark"?"paper":"dark";root.dataset.theme=next;try{localStorage.setItem(key,next)}catch{}})})();</script></body></html>

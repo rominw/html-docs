@@ -645,6 +645,7 @@ print(&quot;All split positions, byte-by-byte input and rejection cases passed.&
 </tbody></table></div>
 <div class="grid2" style="margin-top:18px"><div class="card pad"><h3>能否讲清这四个反例？</h3><ul class="clean"><li>两个线程只修改不同字段，却因同缓存行争用而慢。</li><li>申请了大地址区间，虚拟大小增大，但 RSS 尚未等量增长。</li><li>epoll 已通知可读，应用仍没拿到一条完整消息。</li><li>服务已完成退款，客户端却因回包丢失显示超时。</li></ul></div><div class="card pad"><h3>能否设计这四个验证？</h3><ul class="clean"><li>拆出容器节流、热点 CPU 与下游等待的证据。</li><li>在每个字节边界切割同一条报文，输出仍一致。</li><li>检查文件替换各步骤中断后的可见版本与持久结果。</li><li>模拟断线、重复事件与慢客户端，正文、副作用与内存均可核对。</li></ul></div></div>
 <div class="callout" style="margin-top:18px"><p><strong>面试回答顺序：</strong>“结论与范围 → 机制与时序 → 具体反例 → 工程处理 → 验证证据”。关键词帮助找回链路，不能代替条件与边界。</p></div>
+<p class="verify">继续按技术栈下钻：<a href="resume-tech-columns.html">简历技术原理专栏</a>，将系统与网络基础连到 Java、数据、一致性、工作流、Agent、视觉 AI 和交付。</p>
 <div class="grid3 read-map" style="margin-top:18px"><div class="mini"><a href="java-agent-ai-interview-illustrated.html#chapter-deep">Java / AI 图解手册</a><p>继续下钻 JVM、AQS、数据库、消息与通信实现。</p></div><div class="mini"><a href="agent-ai-interview-questions.html#s-cs">Agent / AI 面试题全集</a><p>把系统与网络基础应用到手撕和全栈场景题。</p></div><div class="mini"><a href="uav-backend-review-handbook.html">六周项目复习手册</a><p>把等待、状态、不变量和未知结果带回真实项目链路。</p></div></div>
 <p class="verify">本页已提供分帧自检；Linux 调度、epoll、抓包、断电和容器故障实验需在相应隔离环境执行。核对资料按章节附在正文之后。</p>
 </section></main>

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="description" content="按简历技术栈组织的Spring 与服务工程原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。"><meta name="date" content="2026-10-13"><title>简历技术原理 · Spring 与服务工程</title><style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .decision{fill:var(--amber2);stroke:var(--amber);stroke-width:1.6}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    .active{fill:var(--blue2);stroke:var(--blue);stroke-width:1.2}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    .dock{position:fixed;right:18px;bottom:18px;z-index:99;display:flex;gap:4px;padding:6px;border-radius:999px;background:rgba(15,23,42,.82);backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(15,23,42,.28)}
+    .dock a{padding:7px 13px;border-radius:999px;color:#fff;text-decoration:none;font:600 13px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+    .dock a:hover{background:rgba(255,255,255,.16)}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+
+    :focus-visible{outline:3px solid var(--blue);outline-offset:4px}
+    html{scroll-padding-top:76px} .diagram{margin:18px 0}.dock{top:auto}
+    .diagram figcaption{margin-top:14px;color:var(--muted);font-size:13px;line-height:1.7}
+    .q{margin-top:16px;scroll-margin-top:78px}.q h3{margin:0 0 14px;font-size:22px;line-height:1.5}
+    .q h4{margin:18px 0 7px;font-size:16px}.q p{margin:10px 0}.q .pill{vertical-align:middle;margin-right:8px}
+    .q .memory-cue{margin:0 0 16px;padding:10px 13px;border-left:3px solid var(--green);border-radius:8px;background:var(--green2);font-size:14px}
+    .memory-cue strong{color:var(--green)}.verify{color:var(--muted);font-size:14px}
+    .sources{margin-top:18px;color:var(--muted);font-size:13px}.sources a{display:inline-block;margin:0 16px 6px 0}
+    .jump-list{display:flex;flex-wrap:wrap;gap:6px 18px;padding:0;list-style:none;font-size:14px;margin:16px 0}
+    p,li,a{overflow-wrap:anywhere}.practice{margin-top:20px}.practice h3{margin-top:0}
+    pre{overflow:auto;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);font:14px/1.75 Consolas,monospace}
+    pre code{padding:0;border:0;border-radius:0;color:var(--ink);background:transparent;font:inherit}
+    .read-map .mini a{display:block;font-weight:700;margin-bottom:6px}
+    @media(max-width:820px){.pad{padding:18px}.q h3{font-size:19px}.diagram{padding:12px}.lead{font-size:17px}}
+
+@page{margin:14mm}@media print{:root,[data-theme=dark]{
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }body{background:var(--panel)}header{padding:0 0 24px}.stats{grid-template-columns:repeat(4,1fr);gap:8px}.stat{padding:12px}.dock{display:none}.diagram svg{min-width:0}.diagram{overflow:visible;padding:10px;break-inside:avoid}.table table{min-width:0}.q h3{break-after:avoid}.head{break-after:avoid}pre{white-space:pre-wrap;overflow:visible}a{color:var(--ink)}}
+
+.column-links a{font-weight:700}.column-links .mini{height:100%}.source-list li{margin:10px 0}.source-list a{overflow-wrap:anywhere}.q p{max-width:100%}
+</style></head>
+<body><header><div class="shell"><div class="kicker">RESUME STACK / PRINCIPLES / FAILURE ANALYSIS</div><h1>Spring 与服务工程</h1><p class="lead">容器、代理、事务和远程调用，逐层识别框架保证</p><div class="doc-meta"><time datetime="2026-10-13">2026年10月13日</time><span>按简历技术类别选题</span><span>原理 · 边界 · 故障推演</span></div><div class="actions"><a class="btn" href="#map">开始阅读</a><button class="btn" id="theme" type="button">切换主题</button><button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button></div><div class="stats"><div class="stat"><b>6</b><span>深挖主题</span></div><div class="stat"><b>2</b><span>机制与故障图</span></div><div class="stat"><b>1</b><span>可运行练习</span></div><div class="stat"><b>8</b><span>原始资料入口</span></div></div></div></header>
+<nav aria-label="章节导航"><div class="shell"><a href="#map">阅读地图</a><a href="#topic-1">01 · Spring 容器和 Boot 自动配置，分别解决什么问题？</a><a href="#topic-2">02 · @Transactional 为什么会失效？该从哪里追？</a><a href="#topic-3">03 · REQUIRED、REQUIRES_NEW 与连接池有什么关联？</a><a href="#topic-4">04 · MyBatis-Plus 如何把方法变成 SQL？插件为何不能当业务保证？</a><a href="#topic-5">05 · Spring Cloud 的服务发现、负载均衡、重试和熔断如何串起来？</a><a href="#topic-6">06 · “只改接口配置，不改代码”背后需要哪些原理？</a><a href="#practice">练习与故障自测</a><a href="#sources">原始资料与关联阅读</a></div></nav><main class="shell"><section id="map"><div class="head"><h2>1. 从项目线索建立原理地图</h2><p>Spring Boot · Spring Cloud · Spring MVC · MyBatis-Plus</p></div>
+<p><a href="resume-tech-columns.html">← 技术原理专栏总入口</a> · <a href="foundations-os-network-column.html">操作系统与网络基础</a></p>
+<div class="grid2"><div class="mini"><h3>简历关联</h3><p>简历以 Spring Boot／Cloud 为主力栈，使用 MyBatis-Plus，并提到配置表驱动的业务接入。这些经历适合从框架执行路径讲到业务边界。</p></div><div class="mini"><h3>本篇要练成什么</h3><p>能画出请求进入、代理拦截、SQL 执行、事务提交与外部调用的顺序，并解释哪个注解在哪个路径才生效。</p></div></div>
+<div class="callout" style="margin-top:16px"><p><strong>阅读方式：</strong>先用记忆关键词复述机制，再推演例子的失败窗口，最后指出验证对象。正文方案是教学分析，不等同于已核对项目源码；具体个人贡献应按真实经历说明。</p></div>
+<p class="verify"><strong>版本与验证范围：</strong>容器与事务以 Spring Framework 6.2 的常见代理模式为基线；Boot、Cloud、MyBatis-Plus 的具体版本和插件顺序需以项目依赖为准。配置练习只推演版本切换。</p><figure class="card diagram" id="fig-spring-flow"><svg viewBox="0 0 1040 370" role="img" aria-labelledby="spring-flow-title spring-flow-desc"><title id="spring-flow-title">机制地图</title><desc id="spring-flow-desc">框架把调用组织起来；本地事务不会自动覆盖 MQ、设备和模型等外部系统。</desc><defs><marker id="arrow-spring-flow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="arrow-spring-flow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker></defs><g class="diagram-node"><rect x="35" y="55" width="280" height="80" rx="10" class="node "/><text x="175" y="87" text-anchor="middle" class="title">请求与上下文</text><text x="175" y="112" text-anchor="middle" class="sub">鉴权 / 参数校验 / requestId</text></g><g class="diagram-node"><rect x="380" y="55" width="280" height="80" rx="10" class="node "/><text x="520" y="87" text-anchor="middle" class="title">容器与代理</text><text x="520" y="112" text-anchor="middle" class="sub">Bean / AOP 拦截链</text></g><g class="diagram-node"><rect x="725" y="55" width="280" height="80" rx="10" class="node "/><text x="865" y="87" text-anchor="middle" class="title">事务边界</text><text x="865" y="112" text-anchor="middle" class="sub">连接 / 传播 / 回滚规则</text></g><g class="diagram-node"><rect x="725" y="235" width="280" height="80" rx="10" class="node g"/><text x="865" y="267" text-anchor="middle" class="title">Mapper 与 SQL</text><text x="865" y="292" text-anchor="middle" class="sub">绑定参数 / 插件 / 条件</text></g><g class="diagram-node"><rect x="380" y="235" width="280" height="80" rx="10" class="node g"/><text x="520" y="267" text-anchor="middle" class="title">本地提交</text><text x="520" y="292" text-anchor="middle" class="sub">业务表与 outbox</text></g><g class="diagram-node"><rect x="35" y="235" width="280" height="80" rx="10" class="node g"/><text x="175" y="267" text-anchor="middle" class="title">外部协作</text><text x="175" y="292" text-anchor="middle" class="sub">超时 / 查证 / 补偿</text></g><path class="edge " d="M315 95H380" marker-end="url(#arrow-spring-flow-blue)"/><path class="edge " d="M660 95H725" marker-end="url(#arrow-spring-flow-blue)"/><path class="edge " d="M865 135V235" marker-end="url(#arrow-spring-flow-blue)"/><path class="edge " d="M725 275H660" marker-end="url(#arrow-spring-flow-blue)"/><path class="edge " d="M380 275H315" marker-end="url(#arrow-spring-flow-blue)"/><text x="520" y="185" text-anchor="middle" class="sub">先识别状态、执行者与保证范围，再沿故障窗口追踪事实。</text></svg><figcaption>机制地图。框架把调用组织起来；本地事务不会自动覆盖 MQ、设备和模型等外部系统。</figcaption></figure></section>
+<section id="topic-1"><div class="head"><h2>2. Spring 容器和 Boot 自动配置，分别解决什么问题？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-1"><p class="memory-cue"><strong>记忆关键词：</strong>定义 → 实例化 → 注入 → 初始化 → 后处理 → 发布</p>
+<h3>先这样回答</h3><p>容器管理对象及其依赖和生命周期，Boot 自动配置根据类路径、属性和已有 Bean 等条件补充定义。启动成功不说明某个预期 Bean 或代理一定生效。</p><h4>拆开机制与保证范围</h4><p>容器先拥有 Bean 定义，再按依赖关系创建和注入对象，随后执行初始化和后处理；最终对外提供的引用可能是代理。不要把对象构造完成、初始化完成和代理可被外部调用混成一个时点，尤其不要依赖初始化方法内的自调用触发事务。</p><p>自动配置的条件决定是否装配，应用自定义 Bean 常会使某些默认配置退让。这个行为随具体配置类而定；排查应查看条件报告、实际 Bean 类型与来源。把“加了 starter”当成启用全部能力，会忽略缺少属性、类或显式排除等条件。</p><p>Spring MVC 常见请求路径是过滤器和 DispatcherServlet、映射与参数处理、控制器及异常/返回值处理。AOP 拦截 Bean 方法与 HTTP 过滤器处在不同层次，鉴权、日志、事务和流式响应资源不能只靠一个注解覆盖全部路径。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>自定义一个同类型连接 Bean 后，默认装配可能退让；HTTP 接口仍可启动，但真正连接的地址与操作者预期不同。需要查运行时对象而不是只看配置文件。</p></div>
+<p><strong>继续追问：</strong>“单例就是线程安全？”单例只说明作用域。“循环依赖能启动就可以接受？”还要检查早期引用、构造依赖与代理完整性。</p><p class="verify"><strong>如何验证：</strong>通过条件评估报告和 Bean 清单核对实际配置；分别覆盖属性缺失、自定义 Bean、初始化失败和请求异常路径。</p>
+<p class="sources"><a href="#ref-2">原始资料 02</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-2"><div class="head"><h2>3. @Transactional 为什么会失效？该从哪里追？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-2"><p class="memory-cue"><strong>记忆关键词：</strong>调用经过代理 · 方法可拦截 · 事务管理器 · 异常规则</p>
+<h3>先这样回答</h3><p>先确认运行时调用是否经过事务代理，再检查事务管理器、资源绑定和回滚规则。默认代理模式下，同一对象的自调用不会新增一次事务拦截。</p><h4>拆开机制与保证范围</h4><p>外部调用代理对象时，拦截器在进入目标方法前获取或加入事务，返回或抛错后处理提交与回滚。this.inner() 调到目标自身，绕过了这层新增拦截；如果外层已有事务，inner 仍可能在该事务中执行，但它自己的传播设置未因此生效。</p><p>回滚规则与异常传出路径有关。常见默认对 RuntimeException 和 Error 回滚，checked exception 通常需配置；如果代码吞掉异常，代理可能看到正常返回。必须按实际版本、全局设置与业务回滚规则核对，不能只看注解存在。</p><p>普通命令式事务往往绑定当前线程，新开的线程不会自动继承同一连接与事务；响应式事务使用另一套上下文机制。远程 HTTP、MQ 和 IoT 调用也不是 JDBC 本地事务的参与者。代理修复解决的是拦截范围，不是分布式原子性。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>外层方法直接调用同类的 REQUIRES_NEW 方法，期望审计独立提交却没有新事务；修复为外部经过独立 Bean 的代理调用后，还需测试两个事务的真实失败语义。</p></div>
+<p><strong>继续追问：</strong>“private 方法能不能加注解？”注解可写不等于当前代理能拦截。“改 public 就够？”还得经过代理且匹配事务配置。</p><p class="verify"><strong>如何验证：</strong>从代理入口发起集成测试，分别抛运行时/受检异常、吞异常和切线程，观察数据库提交结果与连接边界；纯模型练习不能证明事务注解有效。</p>
+<p class="sources"><a href="#ref-3">原始资料 03</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-3"><div class="head"><h2>4. REQUIRED、REQUIRES_NEW 与连接池有什么关联？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-3"><p class="memory-cue"><strong>记忆关键词：</strong>逻辑事务 · 物理连接 · rollback-only · 挂起与资源预算</p>
+<h3>先这样回答</h3><p>REQUIRED 通常加入现有物理事务；REQUIRES_NEW 使用独立物理事务并挂起外层资源。传播模式既改变回滚关系，也改变连接占用与锁等待。</p><h4>拆开机制与保证范围</h4><p>多个 REQUIRED 逻辑范围可能共享同一事务。内部范围标记 rollback-only 后，外层即使捕获异常并继续，最终也可能得到 UnexpectedRollbackException；外层正常返回并不能改变物理事务已不可提交的事实。</p><p>REQUIRES_NEW 的独立提交可用于某些审计需求，但外层持有连接时，内层还需要另一条连接。所有请求都持有外层连接并等待内层连接，会使池子耗尽。内层还可能尝试获取外层已经持有的数据库锁，因此“独立”不等于没有依赖。</p><p>NESTED 常基于保存点，在同一物理事务内局部回滚，支持与语义取决于事务管理器和驱动。不能把它等同独立持久提交，也不能用传播名称证明审计已跨外层失败存活。先给出业务意图，再选资源契约。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>假设连接池容量为 N，N 个请求各持有外层连接并进入 REQUIRES_NEW，内层全都等连接。增加 HTTP 线程会增加等待者，无法凭空生成数据库容量。</p></div>
+<p><strong>继续追问：</strong>“扩大连接池就解决？”还要核对数据库容量和锁关系。“回滚失败日志也被回滚？”应明确日志要保留的提交边界，不能随意嵌套事务。</p><p class="verify"><strong>如何验证：</strong>设置有限池容量，在隔离数据库中观察 active/pending、事务 ID 和锁等待；覆盖内层失败、外层失败和 rollback-only，而不只测成功路径。</p>
+<p class="sources"><a href="#ref-4">原始资料 04</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-4"><div class="head"><h2>5. MyBatis-Plus 如何把方法变成 SQL？插件为何不能当业务保证？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-4"><p class="memory-cue"><strong>记忆关键词：</strong>MappedStatement → 参数绑定 → 拦截器 → SQL → 影响行数</p>
+<h3>先这样回答</h3><p>MyBatis 执行映射语句并绑定参数，MyBatis-Plus 在此基础上提供 CRUD 与插件。真正保护数据的是最终 SQL、数据库约束和影响行数的处理。</p><h4>拆开机制与保证范围</h4><p>一个 Mapper 调用会选择映射语句，构造参数和 SQL，经过执行器、语句处理及配置的拦截路径，再映射结果。参数绑定与字符串拼接不同：把用户输入放进 ${...} 等直接替换位置，会改变 SQL 结构；动态排序字段需采用允许列表。</p><p>乐观锁常把 version 作为更新条件并推进新版本，但只在受支持的操作、参数与插件配置下生效。自定义 SQL、批量路径或遗漏版本条件时，需要自行保证。更新影响行数为零可能意味着版本冲突、状态条件不满足或记录不存在，不能统一当成功。</p><p>租户、逻辑删除、分页和乐观锁拦截器改变最终语句，但不能证明所有手写 SQL 和绕过 Mapper 的路径都被保护。插件顺序还会影响分页和其他改写。二级缓存、连接和事务生命周期也应按 MyBatis/Spring 的整合方式理解。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>机库占用使用 UPDATE ... WHERE status=IDLE AND version=oldVersion。两个请求同时执行时，必须由数据库判定只有合格更新获胜，并把零行更新返回为占用失败。</p></div>
+<p><strong>继续追问：</strong>“用了乐观锁就不用唯一约束？”版本保护更新，唯一约束保护不同身份的重复插入。“分页 total 一定便宜？”还要单独检查 count SQL 的成本。</p><p class="verify"><strong>如何验证：</strong>查看最终绑定 SQL、租户条件与影响行数；覆盖自定义 Mapper、插件顺序、并发冲突和逻辑删除，避免只看 ORM 返回对象。</p>
+<p class="sources"><a href="#ref-6">原始资料 06</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-5"><div class="head"><h2>6. Spring Cloud 的服务发现、负载均衡、重试和熔断如何串起来？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-5"><p class="memory-cue"><strong>记忆关键词：</strong>发现目标 · 选实例 · deadline · 重试预算 · 隔离</p>
+<h3>先这样回答</h3><p>发现和负载均衡选择调用目标，重试重新尝试，熔断控制继续调用的资格。它们处理远程不确定性，不能把超时变成“对方未执行”。</p><h4>拆开机制与保证范围</h4><p>实例列表有缓存与更新延迟，客户端连接池还可能复用已有连接。目标已摘除不代表所有旧连接和在途请求立即消失；负载均衡也不能只凭 Pod 数均分真实负载，长连接、热点键与服务时间都会造成偏斜。</p><p>每层都配置重试会放大请求：网关、客户端和消费者的尝试可能相乘。一次端到端 deadline 要分配给排队、连接、读写与后续尝试，剩余时间不足时停止。读请求也可能昂贵；执行类请求要绑定稳定动作身份，不能仅以 HTTP 方法判定可重试。</p><p>熔断依据采样窗口和配置对后续调用做决策，半开探测需要限量；它既不是事务回滚，也不取消所有在途工作。fallback 应表达真实能力，如“暂时不可查询”，不能把假成功或旧数据伪装成权威执行结果。隔离还需要有界连接、线程和队列。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>任务下发超时，重试到另一实例。若第二实例生成新动作身份，设备可能再次执行；保留原身份并查询受理/执行结果才能判断下一步。</p></div>
+<p><strong>继续追问：</strong>“熔断后就不堆积？”其他队列和在途请求仍可能存在。“发现健康实例就安全？”健康只说明特定探测，不证明业务容量和任务幂等。</p><p class="verify"><strong>如何验证：</strong>模拟摘实例、慢响应、回包丢失和多层重试，核对尝试次数、真实执行次数及总 deadline；分别观察各实例负载和连接复用。</p>
+<p class="sources"><a href="#ref-7">原始资料 07</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-6"><div class="head"><h2>7. “只改接口配置，不改代码”背后需要哪些原理？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-6"><p class="memory-cue"><strong>记忆关键词：</strong>类型化契约 · 允许列表 · 版本快照 · 原子发布 · 审计</p>
+<h3>先这样回答</h3><p>配置驱动把变化从代码移到受约束的数据。它仍需要语义校验、版本和发布协议，否则只是把运行时错误与安全边界隐藏进配置表。</p><h4>拆开机制与保证范围</h4><p>接口配置可以描述路由、参数映射、返回字段和超时，但必须限定可表达的能力。URL、HTTP 方法、字段路径和模板变量都要按契约校验；不能允许配置任意访问内网、执行脚本或把用户输入变成无约束远程请求。</p><p>同一次调用应使用同一配置快照。若路由读取 v2，参数映射却读取 v1，就可能把正确字段发给错误接口。做法是校验整个版本后再整体发布，并在请求开始时捕获快照；在途请求是否使用旧版本，应有明确兼容策略。</p><p>Spring 的配置绑定负责把数据转换到类型，不能代替业务语义验证。配置回滚只回滚后续请求的路由，不自动撤销已完成的副作用；审计要把配置版本、请求身份、实际目标和结果联系起来。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>表单接口 v1 用 departmentId，v2 用 orgCode；如果只更新部分行，用户看起来填表成功，后端却把组织映射错。发布前用固定样例做端到端契约验证。</p></div>
+<p><strong>继续追问：</strong>“做成万能 DSL 更灵活？”表达能力越强，验证和治理成本越大。“热更新要加锁吗？”要保护版本一致性；不可变快照整体替换是一种选择。</p><p class="verify"><strong>如何验证：</strong>下方模型练习验证快照不被后续发布改写；真实框架还需测试属性绑定、无效配置拒绝、权限和下游契约，不把模型自检当作集成验收。</p>
+<p class="sources"><a href="#ref-8">原始资料 08</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="practice"><div class="head"><h2>8. 练习：从能讲到能反驳自己的假设</h2><p>先说预期，再运行；如果结果相反，回到机制与边界。</p></div><figure class="card diagram" id="fig-spring-sequence"><svg viewBox="0 0 1040 494" role="img" aria-labelledby="spring-sequence-title spring-sequence-desc"><title id="spring-sequence-title">故障窗口与恢复时序</title><desc id="spring-sequence-desc">这是推荐练习方案，不是对简历项目源码的断言；提交与外部受理是两个独立边界。</desc><defs><marker id="arrow-spring-sequence-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="arrow-spring-sequence-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker></defs><text x="135" y="45" text-anchor="middle" class="title">客户端</text><path d="M135 70V459" class="life"/><text x="390" y="45" text-anchor="middle" class="title">服务代理</text><path d="M390 70V459" class="life"/><text x="645" y="45" text-anchor="middle" class="title">数据库</text><path d="M645 70V459" class="life"/><text x="900" y="45" text-anchor="middle" class="title">外部服务</text><path d="M900 70V459" class="life"/><path class="edge " d="M135 110H390" marker-end="url(#arrow-spring-sequence-blue)"/><text x="262.5" y="99" text-anchor="middle" class="sub">进入代理，建立本地事务</text><path class="edge " d="M390 164H645" marker-end="url(#arrow-spring-sequence-blue)"/><text x="517.5" y="153" text-anchor="middle" class="sub">写业务记录和待发送意图</text><path class="edge a" d="M645 218H390" marker-end="url(#arrow-spring-sequence-amber)"/><text x="517.5" y="207" text-anchor="middle" class="sub">事务提交成功</text><path class="edge " d="M390 272H900" marker-end="url(#arrow-spring-sequence-blue)"/><text x="645.0" y="261" text-anchor="middle" class="sub">由发送器执行外部调用</text><path class="edge a" d="M900 326H390" marker-end="url(#arrow-spring-sequence-amber)"/><text x="645.0" y="315" text-anchor="middle" class="sub">结果可能迟到或丢失</text><path class="edge " d="M135 380H390" marker-end="url(#arrow-spring-sequence-blue)"/><text x="262.5" y="369" text-anchor="middle" class="sub">用原 requestId 查询与恢复</text></svg><figcaption>故障窗口与恢复时序。这是推荐练习方案，不是对简历项目源码的断言；提交与外部受理是两个独立边界。</figcaption></figure>
+<div class="card pad practice"><h3>模型练习：一次调用只能看见一份配置版本</h3><p>Python 3 标准库模型。它验证不可变快照的版本绑定，不调用 Spring，也不验证真实热更新、网络请求或事务代理。</p><p class="verify">保存为 practice.py，用 python practice.py 运行。</p>
+<pre><code class="language-python">from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Config:
+    version: int
+    route: str
+    field: str
+
+def validate(cfg):
+    allowed = {(&quot;/form/v1&quot;, &quot;departmentId&quot;), (&quot;/form/v2&quot;, &quot;orgCode&quot;)}
+    if cfg.version &lt;= 0 or (cfg.route, cfg.field) not in allowed:
+        raise ValueError(&quot;invalid configuration contract&quot;)
+    return cfg
+
+active = validate(Config(1, &quot;/form/v1&quot;, &quot;departmentId&quot;))
+in_flight = active
+active = validate(Config(2, &quot;/form/v2&quot;, &quot;orgCode&quot;))
+assert in_flight == Config(1, &quot;/form/v1&quot;, &quot;departmentId&quot;)
+assert active == Config(2, &quot;/form/v2&quot;, &quot;orgCode&quot;)
+try:
+    validate(Config(3, &quot;/form/v2&quot;, &quot;departmentId&quot;))
+    raise AssertionError(&quot;mixed contract accepted&quot;)
+except ValueError:
+    pass
+print(&quot;snapshot isolation and invalid contract rejection passed&quot;)
+</code></pre></div>
+<div class="card pad" style="margin-top:18px"><h3>遮住正文，回答四个问题</h3><ul class="clean"><li>业务调用是否真正经过预期代理？</li><li>事务在哪个线程、哪个资源上成立？</li><li>最终 SQL 是否带状态、版本与租户条件？</li><li>重试和配置切换是否保留原业务身份？</li></ul></div></section>
+<section id="sources"><div class="head"><h2>9. 原始资料与关联阅读</h2><p>先定位资料定义的范围，再把它应用到自己的项目。</p></div>
+<div class="card pad"><ol class="source-list"><li id="ref-1"><a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-nature.html">Spring：Bean 生命周期</a></li><li id="ref-2"><a href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">Spring Boot：自动配置</a></li><li id="ref-3"><a href="https://docs.spring.io/spring/reference/6.2/data-access/transaction/declarative/annotations.html">Spring 6.2：@Transactional 与代理调用</a></li><li id="ref-4"><a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">Spring：事务传播</a></li><li id="ref-5"><a href="https://mybatis.org/mybatis-3/sqlmap-xml.html">MyBatis：SQL 映射与参数</a></li><li id="ref-6"><a href="https://baomidou.com/en/plugins/optimistic-locker/">MyBatis-Plus：乐观锁插件</a></li><li id="ref-7"><a href="https://docs.spring.io/spring-cloud-commons/reference/spring-cloud-commons/loadbalancer.html">Spring Cloud Commons：LoadBalancer</a></li><li id="ref-8"><a href="https://docs.spring.io/spring-boot/reference/features/external-config.html">Spring Boot：类型安全配置</a></li></ol><p class="verify">规范、实现与文档版本可能不同。引用用于核对机制，例子中的流程和数字为教学推演；真实环境实验与项目源码核对另行进行。</p></div>
+<div class="grid3 column-links" style="margin-top:18px"><div class="mini"><a href="resume-tech-columns.html">技术类别总入口</a><p>沿项目线索切换到其他专栏。</p></div><div class="mini"><a href="java-agent-ai-interview-illustrated.html">Java / AI 图解手册</a><p>把原理转换为面试回答与连续追问。</p></div><div class="mini"><a href="uav-backend-review-handbook.html">六周项目复习手册</a><p>回到项目链路核对实际职责与事实。</p></div></div></section></main>
+<footer><div class="shell">简历技术原理 · Spring 与服务工程 · 核对日期 2026-10-13 · 原始资料与验证范围见正文</div></footer>
+<nav class="dock" aria-label="页面快捷导航"><a href="../index.html">首页</a><a href="#">↑ 顶部</a></nav>
+<script>(()=>{const root=document.documentElement,key="html-docs-theme";let saved;try{saved=localStorage.getItem(key)}catch{}if(saved)root.dataset.theme=saved==="dark"?"dark":"paper";document.getElementById("theme").addEventListener("click",()=>{const next=root.dataset.theme==="dark"?"paper":"dark";root.dataset.theme=next;try{localStorage.setItem(key,next)}catch{}})})();</script></body></html>

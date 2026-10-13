@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="description" content="按简历技术栈组织的Vue、TypeScript 与流式通信原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。"><meta name="date" content="2026-10-13"><title>简历技术原理 · Vue、TypeScript 与流式通信</title><style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .decision{fill:var(--amber2);stroke:var(--amber);stroke-width:1.6}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    .active{fill:var(--blue2);stroke:var(--blue);stroke-width:1.2}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    .dock{position:fixed;right:18px;bottom:18px;z-index:99;display:flex;gap:4px;padding:6px;border-radius:999px;background:rgba(15,23,42,.82);backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(15,23,42,.28)}
+    .dock a{padding:7px 13px;border-radius:999px;color:#fff;text-decoration:none;font:600 13px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+    .dock a:hover{background:rgba(255,255,255,.16)}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+
+    :focus-visible{outline:3px solid var(--blue);outline-offset:4px}
+    html{scroll-padding-top:76px} .diagram{margin:18px 0}.dock{top:auto}
+    .diagram figcaption{margin-top:14px;color:var(--muted);font-size:13px;line-height:1.7}
+    .q{margin-top:16px;scroll-margin-top:78px}.q h3{margin:0 0 14px;font-size:22px;line-height:1.5}
+    .q h4{margin:18px 0 7px;font-size:16px}.q p{margin:10px 0}.q .pill{vertical-align:middle;margin-right:8px}
+    .q .memory-cue{margin:0 0 16px;padding:10px 13px;border-left:3px solid var(--green);border-radius:8px;background:var(--green2);font-size:14px}
+    .memory-cue strong{color:var(--green)}.verify{color:var(--muted);font-size:14px}
+    .sources{margin-top:18px;color:var(--muted);font-size:13px}.sources a{display:inline-block;margin:0 16px 6px 0}
+    .jump-list{display:flex;flex-wrap:wrap;gap:6px 18px;padding:0;list-style:none;font-size:14px;margin:16px 0}
+    p,li,a{overflow-wrap:anywhere}.practice{margin-top:20px}.practice h3{margin-top:0}
+    pre{overflow:auto;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);font:14px/1.75 Consolas,monospace}
+    pre code{padding:0;border:0;border-radius:0;color:var(--ink);background:transparent;font:inherit}
+    .read-map .mini a{display:block;font-weight:700;margin-bottom:6px}
+    @media(max-width:820px){.pad{padding:18px}.q h3{font-size:19px}.diagram{padding:12px}.lead{font-size:17px}}
+
+@page{margin:14mm}@media print{:root,[data-theme=dark]{
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }body{background:var(--panel)}header{padding:0 0 24px}.stats{grid-template-columns:repeat(4,1fr);gap:8px}.stat{padding:12px}.dock{display:none}.diagram svg{min-width:0}.diagram{overflow:visible;padding:10px;break-inside:avoid}.table table{min-width:0}.q h3{break-after:avoid}.head{break-after:avoid}pre{white-space:pre-wrap;overflow:visible}a{color:var(--ink)}}
+
+.column-links a{font-weight:700}.column-links .mini{height:100%}.source-list li{margin:10px 0}.source-list a{overflow-wrap:anywhere}.q p{max-width:100%}
+</style></head>
+<body><header><div class="shell"><div class="kicker">RESUME STACK / PRINCIPLES / FAILURE ANALYSIS</div><h1>Vue、TypeScript 与流式通信</h1><p class="lead">从响应式依赖追到事件恢复，让界面反映真实业务状态</p><div class="doc-meta"><time datetime="2026-10-13">2026年10月13日</time><span>按简历技术类别选题</span><span>原理 · 边界 · 故障推演</span></div><div class="actions"><a class="btn" href="#map">开始阅读</a><button class="btn" id="theme" type="button">切换主题</button><button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button></div><div class="stats"><div class="stat"><b>6</b><span>深挖主题</span></div><div class="stat"><b>2</b><span>机制与故障图</span></div><div class="stat"><b>1</b><span>可运行练习</span></div><div class="stat"><b>8</b><span>原始资料入口</span></div></div></div></header>
+<nav aria-label="章节导航"><div class="shell"><a href="#map">阅读地图</a><a href="#topic-1">01 · Vue 响应式到底如何从一次赋值走到视图更新？</a><a href="#topic-2">02 · TypeScript 类型为何挡不住坏 JSON？怎样建运行时边界？</a><a href="#topic-3">03 · SSE 为什么既不是“每个 chunk 一个 JSON”，也不是可靠事件存储？</a><a href="#topic-4">04 · 断线、重复、乱序和刷新之后，页面如何仍与权威状态一致？</a><a href="#topic-5">05 · 请求取消、组件卸载与异步竞态如何处理？</a><a href="#topic-6">06 · 前后端的权限按钮、会话和幂等键怎样形成完整契约？</a><a href="#practice">练习与故障自测</a><a href="#sources">原始资料与关联阅读</a></div></nav><main class="shell"><section id="map"><div class="head"><h2>1. 从项目线索建立原理地图</h2><p>Vue · TypeScript · SSE · Fetch · 会话路由 · 状态恢复</p></div>
+<p><a href="resume-tech-columns.html">← 技术原理专栏总入口</a> · <a href="foundations-os-network-column.html">操作系统与网络基础</a></p>
+<div class="grid2"><div class="mini"><h3>简历关联</h3><p>简历提到 Vue 知识管理前端、TypeScript Channel，以及 SSE 反馈和 messageId 结果查询。本篇把浏览器状态与后端执行协议串起来。</p></div><div class="mini"><h3>本篇要练成什么</h3><p>能说明数据变化为何触发渲染、类型检查何时消失、网络分块如何变成事件，以及断线后如何恢复同一任务。</p></div></div>
+<div class="callout" style="margin-top:16px"><p><strong>阅读方式：</strong>先用记忆关键词复述机制，再推演例子的失败窗口，最后指出验证对象。正文方案是教学分析，不等同于已核对项目源码；具体个人贡献应按真实经历说明。</p></div>
+<p class="verify"><strong>版本与验证范围：</strong>响应式以 Vue 3 为讲解基线，简历未指定 Vue 版本；SSE 以 HTML 标准为语境。界面状态练习在 Node 执行 JavaScript，不挂载真实 Vue 或连接服务。</p><figure class="card diagram" id="fig-fullstack-flow"><svg viewBox="0 0 1040 370" role="img" aria-labelledby="fullstack-flow-title fullstack-flow-desc"><title id="fullstack-flow-title">机制地图</title><desc id="fullstack-flow-desc">读取块、SSE 事件、Vue 更新和业务执行是四个不同边界。</desc><defs><marker id="arrow-fullstack-flow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="arrow-fullstack-flow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker></defs><g class="diagram-node"><rect x="35" y="55" width="280" height="80" rx="10" class="node "/><text x="175" y="87" text-anchor="middle" class="title">页面意图</text><text x="175" y="112" text-anchor="middle" class="sub">可信会话 / 操作身份</text></g><g class="diagram-node"><rect x="380" y="55" width="280" height="80" rx="10" class="node "/><text x="520" y="87" text-anchor="middle" class="title">请求与接收</text><text x="520" y="112" text-anchor="middle" class="sub">Fetch/EventSource / 字节流</text></g><g class="diagram-node"><rect x="725" y="55" width="280" height="80" rx="10" class="node "/><text x="865" y="87" text-anchor="middle" class="title">协议解析</text><text x="865" y="112" text-anchor="middle" class="sub">UTF-8 / 行 / 空行事件</text></g><g class="diagram-node"><rect x="725" y="235" width="280" height="80" rx="10" class="node g"/><text x="865" y="267" text-anchor="middle" class="title">运行状态投影</text><text x="865" y="292" text-anchor="middle" class="sub">runId / seq / 合法迁移</text></g><g class="diagram-node"><rect x="380" y="235" width="280" height="80" rx="10" class="node g"/><text x="520" y="267" text-anchor="middle" class="title">响应式与渲染</text><text x="520" y="292" text-anchor="middle" class="sub">依赖 / 调度 / 批处理</text></g><g class="diagram-node"><rect x="35" y="235" width="280" height="80" rx="10" class="node g"/><text x="175" y="267" text-anchor="middle" class="title">恢复与查证</text><text x="175" y="292" text-anchor="middle" class="sub">补发游标 / 最终结果查询</text></g><path class="edge " d="M315 95H380" marker-end="url(#arrow-fullstack-flow-blue)"/><path class="edge " d="M660 95H725" marker-end="url(#arrow-fullstack-flow-blue)"/><path class="edge " d="M865 135V235" marker-end="url(#arrow-fullstack-flow-blue)"/><path class="edge " d="M725 275H660" marker-end="url(#arrow-fullstack-flow-blue)"/><path class="edge " d="M380 275H315" marker-end="url(#arrow-fullstack-flow-blue)"/><text x="520" y="185" text-anchor="middle" class="sub">先识别状态、执行者与保证范围，再沿故障窗口追踪事实。</text></svg><figcaption>机制地图。读取块、SSE 事件、Vue 更新和业务执行是四个不同边界。</figcaption></figure></section>
+<section id="topic-1"><div class="head"><h2>2. Vue 响应式到底如何从一次赋值走到视图更新？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-1"><p class="memory-cue"><strong>记忆关键词：</strong>读取收集依赖 → 写入触发 → 调度 → 渲染 → DOM</p>
+<h3>先这样回答</h3><p>Vue 3 的响应式通过代理和 ref 等机制跟踪读取与变化，再调度依赖它们的计算与渲染。对象变了、响应式触发了和 DOM 已更新是不同阶段。</p><h4>拆开机制与保证范围</h4><p>渲染或 effect 读取响应式属性时形成依赖关系，写入触发相关订阅者。普通局部变量、把原始对象交给未受跟踪的路径，或解构一个基本类型属性，都可能让后续操作不再经过原代理；解构到的对象仍可能保留其内部响应性，应区分绑定与对象。</p><p>computed 缓存基于它跟踪的依赖，watch 用于观察变化和产生适当副作用。把远程请求放进计算属性并期望它等价一次受控动作，会混淆“派生值”与“执行协议”。调度批量更新 DOM，赋值后立即测量 DOM 可能读到旧视图，适当时用 nextTick。</p><p>流式 token 到达频率可能高于用户需要的渲染频率。可以先累计协议事件再按有界频率更新视图，避免逐 token 重排大段内容；批处理不能丢掉事件序号、终态和错误，UI 优化仍需保留完整业务语义。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>一个 SSE 回调把 reactive 对象的 status 解构到局部字符串，随后只改局部变量，页面不更新。修复需要保持响应式访问路径，而不是盲目调用强制刷新。</p></div>
+<p><strong>继续追问：</strong>“nextTick 等网络完成吗？”只等待相应 DOM 更新周期。“响应式对象线程安全？”浏览器调度与后端并发是不同问题，异步交错仍会覆盖状态。</p><p class="verify"><strong>如何验证：</strong>挂载真实 Vue 测试响应性、DOM 时机和高频流更新；用性能证据看重绘、内存和长任务，不把模型 reducer 自检当作框架测试。</p>
+<p class="sources"><a href="#ref-1">原始资料 01</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-2"><div class="head"><h2>3. TypeScript 类型为何挡不住坏 JSON？怎样建运行时边界？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-2"><p class="memory-cue"><strong>记忆关键词：</strong>类型擦除 · unknown → 校验 → 判别联合 → 穷尽分支</p>
+<h3>先这样回答</h3><p>TypeScript 主要在编译时检查类型，网络 JSON 到达运行时仍是外部数据。as 或接口声明不能验证字段，应先校验结构与业务语义，再转换为可处理类型。</p><h4>拆开机制与保证范围</h4><p>const event = JSON.parse(raw) as Event 只是告诉编译器相信类型，实际可以缺 id、把 seq 写成字符串或给未知 status。边界应检查类型、必要字段、大小、枚举与范围，拒绝不合契约的输入，避免它污染内部状态。</p><p>判别联合如 kind=progress/result/error 可以把不同事件的必要字段关联，分支中依据 kind 缩小类型；穷尽检查提醒新增协议事件未被处理。它帮助内部代码表达不变量，但仍需服务端与客户端同时维护版本契约。</p><p>整数序号要考虑 JavaScript 的安全整数范围，超长 ID 应使用字符串等适当协议类型。未知字段是否允许、未知事件是忽略还是触发升级，也应显式设计。格式合法并不说明资源属于当前用户，权限还在服务端判断。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>服务器改了新状态 CANCELLED，旧客户端把任何非 RUNNING 状态都视作成功。使用判别枚举和明确兼容处理，避免协议升级伪造完成。</p></div>
+<p><strong>继续追问：</strong>“用了类型库就不用验证？”静态声明不是输入验证。“所有未知字段都拒绝？”要根据前后兼容契约选择，不能随意扩大信任。</p><p class="verify"><strong>如何验证：</strong>用缺字段、超大序号、未知状态和同名异类型输入测试；下方 reducer 先做运行时检查，再允许更新内部状态。</p>
+<p class="sources"><a href="#ref-4">原始资料 04</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-3"><div class="head"><h2>4. SSE 为什么既不是“每个 chunk 一个 JSON”，也不是可靠事件存储？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-3"><p class="memory-cue"><strong>记忆关键词：</strong>UTF-8 增量解码 → 行 → 空行事件 → id → 保留协议</p>
+<h3>先这样回答</h3><p>SSE 定义事件流格式，网络读取块可以在任意字节位置拆分。解析必须跨块保留状态；自动重连只恢复连接，不自动提供业务事件存储与可靠补发。</p><h4>拆开机制与保证范围</h4><p>多字节字符可能被拆到两个 chunk，增量 TextDecoder 需要保留未完成字节；随后按 SSE 行、字段和空行事件边界解析。多个 data 行按协议组合，注释可用作心跳，不能把任意网络块直接 JSON.parse 后推断为一个完整事件。</p><p>事件 id 和重连时的 Last-Event-ID 帮助表达恢复游标，但服务端要有保留、补发、鉴权和过期处理。无事件可补时应明确转为快照/最终结果查询，而不是返回空流让用户误以为已经追上全部。</p><p>原生 EventSource 与 Fetch 流的 API、请求头、方法与错误处理能力不同，选型要由认证和协议需求决定。代理缓冲、压缩、连接限制和超时会改变实时性；心跳证明某段连接活着，不证明业务任务仍在推进。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>中文字段的一个 UTF-8 字符被拆开，两个事件又合在同一读取块。正确解析仍得到同样事件；按 chunk 切 JSON 会同时出现破字和合包错误。</p></div>
+<p><strong>继续追问：</strong>“收到 done 就能删除任务记录？”先明确 done 表示流结束还是业务终态。“重连会重执行吗？”订阅恢复应复用原 run，不重新创建动作。</p><p class="verify"><strong>如何验证：</strong>使用基础能力专栏中的任意字节分块练习建立底层认识，再按 SSE 标准测试多行 data、注释、CR/LF、空事件、断线和保留过期。</p>
+<p class="sources"><a href="#ref-5">原始资料 05</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-4"><div class="head"><h2>5. 断线、重复、乱序和刷新之后，页面如何仍与权威状态一致？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-4"><p class="memory-cue"><strong>记忆关键词：</strong>任务身份 · 已应用游标 · 缺口检测 · 终态保护 · 快照</p>
+<h3>先这样回答</h3><p>页面只是权威业务状态的一个投影。按 run 身份与事件序号应用更新，检测缺口、拒绝旧事件，并在无法补发时查询权威快照。</p><h4>拆开机制与保证范围</h4><p>requestId/messageId 标识动作，runId 标识执行过程，eventId/seq 标识反馈；职责要按协议定义。连接 ID 变化不应改变这些业务身份。收到旧 run 的回调时先拒绝，避免用户切换场景后被旧结果覆盖。</p><p>只有已经完整解析并应用的事件才能推进游标。重复事件可以忽略，缺号则请求补发或切换快照；若是差量协议，直接跳过缺口继续应用会使数据永久缺失。快照的版本和恢复后增量衔接也需建立清晰边界。</p><p>终态一般不能被普通进度回退。进度条走到 100% 也不能自行判断执行成功；最终结果要来自约定事件或查询接口。服务端保留过期、用户刷新和换实例时，恢复逻辑应提供可解释状态，不无限重连同一个无法恢复的流。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>已经应用 seq=7，随后收到 9 而没有 8。先标记需恢复，不应用 9 的差量；恢复获得版本快照后再从对应游标接续。</p></div>
+<p><strong>继续追问：</strong>“只按最后收到的事件更新？”网络时间不等于业务版本。“去重就不需要快照？”去重解决重复，不解决遗漏。</p><p class="verify"><strong>如何验证：</strong>下方 reducer 验证身份、缺口和终态保护；真实端到端测试还需覆盖刷新、换实例、快照与流的竞争、过期保留。</p>
+<p class="sources"><a href="#ref-5">原始资料 05</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-5"><div class="head"><h2>6. 请求取消、组件卸载与异步竞态如何处理？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-5"><p class="memory-cue"><strong>记忆关键词：</strong>生命周期 · AbortSignal · 代次校验 · 清理 · 副作用查证</p>
+<h3>先这样回答</h3><p>取消本地等待可以释放资源，但不证明服务器没执行。界面还需检查响应属于当前请求/会话代次，并清理连接、监听与缓冲。</p><h4>拆开机制与保证范围</h4><p>用户先查 A 再查 B，A 的慢响应可能在 B 后返回。单纯把任意成功响应写到同一对象会倒退界面；捕获请求代次并在更新前比较，或由任务身份管理不同结果。取消旧请求有帮助，代次校验仍是状态保护。</p><p>组件卸载需要断开流、移除监听和取消可取消任务。响应式 watcher 内发请求也应明确清理策略，具体 API 随 Vue 版本核对。没有清理的闭包可以继续持有正文与缓冲，长期对话会积累内存和后台工作。</p><p>AbortController/Signal 向支持的异步操作传递取消，本地 promise 拒绝不等于撤销远端数据库或设备副作用。查询类请求可以丢弃旧响应；执行类请求应保留动作身份和结果查证，不能因为页面离开就创建一个“从未执行”的假状态。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>用户切换到 B 场景后，A 场景 SSE 仍写入当前列表。用会话/run 代次拒绝旧更新，并在卸载时清理订阅；若 A 有执行任务，结果仍可稍后查询。</p></div>
+<p><strong>继续追问：</strong>“abort 成功就不用查结果？”执行请求可能已受理。“只加防抖？”减少触发次数，不保证响应顺序与生命周期。</p><p class="verify"><strong>如何验证：</strong>人为让早请求晚返回，卸载时持续发送事件，检查不会更新错误场景或持有增长；另测执行成功后本地取消的结果查证。</p>
+<p class="sources"><a href="#ref-7">原始资料 07</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-6"><div class="head"><h2>7. 前后端的权限按钮、会话和幂等键怎样形成完整契约？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-6"><p class="memory-cue"><strong>记忆关键词：</strong>展示资格 · 服务鉴权 · 确认快照 · 稳定身份 · 状态查询</p>
+<h3>先这样回答</h3><p>按钮状态是用户提示，真实鉴权、前置条件和幂等受理由服务端执行。界面要表达受理、执行、成功、失败与未知，而不是只用 HTTP 是否报错判断结果。</p><h4>拆开机制与保证范围</h4><p>页面可以根据权限隐藏按钮，但直接 HTTP 请求仍可能到达服务端；服务端用可信会话验证主体与资源。客户端自报 userId、缓存的权限或上一次工具结果，都不能替代当前授权检查。</p><p>重复点击或网络重试应保留同一动作身份和请求摘要，明确何时是同一动作、何时新建动作。用户修改参数后不应沿用旧确认和旧键；服务端也要拒绝同键异参。查询、重新订阅和再次执行应是不同接口语义。</p><p>前端缓存、浏览器缓存和 Service Worker 等各有数据生命周期。权限切换后旧数据不能继续跨用户复用，状态查询结果应保留权威版本与数据时间。SSE 反馈可以加快展示，但不是唯一可恢复的事实来源。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>HTTP 请求超时后 UI 给“重试”按钮，若点击创建新 messageId 就可能产生第二次副作用。更好的交互先查原动作，确定可重试范围后复用原身份。</p></div>
+<p><strong>继续追问：</strong>“HTTP 200 就执行成功？”可能只是受理。“按钮禁用可防幂等问题？”无法阻止网络重试、多个页面与客户端重放。</p><p class="verify"><strong>如何验证：</strong>覆盖手工绕过 UI、重复提交、权限切换、同键异参和回包丢失；核对界面状态与服务端权威结果始终对应。</p>
+<p class="sources"><a href="#ref-8">原始资料 08</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="practice"><div class="head"><h2>8. 练习：从能讲到能反驳自己的假设</h2><p>先说预期，再运行；如果结果相反，回到机制与边界。</p></div><figure class="card diagram" id="fig-fullstack-sequence"><svg viewBox="0 0 1040 494" role="img" aria-labelledby="fullstack-sequence-title fullstack-sequence-desc"><title id="fullstack-sequence-title">故障窗口与恢复时序</title><desc id="fullstack-sequence-desc">重连恢复订阅，不创建新执行；Last-Event-ID 是否能补发取决于服务器保留与鉴权协议。</desc><defs><marker id="arrow-fullstack-sequence-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="arrow-fullstack-sequence-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker></defs><text x="135" y="45" text-anchor="middle" class="title">浏览器</text><path d="M135 70V459" class="life"/><text x="390" y="45" text-anchor="middle" class="title">事件服务</text><path d="M390 70V459" class="life"/><text x="645" y="45" text-anchor="middle" class="title">执行任务</text><path d="M645 70V459" class="life"/><text x="900" y="45" text-anchor="middle" class="title">状态存储</text><path d="M900 70V459" class="life"/><path class="edge " d="M135 110H390" marker-end="url(#arrow-fullstack-sequence-blue)"/><text x="262.5" y="99" text-anchor="middle" class="sub">订阅已有 run 的事件</text><path class="edge " d="M645 164H900" marker-end="url(#arrow-fullstack-sequence-blue)"/><text x="772.5" y="153" text-anchor="middle" class="sub">保存结果与事件身份</text><path class="edge a" d="M900 218H390" marker-end="url(#arrow-fullstack-sequence-amber)"/><text x="645.0" y="207" text-anchor="middle" class="sub">提供可重放事件</text><path class="edge a" d="M390 272H135" marker-end="url(#arrow-fullstack-sequence-amber)"/><text x="262.5" y="261" text-anchor="middle" class="sub">发送 seq=7 后连接断开</text><path class="edge " d="M135 326H390" marker-end="url(#arrow-fullstack-sequence-blue)"/><text x="262.5" y="315" text-anchor="middle" class="sub">带已应用游标重新连接</text><path class="edge a" d="M390 380H135" marker-end="url(#arrow-fullstack-sequence-amber)"/><text x="262.5" y="369" text-anchor="middle" class="sub">补发或要求查询快照</text></svg><figcaption>故障窗口与恢复时序。重连恢复订阅，不创建新执行；Last-Event-ID 是否能补发取决于服务器保留与鉴权协议。</figcaption></figure>
+<div class="card pad practice"><h3>界面状态练习：坏输入、缺号、旧 run 与终态回退</h3><p>复制到 Node.js 运行，无依赖。它验证 reducer 的运行时输入和状态规则，不解析完整 SSE，也不验证 Vue 渲染、鉴权或服务端补发。</p><p class="verify">保存为 practice.cjs，用 node practice.cjs 运行。</p>
+<pre><code class="language-javascript">const assert = require(&quot;node:assert/strict&quot;);
+const states = new Set([&quot;RUNNING&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;]);
+
+function apply(state, raw) {
+  if (!raw || typeof raw.run !== &quot;string&quot; ||
+      !Number.isSafeInteger(raw.seq) || raw.seq &lt; 1 ||
+      !states.has(raw.status)) throw new Error(&quot;invalid event&quot;);
+  if (raw.run !== state.run || raw.seq &lt;= state.seq) return state;
+  if (state.needsSnapshot || raw.seq !== state.seq + 1)
+    return {...state, needsSnapshot: true};
+  if (state.status !== &quot;RUNNING&quot;) return state;
+  return {...state, seq: raw.seq, status: raw.status};
+}
+
+const start = {run: &quot;run-a&quot;, seq: 0, status: &quot;RUNNING&quot;, needsSnapshot: false};
+assert.throws(() =&gt; apply(start, {run:&quot;run-a&quot;, seq:&quot;1&quot;, status:&quot;RUNNING&quot;}));
+assert.throws(() =&gt; apply(start, {run:&quot;run-a&quot;, seq:1, status:&quot;UNKNOWN_NEW&quot;}));
+assert.equal(apply(start, {run:&quot;run-b&quot;, seq:1, status:&quot;SUCCEEDED&quot;}), start);
+let state = apply(start, {run:&quot;run-a&quot;, seq:1, status:&quot;RUNNING&quot;});
+assert.equal(apply(state, {run:&quot;run-a&quot;, seq:1, status:&quot;RUNNING&quot;}), state);
+const gap = apply(state, {run:&quot;run-a&quot;, seq:3, status:&quot;SUCCEEDED&quot;});
+assert.equal(gap.seq, 1);
+assert.equal(gap.needsSnapshot, true);
+assert.equal(apply(gap, {run:&quot;run-a&quot;, seq:2, status:&quot;RUNNING&quot;}).needsSnapshot, true);
+state = apply(state, {run:&quot;run-a&quot;, seq:2, status:&quot;SUCCEEDED&quot;});
+assert.equal(state.status, &quot;SUCCEEDED&quot;);
+assert.equal(apply(state, {run:&quot;run-a&quot;, seq:3, status:&quot;RUNNING&quot;}), state);
+console.log(&quot;schema, run identity, duplicates, gaps and terminal state passed&quot;);
+</code></pre></div>
+<div class="card pad" style="margin-top:18px"><h3>遮住正文，回答四个问题</h3><ul class="clean"><li>状态更新是否仍经过 Vue 的响应式路径？</li><li>JSON 是否经过运行时校验？</li><li>游标代表收到、解析完还是已经应用？</li><li>断线与取消后是否仍可查同一业务动作？</li></ul></div></section>
+<section id="sources"><div class="head"><h2>9. 原始资料与关联阅读</h2><p>先定位资料定义的范围，再把它应用到自己的项目。</p></div>
+<div class="card pad"><ol class="source-list"><li id="ref-1"><a href="https://vuejs.org/guide/extras/reactivity-in-depth.html">Vue 3：响应式深入</a></li><li id="ref-2"><a href="https://vuejs.org/api/general.html#nexttick">Vue：nextTick 与 DOM 更新时机</a></li><li id="ref-3"><a href="https://www.typescriptlang.org/docs/handbook/2/basic-types.html">TypeScript：基础类型与类型擦除</a></li><li id="ref-4"><a href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html">TypeScript：缩小类型与判别联合</a></li><li id="ref-5"><a href="https://html.spec.whatwg.org/multipage/server-sent-events.html">HTML 标准：Server-sent events</a></li><li id="ref-6"><a href="https://fetch.spec.whatwg.org/">Fetch 标准</a></li><li id="ref-7"><a href="https://dom.spec.whatwg.org/#interface-abortcontroller">DOM 标准：AbortController</a></li><li id="ref-8"><a href="https://www.rfc-editor.org/rfc/rfc9110.html">HTTP：语义、缓存与身份</a></li></ol><p class="verify">规范、实现与文档版本可能不同。引用用于核对机制，例子中的流程和数字为教学推演；真实环境实验与项目源码核对另行进行。</p></div>
+<div class="grid3 column-links" style="margin-top:18px"><div class="mini"><a href="resume-tech-columns.html">技术类别总入口</a><p>沿项目线索切换到其他专栏。</p></div><div class="mini"><a href="java-agent-ai-interview-illustrated.html">Java / AI 图解手册</a><p>把原理转换为面试回答与连续追问。</p></div><div class="mini"><a href="uav-backend-review-handbook.html">六周项目复习手册</a><p>回到项目链路核对实际职责与事实。</p></div></div></section></main>
+<footer><div class="shell">简历技术原理 · Vue、TypeScript 与流式通信 · 核对日期 2026-10-13 · 原始资料与验证范围见正文</div></footer>
+<nav class="dock" aria-label="页面快捷导航"><a href="../index.html">首页</a><a href="#">↑ 顶部</a></nav>
+<script>(()=>{const root=document.documentElement,key="html-docs-theme";let saved;try{saved=localStorage.getItem(key)}catch{}if(saved)root.dataset.theme=saved==="dark"?"dark":"paper";document.getElementById("theme").addEventListener("click",()=>{const next=root.dataset.theme==="dark"?"paper":"dark";root.dataset.theme=next;try{localStorage.setItem(key,next)}catch{}})})();</script></body></html>

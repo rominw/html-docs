@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="description" content="按简历技术栈组织的Redis 与分布式一致性原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。"><meta name="date" content="2026-10-13"><title>简历技术原理 · Redis 与分布式一致性</title><style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .decision{fill:var(--amber2);stroke:var(--amber);stroke-width:1.6}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    .active{fill:var(--blue2);stroke:var(--blue);stroke-width:1.2}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    .dock{position:fixed;right:18px;bottom:18px;z-index:99;display:flex;gap:4px;padding:6px;border-radius:999px;background:rgba(15,23,42,.82);backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(15,23,42,.28)}
+    .dock a{padding:7px 13px;border-radius:999px;color:#fff;text-decoration:none;font:600 13px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+    .dock a:hover{background:rgba(255,255,255,.16)}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+
+    :focus-visible{outline:3px solid var(--blue);outline-offset:4px}
+    html{scroll-padding-top:76px} .diagram{margin:18px 0}.dock{top:auto}
+    .diagram figcaption{margin-top:14px;color:var(--muted);font-size:13px;line-height:1.7}
+    .q{margin-top:16px;scroll-margin-top:78px}.q h3{margin:0 0 14px;font-size:22px;line-height:1.5}
+    .q h4{margin:18px 0 7px;font-size:16px}.q p{margin:10px 0}.q .pill{vertical-align:middle;margin-right:8px}
+    .q .memory-cue{margin:0 0 16px;padding:10px 13px;border-left:3px solid var(--green);border-radius:8px;background:var(--green2);font-size:14px}
+    .memory-cue strong{color:var(--green)}.verify{color:var(--muted);font-size:14px}
+    .sources{margin-top:18px;color:var(--muted);font-size:13px}.sources a{display:inline-block;margin:0 16px 6px 0}
+    .jump-list{display:flex;flex-wrap:wrap;gap:6px 18px;padding:0;list-style:none;font-size:14px;margin:16px 0}
+    p,li,a{overflow-wrap:anywhere}.practice{margin-top:20px}.practice h3{margin-top:0}
+    pre{overflow:auto;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);font:14px/1.75 Consolas,monospace}
+    pre code{padding:0;border:0;border-radius:0;color:var(--ink);background:transparent;font:inherit}
+    .read-map .mini a{display:block;font-weight:700;margin-bottom:6px}
+    @media(max-width:820px){.pad{padding:18px}.q h3{font-size:19px}.diagram{padding:12px}.lead{font-size:17px}}
+
+@page{margin:14mm}@media print{:root,[data-theme=dark]{
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }body{background:var(--panel)}header{padding:0 0 24px}.stats{grid-template-columns:repeat(4,1fr);gap:8px}.stat{padding:12px}.dock{display:none}.diagram svg{min-width:0}.diagram{overflow:visible;padding:10px;break-inside:avoid}.table table{min-width:0}.q h3{break-after:avoid}.head{break-after:avoid}pre{white-space:pre-wrap;overflow:visible}a{color:var(--ink)}}
+
+.column-links a{font-weight:700}.column-links .mini{height:100%}.source-list li{margin:10px 0}.source-list a{overflow-wrap:anywhere}.q p{max-width:100%}
+</style></head>
+<body><header><div class="shell"><div class="kicker">RESUME STACK / PRINCIPLES / FAILURE ANALYSIS</div><h1>Redis 与分布式一致性</h1><p class="lead">把原子命令、租约和真实业务结果放回各自边界</p><div class="doc-meta"><time datetime="2026-10-13">2026年10月13日</time><span>按简历技术类别选题</span><span>原理 · 边界 · 故障推演</span></div><div class="actions"><a class="btn" href="#map">开始阅读</a><button class="btn" id="theme" type="button">切换主题</button><button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button></div><div class="stats"><div class="stat"><b>6</b><span>深挖主题</span></div><div class="stat"><b>2</b><span>机制与故障图</span></div><div class="stat"><b>1</b><span>可运行练习</span></div><div class="stat"><b>8</b><span>原始资料入口</span></div></div></div></header>
+<nav aria-label="章节导航"><div class="shell"><a href="#map">阅读地图</a><a href="#topic-1">01 · Redis 的“单线程、原子”为什么不能直接推出业务正确？</a><a href="#topic-2">02 · messageId、回调幂等与终态保护怎样组成一个状态机？</a><a href="#topic-3">03 · Redisson 锁和 watchdog 能否消除“两个持有者都执行”？</a><a href="#topic-4">04 · 缓存失效为什么仍会出现旧值回填？</a><a href="#topic-5">05 · Redis 已返回成功，为什么切换后还可能丢状态？</a><a href="#topic-6">06 · 热键、Lua 多键和内存淘汰如何改变设计？</a><a href="#practice">练习与故障自测</a><a href="#sources">原始资料与关联阅读</a></div></nav><main class="shell"><section id="map"><div class="head"><h2>1. 从项目线索建立原理地图</h2><p>Redis · Lua · Redisson · 幂等 · 终态保护 · 缓存</p></div>
+<p><a href="resume-tech-columns.html">← 技术原理专栏总入口</a> · <a href="foundations-os-network-column.html">操作系统与网络基础</a></p>
+<div class="grid2"><div class="mini"><h3>简历关联</h3><p>简历提到 Redisson 调度锁、Redis + Lua 原子状态流转、messageId、终态保护与回调幂等。本篇直接沿这条 Action 生命周期下钻。</p></div><div class="mini"><h3>本篇要练成什么</h3><p>能在进程暂停、锁过期、重复回调、主从切换和缓存回填交错中判断哪些不变量仍成立。</p></div></div>
+<div class="callout" style="margin-top:16px"><p><strong>阅读方式：</strong>先用记忆关键词复述机制，再推演例子的失败窗口，最后指出验证对象。正文方案是教学分析，不等同于已核对项目源码；具体个人贡献应按真实经历说明。</p></div>
+<p class="verify"><strong>版本与验证范围：</strong>Redis 原子性讨论限定在相应实例和操作范围；Cluster 多键要求、持久化和故障切换另行讨论。模型练习不执行 Redis 或 Lua。</p><figure class="card diagram" id="fig-redis-flow"><svg viewBox="0 0 1040 370" role="img" aria-labelledby="redis-flow-title redis-flow-desc"><title id="redis-flow-title">机制地图</title><desc id="redis-flow-desc">Redis 原子转移不覆盖外部副作用；TTL 到期也不是设备失败的证明。</desc><defs><marker id="arrow-redis-flow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="arrow-redis-flow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker></defs><g class="diagram-node"><rect x="35" y="55" width="280" height="80" rx="10" class="node "/><text x="175" y="87" text-anchor="middle" class="title">动作受理</text><text x="175" y="112" text-anchor="middle" class="sub">tenant / messageId / 摘要</text></g><g class="diagram-node"><rect x="380" y="55" width="280" height="80" rx="10" class="node "/><text x="520" y="87" text-anchor="middle" class="title">状态资格</text><text x="520" y="112" text-anchor="middle" class="sub">前置状态 / attempt / version</text></g><g class="diagram-node"><rect x="725" y="55" width="280" height="80" rx="10" class="node "/><text x="865" y="87" text-anchor="middle" class="title">Lua 原子转移</text><text x="865" y="112" text-anchor="middle" class="sub">先校验再修改 / 有界执行</text></g><g class="diagram-node"><rect x="725" y="235" width="280" height="80" rx="10" class="node g"/><text x="865" y="267" text-anchor="middle" class="title">外部副作用</text><text x="865" y="292" text-anchor="middle" class="sub">设备或数据库独立边界</text></g><g class="diagram-node"><rect x="380" y="235" width="280" height="80" rx="10" class="node g"/><text x="520" y="267" text-anchor="middle" class="title">回调与查证</text><text x="520" y="292" text-anchor="middle" class="sub">重复 / 迟到 / 结果未知</text></g><g class="diagram-node"><rect x="35" y="235" width="280" height="80" rx="10" class="node g"/><text x="175" y="267" text-anchor="middle" class="title">终态与保留</text><text x="175" y="292" text-anchor="middle" class="sub">保护结果 / 去重期限</text></g><path class="edge " d="M315 95H380" marker-end="url(#arrow-redis-flow-blue)"/><path class="edge " d="M660 95H725" marker-end="url(#arrow-redis-flow-blue)"/><path class="edge " d="M865 135V235" marker-end="url(#arrow-redis-flow-blue)"/><path class="edge " d="M725 275H660" marker-end="url(#arrow-redis-flow-blue)"/><path class="edge " d="M380 275H315" marker-end="url(#arrow-redis-flow-blue)"/><text x="520" y="185" text-anchor="middle" class="sub">先识别状态、执行者与保证范围，再沿故障窗口追踪事实。</text></svg><figcaption>机制地图。Redis 原子转移不覆盖外部副作用；TTL 到期也不是设备失败的证明。</figcaption></figure></section>
+<section id="topic-1"><div class="head"><h2>2. Redis 的“单线程、原子”为什么不能直接推出业务正确？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-1"><p class="memory-cue"><strong>记忆关键词：</strong>命令串行 · 单次边界 · 组合竞态 · 脚本预算</p>
+<h3>先这样回答</h3><p>常见核心命令执行路径的串行性避免命令互相穿插，但一次 GET 与后续 SET 之间仍可插入别的请求。原子操作保护特定 Redis 状态，不覆盖多系统事务。</p><h4>拆开机制与保证范围</h4><p>A GET 到空闲，B 也 GET 到空闲，随后两人 SET 占用，最后只留下一个值却可能已经发了两次设备指令。问题不在单条 SET 是否原子，而在“读条件、判断、写状态”没有被放入同一个受保护边界。</p><p>Lua 把适当的读写条件放到服务端执行，减少网络往返并防止其他命令插入。但长循环、大量扫描或复杂计算会占用该执行路径，拖慢其他请求。Redis 的网络 I/O、后台持久化等可以有其他线程或进程，不能把整个系统一概称为只有一个线程。</p><p>脚本原子执行不等于 SQL 式失败回滚。若脚本先成功写一个键，后续命令因类型或参数出错，不能依赖自动撤销前面的写入。应在写入前完成可做的参数、状态和类型检查，并使执行长度有界。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>一个状态转移先写 DONE 再给错误类型的字段累加，后半段抛错。应用收到错误却不能直接认定状态没有改变，应查询并审视脚本的写前校验。</p></div>
+<p><strong>继续追问：</strong>“MULTI 就能读值后分支？”排队执行与交互式读判定不同。“Lua 报错就可无脑重试？”需先判断实际修改与稳定动作身份。</p><p class="verify"><strong>如何验证：</strong>在隔离 Redis 中注入参数和类型错误，检查错误前后的键；量测脚本耗时和延迟影响。纯状态模型只验证业务规则，不能验证服务器回滚语义。</p>
+<p class="sources"><a href="#ref-1">原始资料 01</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-2"><div class="head"><h2>3. messageId、回调幂等与终态保护怎样组成一个状态机？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-2"><p class="memory-cue"><strong>记忆关键词：</strong>身份绑定 → 合法迁移 → attempt → 终态单调 → 查证</p>
+<h3>先这样回答</h3><p>同一业务动作必须有稳定身份并绑定租户与请求内容，状态转移只接受合法前置条件。重复和迟到回调不能覆盖终态，也不能把其他尝试的结果写进当前动作。</p><h4>拆开机制与保证范围</h4><p>先定义生命周期：PENDING → RUNNING → SUCCEEDED/FAILED；UNKNOWN 可表达未获知外部结果，而不是假装失败。哪些终态可修正、通过谁修正，都要显式规定。若系统允许对账修正，应使用独立受审计路径，不能放开普通回调随意覆盖。</p><p>messageId 解决关联，eventId 解决某次回调去重，attempt 或执行代次解决重试轮次。它们可以不同；只检查 messageId 可能让上一轮晚到的 FAILED 覆盖这一轮 RUNNING。请求摘要还用于拒绝同键异参，避免拿旧成功结果响应新的执行意图。</p><p>Lua 中检查当前状态、版本和代次后再写新状态，必要时同时记结果与事件序号。重复事件返回已存在结果；非法迁移返回可解释原因。去重记录到期后，旧消息可能再次进入，因此保留期要覆盖重投和业务查证需求，不能随意套短缓存 TTL。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>成功回调先到，失败回调迟到。如果迁移只按“最后一条消息”覆盖，状态会退回失败；终态保护和代次校验使这类交错可解释。</p></div>
+<p><strong>继续追问：</strong>“两个相反终态都来了怎么办？”终态保护只能保证不随意改写，还需查证权威执行事实。“收到重复就丢弃？”可返回既有结果并留下必要审计。</p><p class="verify"><strong>如何验证：</strong>枚举事件顺序、重复事件、旧 attempt、同键异参和缺失记录；核对合法迁移与真实结果。下方模型验证终态和身份规则，不证明设备只执行一次。</p>
+<p class="sources"><a href="#ref-2">原始资料 02</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-3"><div class="head"><h2>4. Redisson 锁和 watchdog 能否消除“两个持有者都执行”？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-3"><p class="memory-cue"><strong>记忆关键词：</strong>租约 · 续期 · 暂停 · 所有权 · 资源端资格</p>
+<h3>先这样回答</h3><p>租约限制锁在 Redis 的有效时间，watchdog 在符合条件的路径上续期。网络中断、长暂停和切换仍可能让旧执行者恢复后继续行动，所以资源端必须有最终资格检查。</p><h4>拆开机制与保证范围</h4><p>显式 leaseTime 和 watchdog 使用路径要按 Redisson 版本及调用方式区分；不要把固定租期和无限续约混为一谈。释放锁也应确认所有者，避免 A 超时后删掉 B 新取得的锁。所有权正确只解决释放对象，不解决 A 已在外部执行的问题。</p><p>A 暂停超过租期，B 获锁并提交，然后 A 恢复。A 本地以为持锁，其下游写入是否被拒绝取决于下游契约。数据库条件更新可以保护当前版本/状态；fencing token 是另一类单调资格，必须由真正受保护的资源检查旧令牌，而不只是日志里记录。</p><p>若设备只提供无身份的“执行起飞”接口，Redis 锁不能单独创造精确一次副作用。需要设备或权威服务支持动作身份、条件资格和结果查询；不具备时，应明确可达到的保证和 UNKNOWN 查证流程。分布式锁是控制竞争的一层。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>A 用旧版本占用机库被数据库拒绝，此时不能继续下发。如果先发指令后查资格，数据库保护已经来不及阻止真实副作用。</p></div>
+<p><strong>继续追问：</strong>“租期设很长？”减小误过期概率，却延长故障占用。“每次操作前检查锁？”检查与外部写之间仍有窗口，关键是资源端原子资格。</p><p class="verify"><strong>如何验证：</strong>暂停持锁进程、阻断续约与模拟切换，观察旧执行者是否被权威资源拒绝；只测解锁没有异常，不能验收双持有风险。</p>
+<p class="sources"><a href="#ref-4">原始资料 04</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-4"><div class="head"><h2>5. 缓存失效为什么仍会出现旧值回填？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-4"><p class="memory-cue"><strong>记忆关键词：</strong>读旧快照 → 写新版本 → 删除缓存 → 迟到回填</p>
+<h3>先这样回答</h3><p>Cache-aside 减少读取成本，但删除缓存不是同步屏障。一个早已读到旧值的请求可以在删除之后把旧数据写回，TTL 只是限制某些旧值保留时间。</p><h4>拆开机制与保证范围</h4><p>典型交错：A 读缓存未命中并查到 v1；B 提交 v2 并删除缓存；A 随后回填 v1。整个流程每条命令都成功，缓存仍过时。延迟双删可以缓解某些时间窗口，但延迟不构成对所有暂停和重试的严格证明。</p><p>先确定允许的旧数据窗口与权威读取路径，再选择版本化回填、失效事件、短 TTL 或直接查询。若用“只接受较新版本”的门槛，必须考虑删除后门槛是否也丢失；空缓存不应意味着任意旧请求重新取得写入资格。</p><p>缓存键还应包含租户和影响结果的权限/参数维度。负缓存与 TTL 抖动可分散回源，但权限变更、删除标记和真实结果查询不能被简单的“命中即正确”覆盖。资源抢占不能以缓存值作为最终判断。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>大屏允许几十秒滞后，可以在响应中注明数据时刻并采用受控刷新；机库是否可分配则必须回到权威条件更新。不同数据不应共享同一种新鲜度要求。</p></div>
+<p><strong>继续追问：</strong>“先删后写数据库更好？”也会出现交错窗口。“所有缓存加锁？”锁范围、过期和下游等待仍需处理，先定需要的保证。</p><p class="verify"><strong>如何验证：</strong>人为固定 A 的旧读取，等 B 提交并失效后再释放 A 回填；验证旧值可见窗口与拒绝旧版本的规则，并覆盖权限切换。</p>
+<p class="sources"><a href="#ref-5">原始资料 05</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-5"><div class="head"><h2>6. Redis 已返回成功，为什么切换后还可能丢状态？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-5"><p class="memory-cue"><strong>记忆关键词：</strong>执行确认 · AOF/RDB · 复制进度 · 切换 · 未知结果</p>
+<h3>先这样回答</h3><p>命令受理、持久化和副本确认不是同一时点。RDB、AOF 与复制配置改变恢复窗口；客户端成功响应不能单独证明所有故障后的状态都保留。</p><h4>拆开机制与保证范围</h4><p>RDB 按快照恢复，AOF 按追加日志及 fsync 策略恢复；写入追加缓冲、写文件与完成持久同步有不同边界。策略需要按实际版本、存储和配置核对，不能把 everysec 当成在任何故障下最多只丢固定一秒的硬保证。</p><p>常见 Redis 复制是异步的。主节点写入后副本尚未追上就切换，新主可能缺少近期写入。WAIT 等机制可等待某种副本确认，但其确认范围不能被扩大成跨全部故障的强一致事务。锁、幂等记录和缓存的数据价值不同，恢复策略也应不同。</p><p>如果 Action 已执行但 Redis 幂等记录丢了，重试可能再次执行。需要把关键业务结果放在足够可靠的权威存储或外部执行协议里，Redis 可以作为状态缓存与协调层。TTL 到期时，应转为查询/对账或明确过期结果，而不是生成新动作伪装“从未发生”。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>设备执行成功后服务写了 SUCCEEDED，客户端回包丢失，随后 Redis 故障切换丢记录。客户端再次使用同一身份时，应查权威执行结果，不能因 Redis 没键就再次起飞。</p></div>
+<p><strong>继续追问：</strong>“开 AOF 就不用对账？”存储持久化不覆盖外部调用窗口。“不存在等于没受理？”也可能是过期、淘汰或恢复缺失。</p><p class="verify"><strong>如何验证：</strong>在隔离环境核对 fsync、复制进度、故障后键与权威业务事实；分别模拟成功响应丢失和状态记录缺失，验证 UNKNOWN 恢复。</p>
+<p class="sources"><a href="#ref-6">原始资料 06</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-6"><div class="head"><h2>7. 热键、Lua 多键和内存淘汰如何改变设计？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-6"><p class="memory-cue"><strong>记忆关键词：</strong>hash slot · 单点热点 · 有界集合 · 数据价值 · 观测</p>
+<h3>先这样回答</h3><p>分片扩大总体容量，但同一热键仍落在特定分片。Lua 多键操作需满足相应 Cluster 约束，内存淘汰也可能删除业务以为永久存在的去重状态。</p><h4>拆开机制与保证范围</h4><p>Redis Cluster 将键分到 hash slot，合适的 hash tag 可让需要原子操作的多个键同槽。把全部租户或任务都放进一个 tag，虽然简化多键脚本，却可能制造单分片热点；键的原子范围与分布负载需要一起设计。</p><p>回调集合、流式缓冲和结果历史应有数量、大小和生命周期上限。长脚本、大值读写与高基数集合会增加执行和网络成本；热门聚合查询可以缓存、分批或合并刷新，但合并后要保留每个请求的授权范围。</p><p>maxmemory 与淘汰策略是契约的一部分。普通缓存允许丢失，幂等/终态记录若被淘汰却当作不存在，会损坏执行保证；最好分清权威事实与可丢缓存。监控命令延迟、脚本耗时、热点分布、eviction 和回源压力，而不只看 Redis 总 QPS。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>一个全局 Action 大 Hash 持续增长，所有回调争同一热点，清理又扫描大量字段。按必要业务原子范围拆分，并给结果保留和旧事件查证留明确路径。</p></div>
+<p><strong>继续追问：</strong>“加节点能均分热键？”单键不会自动拆开。“给每个键相同短 TTL？”可能同时回源，也可能让迟到重投失去去重证据。</p><p class="verify"><strong>如何验证：</strong>核对脚本涉及的所有键是否同槽，压测实际热点与大小分布；触发淘汰和迟到回调，验证关键状态不会因缓存缺失而重执行。</p>
+<p class="sources"><a href="#ref-7">原始资料 07</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="practice"><div class="head"><h2>8. 练习：从能讲到能反驳自己的假设</h2><p>先说预期，再运行；如果结果相反，回到机制与边界。</p></div><figure class="card diagram" id="fig-redis-sequence"><svg viewBox="0 0 1040 494" role="img" aria-labelledby="redis-sequence-title redis-sequence-desc"><title id="redis-sequence-title">故障窗口与恢复时序</title><desc id="redis-sequence-desc">资源必须真实校验版本或 fencing token；仅 Redis 中发现锁已过期不能阻止已恢复的旧进程。</desc><defs><marker id="arrow-redis-sequence-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="arrow-redis-sequence-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker></defs><text x="135" y="45" text-anchor="middle" class="title">持锁者 A</text><path d="M135 70V459" class="life"/><text x="390" y="45" text-anchor="middle" class="title">Redis 租约</text><path d="M390 70V459" class="life"/><text x="645" y="45" text-anchor="middle" class="title">持锁者 B</text><path d="M645 70V459" class="life"/><text x="900" y="45" text-anchor="middle" class="title">权威资源</text><path d="M900 70V459" class="life"/><path class="edge " d="M135 110H390" marker-end="url(#arrow-redis-sequence-blue)"/><text x="262.5" y="99" text-anchor="middle" class="sub">A 获得租约与资格</text><path class="edge a" d="M135 164H90V182H135" marker-end="url(#arrow-redis-sequence-amber)"/><text x="520" y="155" text-anchor="middle" class="sub">长暂停，无法及时续约</text><path class="edge a" d="M645 218H390" marker-end="url(#arrow-redis-sequence-amber)"/><text x="517.5" y="207" text-anchor="middle" class="sub">租约到期后 B 获得资格</text><path class="edge " d="M645 272H900" marker-end="url(#arrow-redis-sequence-blue)"/><text x="772.5" y="261" text-anchor="middle" class="sub">B 用较新版本提交</text><path class="edge " d="M135 326H900" marker-end="url(#arrow-redis-sequence-blue)"/><text x="517.5" y="315" text-anchor="middle" class="sub">A 恢复后仍尝试写入</text><path class="edge a" d="M900 380H135" marker-end="url(#arrow-redis-sequence-amber)"/><text x="517.5" y="369" text-anchor="middle" class="sub">资源校验旧资格并拒绝</text></svg><figcaption>故障窗口与恢复时序。资源必须真实校验版本或 fencing token；仅 Redis 中发现锁已过期不能阻止已恢复的旧进程。</figcaption></figure>
+<div class="card pad practice"><h3>状态模型练习：重复、迟到和旧轮次回调不能改写终态</h3><p>Python 3 标准库模型，通过事件排列验证状态不变量；它不调用 Redis，不模拟复制、租约或外部设备副作用。UNKNOWN 保留待查证含义。</p><p class="verify">保存为 practice.py，用 python practice.py 运行。</p>
+<pre><code class="language-python">from itertools import permutations
+
+def apply(state, event, current_attempt=2):
+    attempt, target = event
+    if attempt != current_attempt:
+        return state
+    if state in {&quot;SUCCEEDED&quot;, &quot;FAILED&quot;}:
+        return state
+    allowed = {
+        &quot;PENDING&quot;: {&quot;RUNNING&quot;},
+        &quot;RUNNING&quot;: {&quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;UNKNOWN&quot;},
+        &quot;UNKNOWN&quot;: {&quot;SUCCEEDED&quot;, &quot;FAILED&quot;},
+    }
+    return target if target in allowed.get(state, set()) else state
+
+for order in permutations([(2, &quot;SUCCEEDED&quot;), (1, &quot;FAILED&quot;), (2, &quot;SUCCEEDED&quot;)]):
+    state = &quot;RUNNING&quot;
+    for event in order:
+        state = apply(state, event)
+    assert state == &quot;SUCCEEDED&quot;
+assert apply(&quot;SUCCEEDED&quot;, (2, &quot;FAILED&quot;)) == &quot;SUCCEEDED&quot;
+assert apply(&quot;RUNNING&quot;, (1, &quot;SUCCEEDED&quot;)) == &quot;RUNNING&quot;
+assert apply(&quot;RUNNING&quot;, (2, &quot;UNKNOWN&quot;)) == &quot;UNKNOWN&quot;
+payload_by_id = {}
+
+def accept_identity(key, digest):
+    existing = payload_by_id.get(key)
+    if existing is not None and existing != digest:
+        raise ValueError(&quot;same identity with different payload&quot;)
+    payload_by_id[key] = digest
+
+key = (&quot;tenant-a&quot;, &quot;message-1&quot;)
+accept_identity(key, &quot;payload-digest-a&quot;)
+accept_identity(key, &quot;payload-digest-a&quot;)
+try:
+    accept_identity(key, &quot;payload-digest-b&quot;)
+except ValueError:
+    pass
+else:
+    raise AssertionError(&quot;changed payload must be rejected&quot;)
+assert payload_by_id[key] == &quot;payload-digest-a&quot;
+print(&quot;terminal, duplicate, attempt and identity model passed&quot;)
+</code></pre></div>
+<div class="card pad" style="margin-top:18px"><h3>遮住正文，回答四个问题</h3><ul class="clean"><li>原子范围究竟是一个键、实例还是外部系统？</li><li>过期旧持有者能否被权威资源拒绝？</li><li>回调身份、执行代次与载荷是否绑定？</li><li>键缺失时是否错误推断为未执行？</li></ul></div></section>
+<section id="sources"><div class="head"><h2>9. 原始资料与关联阅读</h2><p>先定位资料定义的范围，再把它应用到自己的项目。</p></div>
+<div class="card pad"><ol class="source-list"><li id="ref-1"><a href="https://redis.io/docs/latest/develop/programmability/eval-intro/">Redis：Lua 原子执行</a></li><li id="ref-2"><a href="https://redis.io/docs/latest/develop/programmability/lua-api/">Redis：Lua API 与错误处理</a></li><li id="ref-3"><a href="https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/">Redis：分布式锁与租约</a></li><li id="ref-4"><a href="https://redisson.pro/docs/data-and-services/locks-and-synchronizers/">Redisson：锁、续约和 fencing</a></li><li id="ref-5"><a href="https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/">Redis：持久化策略</a></li><li id="ref-6"><a href="https://redis.io/docs/latest/operate/oss_and_stack/management/replication/">Redis：复制语义</a></li><li id="ref-7"><a href="https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/">Redis Cluster：hash slot 与 hash tag</a></li><li id="ref-8"><a href="https://redis.io/docs/latest/develop/using-commands/transactions/">Redis：事务与不支持回滚的边界</a></li></ol><p class="verify">规范、实现与文档版本可能不同。引用用于核对机制，例子中的流程和数字为教学推演；真实环境实验与项目源码核对另行进行。</p></div>
+<div class="grid3 column-links" style="margin-top:18px"><div class="mini"><a href="resume-tech-columns.html">技术类别总入口</a><p>沿项目线索切换到其他专栏。</p></div><div class="mini"><a href="java-agent-ai-interview-illustrated.html">Java / AI 图解手册</a><p>把原理转换为面试回答与连续追问。</p></div><div class="mini"><a href="uav-backend-review-handbook.html">六周项目复习手册</a><p>回到项目链路核对实际职责与事实。</p></div></div></section></main>
+<footer><div class="shell">简历技术原理 · Redis 与分布式一致性 · 核对日期 2026-10-13 · 原始资料与验证范围见正文</div></footer>
+<nav class="dock" aria-label="页面快捷导航"><a href="../index.html">首页</a><a href="#">↑ 顶部</a></nav>
+<script>(()=>{const root=document.documentElement,key="html-docs-theme";let saved;try{saved=localStorage.getItem(key)}catch{}if(saved)root.dataset.theme=saved==="dark"?"dark":"paper";document.getElementById("theme").addEventListener("click",()=>{const next=root.dataset.theme==="dark"?"paper":"dark";root.dataset.theme=next;try{localStorage.setItem(key,next)}catch{}})})();</script></body></html>

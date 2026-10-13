@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="description" content="按简历技术栈组织的Java、JVM 与并发原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。"><meta name="date" content="2026-10-13"><title>简历技术原理 · Java、JVM 与并发</title><style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .decision{fill:var(--amber2);stroke:var(--amber);stroke-width:1.6}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    .active{fill:var(--blue2);stroke:var(--blue);stroke-width:1.2}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    .dock{position:fixed;right:18px;bottom:18px;z-index:99;display:flex;gap:4px;padding:6px;border-radius:999px;background:rgba(15,23,42,.82);backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(15,23,42,.28)}
+    .dock a{padding:7px 13px;border-radius:999px;color:#fff;text-decoration:none;font:600 13px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+    .dock a:hover{background:rgba(255,255,255,.16)}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+
+    :focus-visible{outline:3px solid var(--blue);outline-offset:4px}
+    html{scroll-padding-top:76px} .diagram{margin:18px 0}.dock{top:auto}
+    .diagram figcaption{margin-top:14px;color:var(--muted);font-size:13px;line-height:1.7}
+    .q{margin-top:16px;scroll-margin-top:78px}.q h3{margin:0 0 14px;font-size:22px;line-height:1.5}
+    .q h4{margin:18px 0 7px;font-size:16px}.q p{margin:10px 0}.q .pill{vertical-align:middle;margin-right:8px}
+    .q .memory-cue{margin:0 0 16px;padding:10px 13px;border-left:3px solid var(--green);border-radius:8px;background:var(--green2);font-size:14px}
+    .memory-cue strong{color:var(--green)}.verify{color:var(--muted);font-size:14px}
+    .sources{margin-top:18px;color:var(--muted);font-size:13px}.sources a{display:inline-block;margin:0 16px 6px 0}
+    .jump-list{display:flex;flex-wrap:wrap;gap:6px 18px;padding:0;list-style:none;font-size:14px;margin:16px 0}
+    p,li,a{overflow-wrap:anywhere}.practice{margin-top:20px}.practice h3{margin-top:0}
+    pre{overflow:auto;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);font:14px/1.75 Consolas,monospace}
+    pre code{padding:0;border:0;border-radius:0;color:var(--ink);background:transparent;font:inherit}
+    .read-map .mini a{display:block;font-weight:700;margin-bottom:6px}
+    @media(max-width:820px){.pad{padding:18px}.q h3{font-size:19px}.diagram{padding:12px}.lead{font-size:17px}}
+
+@page{margin:14mm}@media print{:root,[data-theme=dark]{
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }body{background:var(--panel)}header{padding:0 0 24px}.stats{grid-template-columns:repeat(4,1fr);gap:8px}.stat{padding:12px}.dock{display:none}.diagram svg{min-width:0}.diagram{overflow:visible;padding:10px;break-inside:avoid}.table table{min-width:0}.q h3{break-after:avoid}.head{break-after:avoid}pre{white-space:pre-wrap;overflow:visible}a{color:var(--ink)}}
+
+.column-links a{font-weight:700}.column-links .mini{height:100%}.source-list li{margin:10px 0}.source-list a{overflow-wrap:anywhere}.q p{max-width:100%}
+</style></head>
+<body><header><div class="shell"><div class="kicker">RESUME STACK / PRINCIPLES / FAILURE ANALYSIS</div><h1>Java、JVM 与并发</h1><p class="lead">从对象发布到任务预算，理解正确性与性能的不同边界</p><div class="doc-meta"><time datetime="2026-10-13">2026年10月13日</time><span>按简历技术类别选题</span><span>原理 · 边界 · 故障推演</span></div><div class="actions"><a class="btn" href="#map">开始阅读</a><button class="btn" id="theme" type="button">切换主题</button><button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button></div><div class="stats"><div class="stat"><b>6</b><span>深挖主题</span></div><div class="stat"><b>2</b><span>机制与故障图</span></div><div class="stat"><b>1</b><span>可运行练习</span></div><div class="stat"><b>7</b><span>原始资料入口</span></div></div></div></header>
+<nav aria-label="章节导航"><div class="shell"><a href="#map">阅读地图</a><a href="#topic-1">01 · 对象“已经赋值”为什么还不等于“另一个线程可以安全使用”？</a><a href="#topic-2">02 · AQS、CAS 和锁队列究竟分别负责什么？</a><a href="#topic-3">03 · 线程池为什么不能只按“核心数乘二”配置？</a><a href="#topic-4">04 · ConcurrentHashMap 的安全范围到哪里为止？</a><a href="#topic-5">05 · JVM GC、内存泄漏和容器 OOM 如何建立因果链？</a><a href="#topic-6">06 · 虚拟线程与 CompletableFuture 分别改变了什么？</a><a href="#practice">练习与故障自测</a><a href="#sources">原始资料与关联阅读</a></div></nav><main class="shell"><section id="map"><div class="head"><h2>1. 从项目线索建立原理地图</h2><p>Java · JVM · JMM · AQS · 线程池 · GC</p></div>
+<p><a href="resume-tech-columns.html">← 技术原理专栏总入口</a> · <a href="foundations-os-network-column.html">操作系统与网络基础</a></p>
+<div class="grid2"><div class="mini"><h3>简历关联</h3><p>简历提到 JVM／并发，以及并行航线规划、任务聚合。可用这条链路解释对象共享、线程预算和故障定位。</p></div><div class="mini"><h3>本篇要练成什么</h3><p>能从一次任务提交追到对象可见性、锁等待、堆中持有关系与容器资源，而不是只背集合和 GC 名称。</p></div></div>
+<div class="callout" style="margin-top:16px"><p><strong>阅读方式：</strong>先用记忆关键词复述机制，再推演例子的失败窗口，最后指出验证对象。正文方案是教学分析，不等同于已核对项目源码；具体个人贡献应按真实经历说明。</p></div>
+<p class="verify"><strong>版本与验证范围：</strong>并发 API 以 Java 21 文档为阅读基线；虚拟线程的固定载体问题单独区分 JDK 21 与 JDK 24 之后的变化。练习只验证线程池容量机制。</p><figure class="card diagram" id="fig-java-flow"><svg viewBox="0 0 1040 370" role="img" aria-labelledby="java-flow-title java-flow-desc"><title id="java-flow-title">机制地图</title><desc id="java-flow-desc">对象共享需要发布关系；并行执行需要预算；方法返回与后台任务完成不是同一个时刻。</desc><defs><marker id="arrow-java-flow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="arrow-java-flow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker></defs><g class="diagram-node"><rect x="35" y="55" width="280" height="80" rx="10" class="node "/><text x="175" y="87" text-anchor="middle" class="title">规划输入</text><text x="175" y="112" text-anchor="middle" class="sub">不可变快照 / 安全发布</text></g><g class="diagram-node"><rect x="380" y="55" width="280" height="80" rx="10" class="node "/><text x="520" y="87" text-anchor="middle" class="title">任务准入</text><text x="520" y="112" text-anchor="middle" class="sub">队列 / 拒绝 / 并发预算</text></g><g class="diagram-node"><rect x="725" y="55" width="280" height="80" rx="10" class="node "/><text x="865" y="87" text-anchor="middle" class="title">工作线程</text><text x="865" y="112" text-anchor="middle" class="sub">计算与等待分别计量</text></g><g class="diagram-node"><rect x="725" y="235" width="280" height="80" rx="10" class="node g"/><text x="865" y="267" text-anchor="middle" class="title">结果聚合</text><text x="865" y="292" text-anchor="middle" class="sub">Future / 完成关系</text></g><g class="diagram-node"><rect x="380" y="235" width="280" height="80" rx="10" class="node g"/><text x="520" y="267" text-anchor="middle" class="title">对象生命周期</text><text x="520" y="292" text-anchor="middle" class="sub">引用链 / 堆与堆外</text></g><g class="diagram-node"><rect x="35" y="235" width="280" height="80" rx="10" class="node g"/><text x="175" y="267" text-anchor="middle" class="title">异常与回收</text><text x="175" y="292" text-anchor="middle" class="sub">取消 / 清理 / GC 证据</text></g><path class="edge " d="M315 95H380" marker-end="url(#arrow-java-flow-blue)"/><path class="edge " d="M660 95H725" marker-end="url(#arrow-java-flow-blue)"/><path class="edge " d="M865 135V235" marker-end="url(#arrow-java-flow-blue)"/><path class="edge " d="M725 275H660" marker-end="url(#arrow-java-flow-blue)"/><path class="edge " d="M380 275H315" marker-end="url(#arrow-java-flow-blue)"/><text x="520" y="185" text-anchor="middle" class="sub">先识别状态、执行者与保证范围，再沿故障窗口追踪事实。</text></svg><figcaption>机制地图。对象共享需要发布关系；并行执行需要预算；方法返回与后台任务完成不是同一个时刻。</figcaption></figure></section>
+<section id="topic-1"><div class="head"><h2>2. 对象“已经赋值”为什么还不等于“另一个线程可以安全使用”？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-1"><p class="memory-cue"><strong>记忆关键词：</strong>构造 → 发布 → happens-before → 不变量</p>
+<h3>先这样回答</h3><p>对象共享的关键是写入与读取之间是否建立规定的可见性和顺序关系。字段赋值先后只是一个线程的程序顺序，不能代替跨线程发布协议。</p><h4>拆开机制与保证范围</h4><p>设规划配置有 version 和 regions 两个字段。写线程构建完配置，再经 volatile 引用发布；读线程通过该引用取得快照，才可以把发布前的写入作为同一份初始化结果理解。若构造时 this 逃逸，或发布后继续无同步修改内部集合，“引用可见”也救不了内部竞态。</p><p>volatile 的读写关系能用于发布，但 count++ 是读、计算、写三个步骤，仍可丢更新。不可变对象降低同步面；如果快照包含可变列表，需要复制或明确所有权。final 的初始化安全性有特定前提，也不赋予容器内容自动线程安全。</p><p>把业务不变量写出来：同一版本的区域和参数必须匹配。正确做法可以是整体替换不可变快照，而不是为每个字段各加 volatile，再希望读者恰好读到同一版本。多字段组合正确性与单字段可见性要分开回答。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>配置从 v1 切到 v2：逐字段更新时，读者可能读到 v2 的阈值和 v1 的区域；整体快照替换把版本绑定在一个对象身份中。</p></div>
+<p><strong>继续追问：</strong>“加 synchronized 一定解决？”要让读写遵守同一保护协议。“ConcurrentHashMap 放了对象就安全？”发布关系不覆盖随后任意修改对象内容。</p><p class="verify"><strong>如何验证：</strong>先列出读写点和所有权，再用固定输入核对是否出现混合版本；压力跑不出错误只能增加信心，不能替代 happens-before 推导。</p>
+<p class="sources"><a href="#ref-1">原始资料 01</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-2"><div class="head"><h2>3. AQS、CAS 和锁队列究竟分别负责什么？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-2"><p class="memory-cue"><strong>记忆关键词：</strong>状态 CAS · 队列等待 · 唤醒再竞争 · 公平与吞吐</p>
+<h3>先这样回答</h3><p>AQS 为同步器提供状态管理和排队等待骨架。CAS 争用同步状态，队列组织未成功获取者；唤醒只提供重新尝试的机会，并不直接把业务资源授予线程。</p><h4>拆开机制与保证范围</h4><p>以独占锁为例，获取者尝试改变同步状态，失败后可能进入等待队列并挂起。释放者更新状态并推进等待者；公平策略通常约束插队，非公平策略可能让新到线程先竞争。队列存在不等于每种同步器都严格 FIFO，细节还与具体实现有关。</p><p>CAS 无法把“查空闲机库、写资源占用、发设备指令”三个外部步骤变成原子事务。即使本地锁正确，另一个服务实例不受它保护。锁的范围、被保护数据和持有时间要先确定，长时间把网络调用包在本地锁内会放大等待。</p><p>条件等待也属于协议：在锁内检查谓词，等待释放相应锁，醒来重新竞争并用循环检查谓词。通知与资源状态不是同一对象，虚假唤醒和其他线程抢先消耗资源都要求重新验证条件。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>两个规划线程都等待“机库可用”。一次通知后第一个线程占用了资源，第二个线程即使醒来仍需重新检查，不能因为收到通知就下发任务。</p></div>
+<p><strong>继续追问：</strong>“CAS 就没有锁等待？”不代表没有竞争和重试成本。“公平必然更好？”应比较尾延迟、吞吐和饥饿风险，不能从名称直接选。</p><p class="verify"><strong>如何验证：</strong>记录持锁时长与等待时长，结合线程栈判断 CPU 自旋、park 或下游阻塞；不要只看线程状态名就归因为 AQS。</p>
+<p class="sources"><a href="#ref-3">原始资料 03</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-3"><div class="head"><h2>4. 线程池为什么不能只按“核心数乘二”配置？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-3"><p class="memory-cue"><strong>记忆关键词：</strong>准入 → 核心线程 → 有界队列 → 扩容 → 拒绝</p>
+<h3>先这样回答</h3><p>线程池参数决定任务如何等待与被拒绝。预算要由到达速率、服务时间、下游容量和可接受排队共同约束，经验公式只能是测量前的起点。</p><h4>拆开机制与保证范围</h4><p>ThreadPoolExecutor 的典型路径是先补核心工作线程，再尝试入队；队列放不下才尝试扩到 maximumPoolSize，仍不行则走拒绝策略。使用无界队列时，最大线程数通常不会帮你处理队列积压，慢任务会把压力转成等待和对象持有。</p><p>规划包含 CPU 计算与远程调用时，二者的限制不同。CPU 部分超过可用配额会增加竞争；等待部分可以提高并发，但数据库连接、设备请求和模型额度仍有限。把不同等待类型放入同一个池，还可能使长任务阻塞轻量回调。</p><p>CallerRuns 会让提交者执行任务，因此可能阻塞 HTTP 接收线程或事件循环；静默丢弃会破坏结果聚合。拒绝需要变成明确的受理失败或可恢复状态。排队时间必须占用同一总 deadline，开始执行前应确认任务尚有价值。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>假设 core=2、max=4、queue=2 且所有任务阻塞：前六个可被接收，第七个被拒绝。把 queue 改成无界，会让后续任务堆积而不是自动扩到四线程。</p></div>
+<p><strong>继续追问：</strong>“线程越多吞吐越高？”下游和 CPU 会成为上限。“Future 等待超时即可？”还要处理取消、队列移除和已经执行的动作结果。</p><p class="verify"><strong>如何验证：</strong>练习用闩锁固定任务占用以验证容量路径；真实调优再记录排队、执行、拒绝率、CPU 配额和下游并发，避免单次压测得出永久参数。</p>
+<p class="sources"><a href="#ref-2">原始资料 02</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-4"><div class="head"><h2>5. ConcurrentHashMap 的安全范围到哪里为止？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-4"><p class="memory-cue"><strong>记忆关键词：</strong>单键操作 · 原子更新 · 可变值 · 热点键</p>
+<h3>先这样回答</h3><p>ConcurrentHashMap 支持并发访问及特定单键原子操作，但不会把多次 get/put 或多个键组成业务事务，也不自动保护取出的可变值。</p><h4>拆开机制与保证范围</h4><p>get 后计算再 put 可以覆盖别人的结果。单键计数可使用合适的原子更新方式；compute 类回调要简短，不应在里面做长网络等待。它的具体实现会随 JDK 版本变化，答题先说 API 保证，再深入所用版本的桶、CAS 与锁路径。</p><p>父任务聚合需要的不变量可能是“子任务只记一次、总数与状态匹配”。如果分别改 finishedCount 和 status 两个键，中途观察者可能看到不一致。可把聚合状态封成一个不可变值做单键状态更新，或转到数据库事务与事件幂等协议。</p><p>大量线程更新同一热键仍有竞争；弱一致遍历不能直接用来证明精确时刻的全部任务已完成。LongAdder 适合某些高竞争统计，但其读取并不是天然的业务结算快照。统计指标与状态机决策应使用不同契约。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>同一个采集完成回调重送两次，即使 count.merge 是原子的，也可能把同一子任务算两次；需要先按子任务身份去重。</p></div>
+<p><strong>继续追问：</strong>“线程安全集合为何还有竞态？”竞态发生在组合操作和业务身份层。“全局加锁？”可能正确，但应先衡量保护范围与跨实例要求。</p><p class="verify"><strong>如何验证：</strong>构造重复回调、不同子任务并发、状态读取与终态写入交错；核对身份集合、计数和终态，而不只验证 map 没抛异常。</p>
+<p class="sources"><a href="#ref-6">原始资料 06</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-5"><div class="head"><h2>6. JVM GC、内存泄漏和容器 OOM 如何建立因果链？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-5"><p class="memory-cue"><strong>记忆关键词：</strong>GC Roots → 可达性 → 活对象 → 堆外 → 容器计费</p>
+<h3>先这样回答</h3><p>GC 回收不可达的堆对象，不能替应用删除仍被队列、缓存或会话引用的数据。容器总内存还包含堆外、线程栈和其他计费项，所以调大堆不一定解决 OOM。</p><h4>拆开机制与保证范围</h4><p>对象从请求进入任务队列，再被 Future、结果缓存或 SSE 会话持有；请求超时后，如果这些引用未断开，GC 仍把它们视作活对象。这类生命周期缺陷常表现为 GC 后基线逐步上升，和瞬时大量分配造成的频繁 GC 不同。</p><p>G1 把堆划分为 Region，并按活对象和回收成本组织回收；并发工作减少某些长停顿，但仍有需要停顿的阶段。暂停目标是调优目标而非硬实时承诺，活对象过多、分配压力和巨型对象都会改变表现。</p><p>先区分 heap used/committed、RSS 与容器内存。DirectByteBuffer、原生模型库和线程栈可以在 Java 堆外消耗空间。把 Xmx 贴近容器上限，会挤掉这些预算；更大堆也可能让泄漏更晚暴露而不改变根因。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>断线后的流式会话没有清理，每个会话仍持有消息和缓冲。Full GC 后占用仍不断增长；重启恢复只说明持有关系被清空，不能证明 GC 算法有错。</p></div>
+<p><strong>继续追问：</strong>“GC 频繁就是泄漏？”要看回收后的活集趋势。“OOM 一定会有 Java 堆转储？”容器外部杀死进程未必留下 JVM 的 OOM 证据。</p><p class="verify"><strong>如何验证：</strong>结合 GC 日志、堆转储中的支配关系、线程数量、原生内存与 cgroup 事件；在隔离环境复现会话创建与清理，验证回收后基线稳定。</p>
+<p class="sources"><a href="#ref-4">原始资料 04</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="topic-6"><div class="head"><h2>7. 虚拟线程与 CompletableFuture 分别改变了什么？</h2><p>从机制到边界，再用具体交错检验结论。</p></div>
+<article class="card pad q" id="q-6"><p class="memory-cue"><strong>记忆关键词：</strong>等待组织 · 载体线程 · 取消协议 · 下游仍有限</p>
+<h3>先这样回答</h3><p>虚拟线程让许多阻塞等待更便宜，CompletableFuture 组织异步依赖；两者都不增加 CPU 算力，也不替代业务并发、超时和取消协议。</p><h4>拆开机制与保证范围</h4><p>虚拟线程由运行时调度到载体线程，适用阻塞方式编写的大量 I/O 等待任务；CPU 密集计算仍占用真实执行资源。JDK 21 中 synchronized 相关固定会限制某些路径，JEP 491 在 JDK 24 改善该问题，其他原生调用路径仍需按版本检查。</p><p>CompletableFuture 的某些非 Async 阶段可能由完成前一阶段的线程执行；Async 阶段的执行器选择也需明确。把阻塞数据库调用随手丢到公共池，可能影响其他任务。任务链完成异常和应用自行创建的子任务是否退出，也是不同问题。</p><p>取消不是撤销已经完成的远端动作。Future.cancel 的参数和具体实现定义了本地取消行为，不能据此推断设备没有起飞或数据库没有提交。只有动作身份、权威查询与资源清理协议才能处理这种边界。</p>
+<div class="callout" style="margin-top:16px"><p><strong>项目推演：</strong>把一万个等待任务换成虚拟线程后，数据库连接池仍只有有限容量；如果没有准入限制，只是把线程瓶颈换成连接等待和更长的任务积压。</p></div>
+<p><strong>继续追问：</strong>“虚拟线程还要池化吗？”通常不以池化虚拟线程控制数量，而是对实际有限资源做准入。“异步后异常会自己打印？”必须消费并记录完成结果。</p><p class="verify"><strong>如何验证：</strong>按 JDK 版本观察载体利用、固定事件、连接等待与取消后残留工作；比较相同业务结果和同样下游容量，不能只比较创建线程的速度。</p>
+<p class="sources"><a href="#ref-5">原始资料 05</a> · <a href="#practice">可运行练习与自测</a></p></article></section>
+<section id="practice"><div class="head"><h2>8. 练习：从能讲到能反驳自己的假设</h2><p>先说预期，再运行；如果结果相反，回到机制与边界。</p></div><figure class="card diagram" id="fig-java-sequence"><svg viewBox="0 0 1040 494" role="img" aria-labelledby="java-sequence-title java-sequence-desc"><title id="java-sequence-title">故障窗口与恢复时序</title><desc id="java-sequence-desc">Future 取消或请求超时不会自动撤销外部副作用；取消传播和业务查证必须单独设计。</desc><defs><marker id="arrow-java-sequence-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="arrow-java-sequence-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker></defs><text x="135" y="45" text-anchor="middle" class="title">请求线程</text><path d="M135 70V459" class="life"/><text x="390" y="45" text-anchor="middle" class="title">线程池</text><path d="M390 70V459" class="life"/><text x="645" y="45" text-anchor="middle" class="title">规划任务</text><path d="M645 70V459" class="life"/><text x="900" y="45" text-anchor="middle" class="title">下游服务</text><path d="M900 70V459" class="life"/><path class="edge " d="M135 110H390" marker-end="url(#arrow-java-sequence-blue)"/><text x="262.5" y="99" text-anchor="middle" class="sub">提交任务：先判断准入</text><path class="edge " d="M390 164H645" marker-end="url(#arrow-java-sequence-blue)"/><text x="517.5" y="153" text-anchor="middle" class="sub">队列中取出并执行</text><path class="edge " d="M645 218H900" marker-end="url(#arrow-java-sequence-blue)"/><text x="772.5" y="207" text-anchor="middle" class="sub">I/O 等待：占用下游预算</text><path class="edge " d="M135 272H390" marker-end="url(#arrow-java-sequence-blue)"/><text x="262.5" y="261" text-anchor="middle" class="sub">请求超时：发出取消</text><path class="edge a" d="M900 326H645" marker-end="url(#arrow-java-sequence-amber)"/><text x="772.5" y="315" text-anchor="middle" class="sub">调用可能已经完成</text><path class="edge a" d="M645 380H135" marker-end="url(#arrow-java-sequence-amber)"/><text x="390.0" y="369" text-anchor="middle" class="sub">记录结果或未知，释放资源</text></svg><figcaption>故障窗口与恢复时序。Future 取消或请求超时不会自动撤销外部副作用；取消传播和业务查证必须单独设计。</figcaption></figure>
+<div class="card pad practice"><h3>真实 API 练习：有界线程池的第七个任务为什么被拒绝</h3><p>Java 21 可用语法，使用标准库；闩锁固定任务生命周期，自检 core → queue → max → reject 的实际路径。它不测吞吐，也不代表线上推荐参数。</p><p class="verify">保存为 ThreadBudget.java，用 javac --release 21 ThreadBudget.java 编译，再用 java ThreadBudget 运行。</p>
+<pre><code class="language-java">import java.util.concurrent.*;
+
+public class ThreadBudget {
+    public static void main(String[] args) throws Exception {
+        var release = new CountDownLatch(1);
+        var pool = new ThreadPoolExecutor(2, 4, 30, TimeUnit.SECONDS,
+                new ArrayBlockingQueue&lt;Runnable&gt;(2),
+                new ThreadPoolExecutor.AbortPolicy());
+        Runnable task = () -&gt; {
+            try { release.await(); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        };
+        try {
+            for (int i = 0; i &lt; 6; i++) pool.execute(task);
+            if (pool.getPoolSize() != 4 || pool.getQueue().size() != 2)
+                throw new AssertionError(&quot;unexpected capacity path&quot;);
+            boolean rejected = false;
+            try { pool.execute(task); }
+            catch (RejectedExecutionException e) { rejected = true; }
+            if (!rejected) throw new AssertionError(&quot;seventh task admitted&quot;);
+        } finally {
+            release.countDown();
+            pool.shutdown();
+            if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
+                pool.shutdownNow();
+                throw new AssertionError(&quot;workers did not finish&quot;);
+            }
+        }
+        System.out.println(&quot;bounded capacity and rejection passed&quot;);
+    }
+}
+</code></pre></div>
+<div class="card pad" style="margin-top:18px"><h3>遮住正文，回答四个问题</h3><ul class="clean"><li>配置对象在发布后是否仍被修改？</li><li>任务是否在队列里已经耗尽 deadline？</li><li>取消后是谁释放资源、谁查证外部结果？</li><li>内存证据指向堆对象还是容器总预算？</li></ul></div></section>
+<section id="sources"><div class="head"><h2>9. 原始资料与关联阅读</h2><p>先定位资料定义的范围，再把它应用到自己的项目。</p></div>
+<div class="card pad"><ol class="source-list"><li id="ref-1"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">Java 21：并发包与 happens-before</a></li><li id="ref-2"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">Java 21：ThreadPoolExecutor</a></li><li id="ref-3"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/AbstractQueuedSynchronizer.html">Java 21：AbstractQueuedSynchronizer</a></li><li id="ref-4"><a href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-first-g1-garbage-collector1.html">Java 21：G1 GC</a></li><li id="ref-5"><a href="https://docs.oracle.com/en/java/javase/24/migrate/significant-changes-jdk-24.html">Oracle：JDK 24 与 JEP 491 的行为变化</a></li><li id="ref-6"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">Java 21：ConcurrentHashMap</a></li><li id="ref-7"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/Future.html">Java 21：Future 的取消契约</a></li></ol><p class="verify">规范、实现与文档版本可能不同。引用用于核对机制，例子中的流程和数字为教学推演；真实环境实验与项目源码核对另行进行。</p></div>
+<div class="grid3 column-links" style="margin-top:18px"><div class="mini"><a href="resume-tech-columns.html">技术类别总入口</a><p>沿项目线索切换到其他专栏。</p></div><div class="mini"><a href="java-agent-ai-interview-illustrated.html">Java / AI 图解手册</a><p>把原理转换为面试回答与连续追问。</p></div><div class="mini"><a href="uav-backend-review-handbook.html">六周项目复习手册</a><p>回到项目链路核对实际职责与事实。</p></div></div></section></main>
+<footer><div class="shell">简历技术原理 · Java、JVM 与并发 · 核对日期 2026-10-13 · 原始资料与验证范围见正文</div></footer>
+<nav class="dock" aria-label="页面快捷导航"><a href="../index.html">首页</a><a href="#">↑ 顶部</a></nav>
+<script>(()=>{const root=document.documentElement,key="html-docs-theme";let saved;try{saved=localStorage.getItem(key)}catch{}if(saved)root.dataset.theme=saved==="dark"?"dark":"paper";document.getElementById("theme").addEventListener("click",()=>{const next=root.dataset.theme==="dark"?"paper":"dark";root.dataset.theme=next;try{localStorage.setItem(key,next)}catch{}})})();</script></body></html>
