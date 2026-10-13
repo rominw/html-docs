@@ -1,5 +1,11 @@
 [
   {
+    "title": "MCP 官方文档全解：Model Context Protocol 2026-07-28 深度导读",
+    "description": "基于 modelcontextprotocol.io 官方文档的中文全解：覆盖 MCP 2026-07-28 版核心架构、无状态协议设计、三大服务器原语、Elicitation 与 MRTR 多轮往返、stdio 与 Streamable HTTP 传输、OAuth 2.1 授权、安全攻防与开发者生态。",
+    "date": "2026-10-13",
+    "url": "documents/mcp-official-docs-guide.html"
+  },
+  {
     "title": "无人机巡检平台后端 · 六周直读复习手册",
     "description": "无人机巡检平台后端六周直读复习手册：自动建模调度、分布式一致性、状态机与断点续飞、AI 工程化、智能体集成与违章停车多轮复核，百余道面试追问与代码级事实。",
     "date": "2026-10-12",

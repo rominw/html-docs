@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="基于 modelcontextprotocol.io 官方文档的中文全解：覆盖 MCP 2026-07-28 版核心架构、无状态协议设计、三大服务器原语、Elicitation 与 MRTR 多轮往返、stdio 与 Streamable HTTP 传输、OAuth 2.1 授权、安全攻防与开发者生态。">
+  <meta name="date" content="2026-10-13">
+  <title>MCP 官方文档全解：Model Context Protocol 2026-07-28 深度导读</title>
+  <style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .decision{fill:var(--amber2);stroke:var(--amber);stroke-width:1.6}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    .active{fill:var(--blue2);stroke:var(--blue);stroke-width:1.2}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    .dock{position:fixed;right:18px;bottom:18px;z-index:99;display:flex;gap:4px;padding:6px;border-radius:999px;background:rgba(15,23,42,.82);backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(15,23,42,.28)}
+    .dock a{padding:7px 13px;border-radius:999px;color:#fff;text-decoration:none;font:600 13px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+    .dock a:hover{background:rgba(255,255,255,.16)}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell">
+      <div class="kicker">MODEL CONTEXT PROTOCOL · OFFICIAL DOCS DIGEST</div>
+      <h1>MCP 官方文档全解</h1>
+      <p class="lead">把 modelcontextprotocol.io 官方文档从概念、协议规范到安全与工具链完整翻了一遍，整理成一篇可检索的中文导读——以 2026-07-28 当前版规范为准，覆盖架构、无状态化改造、三大原语、MRTR、传输、OAuth 授权与生态工具。</p>
+      <div class="doc-meta">
+        <time datetime="2026-10-13">2026年10月13日</time>
+        <span>协议规范 · 官方文档导读</span>
+        <span>依据 modelcontextprotocol.io（规范版本 2026-07-28）</span>
+      </div>
+      <div class="actions">
+        <a class="btn" href="#intro">开始阅读</a>
+        <button class="btn" id="theme" type="button">切换主题</button>
+        <button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>2026-07-28</b><span>当前协议版本（无状态化重构版）</span></div>
+        <div class="stat"><b>3 + 1</b><span>服务器三大原语 + 客户端 Elicitation</span></div>
+        <div class="stat"><b>2 种传输</b><span>stdio 与 Streamable HTTP</span></div>
+        <div class="stat"><b>10 门 SDK</b><span>TypeScript、Python、Go、Rust 等官方 SDK</span></div>
+      </div>
+    </div>
+  </header>
+  <nav>
+    <div class="shell">
+      <a href="#intro">1 是什么</a><a href="#architecture">2 核心架构</a><a href="#changes">3 版本变更</a><a href="#messages">4 消息与 _meta</a><a href="#primitives">5 服务器原语</a><a href="#mrtr">6 客户端原语与 MRTR</a><a href="#transports">7 传输层</a><a href="#security">8 授权与安全</a><a href="#utilities">9 缓存与工具类</a><a href="#ecosystem">10 版本与生态</a>
+    </div>
+  </nav>
+  <main class="shell">
+
+    <!-- ============ 1 ============ -->
+    <section id="intro">
+      <div class="head"><h2>1. MCP 是什么</h2><p>一个连接 AI 应用与外部系统的开放标准——官方的比喻是「AI 应用的 USB-C 接口」。</p></div>
+      <div class="grid3">
+        <div class="mini"><h3>解决 N×M 集成问题</h3><p>没有统一协议时，N 个 AI 应用 × M 个数据源/工具需要 N×M 套定制集成；MCP 把它变成 N+M：应用实现一次客户端，服务方实现一次服务器。</p></div>
+        <div class="mini"><h3>连接什么</h3><p>数据源（本地文件、数据库）、工具（搜索引擎、API、计算器）、工作流（专门化的提示模板），让 AI 能拿到关键信息并执行任务。</p></div>
+        <div class="mini"><h3>广泛的生态</h3><p>Claude、ChatGPT、VS Code、Cursor 等客户端均已支持，官方还维护参考服务器实现、多语言 SDK 与 Inspector 调试工具。</p></div>
+      </div>
+      <div class="card pad" style="margin-top:15px">
+        <h3 style="margin-top:0">官方文档的板块结构</h3>
+        <ul class="clean">
+          <li><strong>Learn（概念）</strong>：介绍、架构总览、服务器/客户端概念、版本机制——回答「MCP 是什么、怎么运转」。</li>
+          <li><strong>Develop（开发）</strong>：本地/远程服务器接入、构建服务器与客户端的实操教程、客户端最佳实践、SDK 清单。</li>
+          <li><strong>Security（安全）</strong>：OAuth 授权教程、安全最佳实践（攻击面与缓解）、本地服务器安全三篇。</li>
+          <li><strong>Tools（工具）</strong>：MCP Inspector（Web/CLI/TUI/mcpdo 四种形态）与调试指南。</li>
+          <li><strong>Specification（规范）</strong>：按版本冻结的协议本体，含变更日志与废弃特性注册表。</li>
+        </ul>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>边界很重要：</strong>MCP 只定义「上下文如何交换」的协议——它不规定 AI 应用如何使用 LLM、如何管理上下文。宿主的智能编排完全在协议之外。</p></div>
+    </section>
+
+    <!-- ============ 2 ============ -->
+    <section id="architecture">
+      <div class="head"><h2>2. 核心架构：宿主、客户端与服务器</h2><p>客户端-服务器架构 + 双层协议设计，2026-07-28 版起彻底无状态。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 292" role="img" aria-labelledby="archTitle archDesc">
+          <title id="archTitle">MCP 整体架构</title>
+          <desc id="archDesc">MCP 宿主应用为每个服务器创建一个专属客户端；本地服务器以 stdio 子进程运行，远程服务器通过 Streamable HTTP 服务多个客户端。</desc>
+          <defs><marker id="arA" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker></defs>
+          <rect class="lane" x="20" y="22" width="1000" height="118" rx="16"/>
+          <text class="sub" x="40" y="47">MCP Host（AI 应用：Claude Desktop / VS Code / Cursor …）</text>
+          <text class="sub" x="1000" y="47" text-anchor="end">每个服务器一个专属客户端连接</text>
+          <rect class="node" x="50" y="66" width="180" height="52" rx="10"/><text class="title" x="140" y="97" text-anchor="middle">MCP Client 1</text>
+          <rect class="node" x="280" y="66" width="180" height="52" rx="10"/><text class="title" x="370" y="97" text-anchor="middle">MCP Client 2</text>
+          <rect class="node" x="510" y="66" width="180" height="52" rx="10"/><text class="title" x="600" y="97" text-anchor="middle">MCP Client 3</text>
+          <rect class="node" x="740" y="66" width="180" height="52" rx="10"/><text class="title" x="830" y="97" text-anchor="middle">MCP Client 4</text>
+          <path class="edge" d="M140 118V212" marker-end="url(#arA)"/>
+          <path class="edge" d="M370 118V212" marker-end="url(#arA)"/>
+          <path class="edge" d="M600 118V182H790V212" marker-end="url(#arA)"/>
+          <path class="edge" d="M830 118V212" marker-end="url(#arA)"/>
+          <text class="sub" x="152" y="172">stdio</text>
+          <text class="sub" x="382" y="172">stdio</text>
+          <text class="sub" x="668" y="176">HTTPS · Streamable HTTP</text>
+          <rect class="node g" x="40" y="212" width="200" height="56" rx="10"/><text class="title" x="140" y="235" text-anchor="middle">本地 Server A</text><text class="sub" x="140" y="254" text-anchor="middle">Filesystem · 子进程</text>
+          <rect class="node g" x="270" y="212" width="200" height="56" rx="10"/><text class="title" x="370" y="235" text-anchor="middle">本地 Server B</text><text class="sub" x="370" y="254" text-anchor="middle">Database · 子进程</text>
+          <rect class="node v" x="680" y="212" width="280" height="56" rx="10"/><text class="title" x="820" y="235" text-anchor="middle">远程 Server C</text><text class="sub" x="820" y="254" text-anchor="middle">Sentry · 多客户端共享</text>
+        </svg>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">三种参与者</h3>
+          <ul class="clean">
+            <li><strong>MCP Host（宿主）</strong>：AI 应用本体（如 Claude Code、VS Code），负责协调并管理一个或多个 MCP 客户端，掌控整体用户体验。</li>
+            <li><strong>MCP Client（客户端）</strong>：协议层组件，由宿主为每个服务器实例化，维护与对应服务器的专属连接并获取上下文。</li>
+            <li><strong>MCP Server（服务器）</strong>：向客户端提供上下文的程序，与运行位置无关——本地 stdio 服务器通常服务单个客户端，远程 Streamable HTTP 服务器通常服务大量客户端。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">两层协议</h3>
+          <ul class="clean">
+            <li><strong>数据层（内层）</strong>：基于 JSON-RPC 2.0 的交换协议——发现（<code>server/discover</code>）、服务器特性（tools / resources / prompts）、客户端特性（elicitation）、工具类特性（通知、进度）。</li>
+            <li><strong>传输层（外层）</strong>：负责通道与安全——连接建立、消息成帧、授权。对上层屏蔽细节，让同一套 JSON-RPC 消息跑在 stdio 或 HTTP 之上。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>无状态是本版的底色：</strong>处理一个请求所需的全部信息都包含在请求自身之中。服务器不得从先前请求（哪怕同一连接上的）推断上下文；需要跨请求的状态必须用显式句柄（如购物车 ID）由客户端每次携带。一个打开的 stdio 进程不是「会话」，连接身份不能当作会话连续性的依据。</p></div>
+    </section>
+
+    <!-- ============ 3 ============ -->
+    <section id="changes">
+      <div class="head"><h2>3. 2026-07-28 版重大变更</h2><p>这是 MCP 迄今最大的一次协议重构：去会话、去握手、全部元数据随请求走。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>变更</th><th>过去（≤ 2025-11-25）</th><th>现在（2026-07-28）</th></tr></thead>
+          <tbody>
+            <tr><td>初始化握手</td><td><code>initialize</code> / <code>notifications/initialized</code> 两步握手建立会话</td><td>删除握手。每个请求在 <code>_meta</code> 中自带协议版本与客户端能力（<code>io.modelcontextprotocol/protocolVersion</code>、<code>clientCapabilities</code> 等）</td></tr>
+            <tr><td>能力发现</td><td>握手响应返回 capabilities</td><td>新增必实现 RPC <code>server/discover</code>：一次拿到服务器支持的版本、能力与身份，客户端可调用亦可跳过</td></tr>
+            <tr><td>HTTP 会话</td><td><code>Mcp-Session-Id</code> 头维护会话，GET 端点开 SSE 流</td><td>移除协议级会话与 GET 端点；列表端点不再按连接变化，跨调用状态改用服务器签发的显式句柄</td></tr>
+            <tr><td>服务端→客户端请求</td><td>服务器可在流上主动发请求（<code>sampling/createMessage</code>、<code>elicitation/create</code>、<code>roots/list</code>）</td><td>改为 <strong>MRTR</strong>（多轮往返请求）：以 <code>resultType: "input_required"</code> 的结果携带 <code>inputRequests</code>，客户端收集输入后重试原请求并附 <code>inputResponses</code></td></tr>
+            <tr><td>结果类型</td><td>Result 无类型标记</td><td>所有结果必须带 <code>resultType</code>：<code>"complete"</code> 或 <code>"input_required"</code>；旧版服务器缺省该字段时客户端按 <code>"complete"</code> 处理</td></tr>
+            <tr><td>变更通知</td><td><code>resources/subscribe</code> + HTTP GET 流</td><td>统一为 <code>subscriptions/listen</code>：单个长生命周期 POST 响应流，客户端按过滤器选择订阅，通知以 <code>subscriptionId</code> 关联</td></tr>
+            <tr><td>被移除的方法</td><td><code>ping</code>、<code>logging/setLevel</code>、<code>notifications/roots/list_changed</code></td><td>全部移除；日志级别改为每请求经 <code>_meta</code> 的 <code>io.modelcontextprotocol/logLevel</code> 设置</td></tr>
+            <tr><td>SSE 可恢复性</td><td><code>Last-Event-ID</code> 恢复流、消息重投递</td><td>移除。断流即丢失在途请求，客户端必须以新请求 ID 重发</td></tr>
+            <tr><td>任务（Tasks）</td><td>实验性任务在核心协议中</td><td>拆出为官方扩展 <code>io.modelcontextprotocol/tasks</code>：轮询式 <code>tasks/get</code> + <code>tasks/update</code>，服务器可主动返回任务句柄</td></tr>
+            <tr><td>HTTP 标准头</td><td>仅版本头</td><td>POST 必须带 <code>Mcp-Method</code>、<code>Mcp-Name</code>；新增 <code>x-mcp-header</code> 把工具参数镜像为 <code>Mcp-Param-*</code> 头</td></tr>
+            <tr><td>错误码分区</td><td>实现自定义错误散落在 -32000 段</td><td>明确分区：-32000～-32019 留给历史实现，-32020～-32099 保留给规范（<code>HeaderMismatch</code> -32020、<code>MissingRequiredClientCapability</code> -32021、<code>UnsupportedProtocolVersion</code> -32022）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card pad table" style="margin-top:15px">
+        <table>
+          <thead><tr><th>被废弃的特性</th><th>状态</th><th>官方迁移路径</th><th>最早移除</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Roots</strong>（客户端告知文件系统边界）</td><td><span class="pill a">Deprecated</span></td><td>改用工具参数、资源 URI 或服务器配置传递目录/文件</td><td>2027-07-28 后的首个修订版</td></tr>
+            <tr><td><strong>Sampling</strong>（服务器借客户端调用 LLM）</td><td><span class="pill a">Deprecated</span></td><td>直接对接 LLM 提供商 API</td><td>2027-07-28 后的首个修订版</td></tr>
+            <tr><td><strong>Logging</strong>（<code>notifications/message</code>）</td><td><span class="pill a">Deprecated</span></td><td>stdio 写 <code>stderr</code>，可观测性用 OpenTelemetry</td><td>2027-07-28 后的首个修订版</td></tr>
+            <tr><td><strong>OAuth 动态客户端注册</strong>（RFC 7591）</td><td><span class="pill a">Deprecated</span></td><td>改用 Client ID Metadata Documents（CIMD）</td><td>2027-07-28 后的首个修订版</td></tr>
+            <tr><td><strong>HTTP+SSE 传输</strong>（2024-11-05 版）</td><td><span class="pill a">Deprecated</span></td><td>迁移到 Streamable HTTP</td><td>SEP-2596 定稿后三个月</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn" style="margin-top:14px"><p><strong>给新实现的忠告：</strong>不要在新项目中采用 Roots、Sampling、Logging 与动态客户端注册——它们仍可工作（废弃窗口至少 12 个月），但已被列入移除计划。规范同时引入了正式的「特性生命周期与废弃政策」（Active / Deprecated / Removed 三态 + 废弃注册表）。</p></div>
+    </section>
+
+    <!-- ============ 4 ============ -->
+    <section id="messages">
+      <div class="head"><h2>4. 协议消息与 _meta 元数据</h2><p>一切围绕 JSON-RPC 2.0 的三种消息展开，元数据全部内联在 <code>_meta</code> 里。</p></div>
+      <div class="grid3">
+        <div class="mini"><h3>Request（请求）</h3><p>带字符串或整数 <code>id</code>（不允许 null，且不得与在途请求撞号）、<code>method</code>、可选 <code>params</code>。客户端发给服务器以发起操作。</p></div>
+        <div class="mini"><h3>Response（响应）</h3><p>成功时回 <code>result</code>（必须含 <code>resultType</code> 字段，支持多态结果）；失败时回 <code>error</code>（code + message + 可选 data）。</p></div>
+        <div class="mini"><h3>Notification（通知）</h3><p>单向消息，无 <code>id</code>，接收方不得回复。用于进度、日志、订阅流上的变更事件。</p></div>
+      </div>
+      <div class="card pad table" style="margin-top:15px">
+        <table>
+          <thead><tr><th>_meta 保留键</th><th>方向</th><th>作用</th></tr></thead>
+          <tbody>
+            <tr><td><code>io.modelcontextprotocol/protocolVersion</code></td><td>客户端 → 每请求（必填）</td><td>声明本请求使用的协议版本，如 <code>"2026-07-28"</code></td></tr>
+            <tr><td><code>io.modelcontextprotocol/clientCapabilities</code></td><td>客户端 → 每请求（必填）</td><td>声明与该请求相关的能力（elicitation 等）；缺必填字段即畸变请求，服务器以 -32602 拒绝</td></tr>
+            <tr><td><code>io.modelcontextprotocol/clientInfo</code> / <code>serverInfo</code></td><td>双向（建议携带）</td><td>自报的实现名与版本，仅用于展示/日志/调试</td></tr>
+            <tr><td><code>io.modelcontextprotocol/logLevel</code></td><td>客户端 → 每请求（可选）</td><td>为该请求设置最低日志级别（Logging 特性，已废弃）</td></tr>
+            <tr><td><code>io.modelcontextprotocol/subscriptionId</code></td><td>服务器 → 订阅流通知</td><td>把通知关联到打开它的 <code>subscriptions/listen</code> 请求</td></tr>
+            <tr><td><code>progressToken</code></td><td>客户端 → 请求</td><td>为该请求开启进度通知（见第 6 节）</td></tr>
+            <tr><td><code>traceparent</code> / <code>tracestate</code> / <code>baggage</code></td><td>双向</td><td>W3C 格式的 OpenTelemetry 链路上下文透传</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">错误码体系</h3>
+          <ul class="clean">
+            <li>通用协议错误沿用 JSON-RPC 2.0：<code>-32700</code>（解析错误）、<code>-32600</code>～<code>-32603</code>（无效请求/方法/参数/内部错误）。</li>
+            <li><code>-32020</code> HeaderMismatch：HTTP 头与请求体不匹配。</li>
+            <li><code>-32021</code> MissingRequiredClientCapability：请求依赖客户端未声明的能力。</li>
+            <li><code>-32022</code> UnsupportedProtocolVersion：版本不支持，<code>data.supported</code> 列出可用版本供重试。</li>
+            <li>资源不存在从 <code>-32002</code> 改为 <code>-32602</code>；客户端仍应兼容旧码。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">JSON Schema 约定</h3>
+          <ul class="clean">
+            <li>工具输入/输出 schema 未带 <code>$schema</code> 时默认按 <strong>2020-12</strong> 方言解释，实现必须支持。</li>
+            <li>不得自动解引用指向网络 URI 的 <code>$ref</code>；校验失败应显式拒绝而非静默放行。</li>
+            <li>对 <code>anyOf/oneOf/allOf</code> 等组合关键字设置深度/数量/时间预算，防止恶意 schema 拖垮校验器（DoS）。</li>
+            <li>规范本体是 TypeScript schema（仓库中的 schema.ts），JSON Schema 由其自动生成。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>身份字段不可信：</strong><code>clientInfo</code> 与 <code>serverInfo</code> 是发送方自报的，协议不校验。实现不应据此改变行为，更不应据此做安全决策。另：<code>_meta</code> 键名采用「反域名前缀/名称」格式，第二段为 <code>modelcontextprotocol</code> 或 <code>mcp</code> 的前缀（如 <code>io.modelcontextprotocol/</code>）保留给协议与官方扩展。</p></div>
+    </section>
+
+    <!-- ============ 5 ============ -->
+    <section id="primitives">
+      <div class="head"><h2>5. 服务器原语：Tools / Resources / Prompts</h2><p>三种积木按「谁来控制」区分——模型控制、应用控制、用户控制。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>原语</th><th>控制方</th><th>定位</th><th>典型例子</th><th>协议方法</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Tools</strong></td><td>模型（Model）</td><td>可执行函数：查库、调 API、改文件。模型根据上下文决定何时调用，可要求用户确认</td><td>搜索航班、发消息、建日历事件</td><td><code>tools/list</code>、<code>tools/call</code></td></tr>
+            <tr><td><strong>Resources</strong></td><td>应用（Application）</td><td>只读数据源，作为上下文提供给模型：文件内容、库表结构、API 文档</td><td>读文档、访问知识库、读日历</td><td><code>resources/list</code>、<code>resources/templates/list</code>、<code>resources/read</code>、订阅更新</td></tr>
+            <tr><td><strong>Prompts</strong></td><td>用户（User）</td><td>预制指令模板，需用户显式触发；可引用资源与工具组成完整工作流</td><td>计划一次度假、总结会议、起草邮件</td><td><code>prompts/list</code>、<code>prompts/get</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">Tools 要点</h3>
+          <ul class="clean">
+            <li><strong>命名</strong>：1–128 字符、大小写敏感、仅 <code>A-Za-z0-9_.-</code>、服务器内唯一；聚合多服务器时客户端应加前缀消歧。</li>
+            <li><strong>Schema</strong>：<code>inputSchema</code> 必填（无参数时推荐 <code>{"type":"object","additionalProperties":false}</code>）；<code>outputSchema</code> 可选，配 <code>structuredContent</code>（任意 JSON 值）返回结构化结果，兼容起见应同时在 text 块里给序列化 JSON。</li>
+            <li><strong>两类错误</strong>：协议错误（未知工具、畸变请求）走 JSON-RPC error；工具执行错误（参数校验失败、业务失败）用 <code>isError: true</code> 的正常结果返回，让模型能自我纠正后重试。</li>
+            <li><strong>有状态工具</strong>：协议无会话，跨调用状态用显式句柄——<code>create_basket</code> 返回 <code>basket_id</code>，后续调用携带；句柄要高熵、不透明、绑定期限，并按「名称而非能力」做每次鉴权。</li>
+            <li><strong>确定性顺序</strong>：<code>tools/list</code> 应按稳定顺序返回，便于客户端缓存并提高 LLM 提示词缓存命中率。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">Resources 与 Prompts 要点</h3>
+          <ul class="clean">
+            <li><strong>URI 标识</strong>：每个资源有唯一 URI 与可选 MIME 类型；<code>https://</code> 仅用于客户端可自行抓取的资源，<code>file://</code> 不必对应物理文件系统，可自定义 scheme。</li>
+            <li><strong>资源模板</strong>：RFC 6570 URI 模板（如 <code>weather://forecast/{city}/{date}</code>）实现参数化查询，参数可接自动补全。</li>
+            <li><strong>注解</strong>：<code>audience</code>（user/assistant）、<code>priority</code>（0–1）、<code>lastModified</code> 帮客户端过滤与排序上下文。</li>
+            <li><strong>内容</strong>：文本（<code>text</code>）或二进制（<code>blob</code>，base64）；工具结果可回 <code>resource_link</code> 或内嵌 resource。</li>
+            <li><strong>Prompts 形态</strong>：参数化模板 + <code>messages</code>（role 为 user/assistant，内容可为文本/图像/音频/资源链接）；常以斜杠命令、命令面板等 UI 暴露。</li>
+            <li><strong>变化通知</strong>：三者都在能力中声明 <code>listChanged</code>，经 <code>subscriptions/listen</code> 推送列表变化。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout warn" style="margin-top:14px"><p><strong>人在回路：</strong>信任与安全上应始终有能拒绝工具调用的人。应用应清晰展示暴露给模型的工具、调用时给出可见指示、对敏感操作弹确认。工具注解（annotations）来自服务器，除非可信来源否则视为不可信输入——名称与描述本身就是模型会读的指令。</p></div>
+    </section>
+
+    <!-- ============ 6 ============ -->
+    <section id="mrtr">
+      <div class="head"><h2>6. 客户端原语与多轮往返（MRTR）</h2><p>服务器需要用户输入或 LLM 补全时，不再主动发请求，而是「把请求装进结果里」。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 470" role="img" aria-labelledby="mrtrTitle mrtrDesc">
+          <title id="mrtrTitle">多轮往返请求（MRTR）时序</title>
+          <desc id="mrtrDesc">客户端调用工具，服务器返回 InputRequiredResult 附带输入请求与不透明状态；客户端向用户收集输入后以新的请求 ID 重试原请求并带回输入响应，服务器返回最终结果。</desc>
+          <defs>
+            <marker id="mrB" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker>
+            <marker id="mrA" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--amber)"/></marker>
+          </defs>
+          <rect class="node" x="110" y="26" width="120" height="48" rx="9"/><text class="title" x="170" y="55" text-anchor="middle">用户</text>
+          <rect class="node" x="460" y="26" width="120" height="48" rx="9"/><text class="title" x="520" y="55" text-anchor="middle">MCP 客户端</text>
+          <rect class="node v" x="820" y="26" width="120" height="48" rx="9"/><text class="title" x="880" y="55" text-anchor="middle">MCP 服务器</text>
+          <path class="life" d="M170 74V424M520 74V424M880 74V424"/>
+          <rect class="active" x="874" y="118" width="12" height="58" rx="4"/>
+          <rect class="active" x="514" y="216" width="12" height="62" rx="4"/>
+          <rect class="active" x="874" y="326" width="12" height="58" rx="4"/>
+          <path class="edge" d="M520 124H868" marker-end="url(#mrB)"/><text class="sub" x="700" y="115" text-anchor="middle">tools/call（id: 1，原始参数）</text>
+          <path class="edge a" d="M880 170H528" marker-end="url(#mrA)"/><text class="sub" x="700" y="161" text-anchor="middle">InputRequiredResult：inputRequests + requestState</text>
+          <path class="edge a" d="M520 222H178" marker-end="url(#mrA)"/><text class="sub" x="345" y="213" text-anchor="middle">展示表单 / 征求输入（elicitation）</text>
+          <path class="edge" d="M170 272H508" marker-end="url(#mrB)"/><text class="sub" x="345" y="263" text-anchor="middle">填写并提交（action: accept）</text>
+          <path class="edge" d="M520 332H868" marker-end="url(#mrB)"/><text class="sub" x="700" y="323" text-anchor="middle">tools/call（id: 2，inputResponses + requestState）</text>
+          <path class="edge a" d="M880 378H528" marker-end="url(#mrA)"/><text class="sub" x="700" y="369" text-anchor="middle">最终结果（resultType: complete）</text>
+          <text class="sub" x="520" y="452" text-anchor="middle">两次调用是相互独立的 JSON-RPC 请求（id 必须不同）——服务器零状态，上下文全部编码在不透明的 requestState 中由客户端带回</text>
+        </svg>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">MRTR 机制</h3>
+          <ul class="clean">
+            <li>仅 <code>tools/call</code>、<code>resources/read</code>、<code>prompts/get</code> 三个请求可返回 <code>InputRequiredResult</code>。</li>
+            <li><code>inputRequests</code> 是「键 → 请求对象」的映射，值只允许 <code>elicitation/create</code>、<code>sampling/createMessage</code>、<code>roots/list</code> 三种；不得发给客户端未声明支持的能力。</li>
+            <li><code>requestState</code> 是只对服务器有意义的 opaque 字符串（可 base64 JSON、加密 JWT、序列化二进制）；客户端必须原样回带、禁止解析或修改。</li>
+            <li>重试是新请求：JSON-RPC <code>id</code> 必须不同；缺信息时服务器应再次返回 <code>InputRequiredResult</code> 而不是报错。</li>
+            <li>服务器可以多次循环请求输入，但不得假设客户端一定会重试。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">requestState 安全红线</h3>
+          <ul class="clean">
+            <li>它经客户端之手，必须按<strong>攻击者可控输入</strong>处理：一旦影响鉴权、资源访问或业务逻辑，必须做完整性保护（HMAC 或 AEAD）并拒绝校验失败的值。</li>
+            <li>防重放应在受保护载荷中绑定：认证主体（跨用户拒收）、短 TTL、原请求标识（方法名 + 关键参数摘要）。</li>
+            <li>「至多消费一次」的语义（如一次性核销）必须由服务器侧自行保证，协议不提供单次性。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card pad" style="margin-top:15px">
+        <h3 style="margin-top:0">Elicitation：服务器向用户要信息（当前唯一的活跃客户端原语）</h3>
+        <ul class="clean">
+          <li><strong>form 模式（带内）</strong>：用受限 JSON Schema 子集（扁平对象 + string/number/boolean/枚举，format 支持 email/uri/date/date-time，支持 default 预填）描述要收集的结构，客户端据此渲染表单并校验。刻意不支持嵌套对象，换取一致的客户端体验。</li>
+          <li><strong>url 模式（带外）</strong>：给一个 URL 让用户自己去开——交互数据不过客户端、不进 LLM 上下文，适合凭据录入与第三方 OAuth（服务器此时同时是 MCP 客户端的资源服务器、第三方服务的 OAuth 客户端）。</li>
+          <li><strong>三动作响应模型</strong>：<code>accept</code>（提交数据）/ <code>decline</code>（明确拒绝）/ <code>cancel</code>（直接关闭）；url 模式的 accept 只代表用户同意打开，完成与否由服务器从 requestState 或自身存储判断。</li>
+          <li><strong>隐私与反钓鱼</strong>：密码、API key、访问令牌、支付凭据<strong>禁止</strong>走 form 模式；客户端必须显示完整 URL、取得明确同意后才打开、不得预取；服务器必须核实打开 URL 的用户与发起请求的用户是同一人（如 connect 页核对会话 cookie 与 MCP 授权的 sub 一致），否则存在账户接管式钓鱼。</li>
+          <li><strong>能力声明</strong>：客户端在每请求的 <code>clientCapabilities.elicitation</code> 声明 <code>form</code>/<code>url</code> 子模式；空对象等价于仅 form。</li>
+        </ul>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">Sampling（已废弃）</h3>
+          <p style="margin:0 0 8px;color:var(--muted)">服务器借宿主的 LLM 做补全（<code>sampling/createMessage</code>，走 MRTR），带 modelPreferences（cost/speed/intelligence 权重）、systemPrompt、maxTokens，设计上全程人工审批。新实现应直接对接 LLM 提供商 API。</p>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">Roots（已废弃）</h3>
+          <p style="margin:0 0 8px;color:var(--muted)">客户端用 <code>file://</code> URI 列表告知服务器工作边界（<code>roots/list</code>）。它是协调机制而非安全边界——「应尊重」而非「必须强制」。新实现改用工具参数 / 资源 URI / 服务器配置传递路径。</p>
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">订阅与通知（subscriptions/listen）</h3>
+          <ul class="clean">
+            <li>过滤器：<code>toolsListChanged</code> / <code>promptsListChanged</code> / <code>resourcesListChanged</code> / <code>resourceSubscriptions</code>（URI 数组）。</li>
+            <li>服务器第一条消息必须是 <code>notifications/subscriptions/acknowledged</code>，其 <code>notifications</code> 字段反映实际接受的子集。</li>
+            <li>流上每条通知带 <code>subscriptionId</code>（即 listen 请求的 JSON-RPC id），多订阅可并发、可分路。</li>
+            <li>服务器主动收摊时应回一个正常响应作为优雅结束；传输断开则客户端可重连；stdio 重连后必须重发 listen。</li>
+            <li>通知是尽力而为，客户端仍应配合轮询/TTL 保证新鲜度。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">进度与取消</h3>
+          <ul class="clean">
+            <li><strong>进度</strong>：请求带 <code>progressToken</code>，服务器以 <code>notifications/progress</code> 回报 <code>progress</code>（必须递增，可浮点）、可选 <code>total</code> 与 <code>message</code>；只在相关请求的响应流上发。</li>
+            <li><strong>取消</strong>：Streamable HTTP 上直接关掉该请求的 SSE 响应流即为取消信号；stdio 上发 <code>notifications/cancelled</code> 引用请求 id。服务器端取消仅用于订阅流收摊。</li>
+            <li><strong>超时</strong>：双方应对所有请求设超时；可按进度通知重置计时，但必须保留最大超时上限。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 7 ============ -->
+    <section id="transports">
+      <div class="head"><h2>7. 传输层：stdio 与 Streamable HTTP</h2><p>同一套 JSON-RPC 消息，两种官方通道；帧格式与取消语义各不相同。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>维度</th><th>stdio</th><th>Streamable HTTP</th></tr></thead>
+          <tbody>
+            <tr><td>形态</td><td>客户端把服务器作为<strong>子进程</strong>启动，stdin/stdout 通信</td><td>服务器是独立进程，暴露<strong>单个 MCP 端点</strong>（如 <code>https://example.com/mcp</code>）接受 POST</td></tr>
+            <tr><td>成帧</td><td>换行分隔的 JSON-RPC，消息内不得含换行</td><td>每条消息一个 HTTP POST；响应为单个 JSON 或该请求作用域内的 SSE 流</td></tr>
+            <tr><td>方向约束</td><td>stdout 只许协议消息且禁止服务器发请求（服务端→客户端交互全部走 MRTR）；日志写 stderr</td><td>客户端只 POST 请求/通知（通知回 202）；服务器不得在流上发独立请求</td></tr>
+            <tr><td>取消</td><td><code>notifications/cancelled</code> + 请求 id</td><td>关闭该请求的 SSE 响应流</td></tr>
+            <tr><td>请求元数据</td><td>全部内联在消息体 <code>_meta</code>，无头层</td><td>镜像到 HTTP 头：<code>MCP-Protocol-Version</code>（必填，须与 _meta 一致）、<code>Mcp-Method</code>、<code>Mcp-Name</code>；头体不一致回 400 + <code>HeaderMismatch</code></td></tr>
+            <tr><td>关闭</td><td>关 stdin → 等退出 → 超时则 SIGTERM/SIGKILL（Windows 用 TerminateProcess / Job Objects）</td><td>流结束即请求结束；订阅流可由任一方关闭</td></tr>
+            <tr><td>授权</td><td>不走 OAuth，凭据从环境变量取</td><td>按第 8 节 OAuth 2.1 框架；须校验 <code>Origin</code> 防 DNS rebinding（无效回 403）、本地只绑 127.0.0.1</td></tr>
+            <tr><td>适用</td><td>本机进程，零网络开销，性能最优</td><td>远程/多客户端；支持标准 HTTP 认证与中间件</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">Streamable HTTP 细节</h3>
+          <ul class="clean">
+            <li>每个 POST 必须带 <code>Accept: application/json, text/event-stream</code>，两种响应都要能处理。</li>
+            <li>SSE 响应流：先发与该请求相关的通知（进度/日志），最终响应结束流；建议带 <code>X-Accel-Buffering: no</code> 让 nginx 等反代关闭缓冲，静默期发 <code>:</code> 注释行做 keep-alive。</li>
+            <li>不再支持 <code>Last-Event-ID</code> 断流恢复——断流即失败，以新 id 重发。</li>
+            <li>未知方法回 <code>404 + -32601</code>（区别于旧 HTTP+SSE 服务器的裸 404）。</li>
+            <li>长连接通知只能来自 <code>subscriptions/listen</code> 的响应流；请求级通知不进订阅流。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">x-mcp-header：参数进 HTTP 头</h3>
+          <ul class="clean">
+            <li>工具 schema 里给原始类型参数标 <code>"x-mcp-header": "Region"</code>，客户端调用时就会加 <code>Mcp-Param-Region: us-west1</code>，供负载均衡/WAF/网关不解体就能路由。</li>
+            <li>约束：非空、RFC 9110 token 语法、schema 内大小写不敏感唯一、仅 integer/string/boolean、只能出现在从根纯 <code>properties</code> 链可达的位置（不得穿过 items/组合关键字/$ref）。</li>
+            <li>非 ASCII/含控制符/首尾空格的值用 Base64 哨兵编码：<code>=?base64?…?=</code>；与哨兵模式撞形的普通值也必须编码。</li>
+            <li>处理消息体的服务器必须校验头值（解码后）与请求体一致，失败回 400 + <code>-32020</code>。</li>
+            <li>敏感参数（密码、密钥、PII）<strong>不应</strong>标注 x-mcp-header——头对链路上中间人可见。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card pad" style="margin-top:15px">
+        <h3 style="margin-top:0">与旧版服务器的互通探测</h3>
+        <ul class="clean">
+          <li><strong>stdio</strong>：双时代（dual-era）客户端应先发 <code>server/discover</code>——拿到 DiscoverResult 或现代错误（如 UnsupportedProtocolVersion）即现代服务器；其他错误或超时则回落 <code>initialize</code> 握手。回落不能绑定特定错误码。</li>
+          <li><strong>HTTP</strong>：先发一个现代请求，收到 400 时先看响应体——含可识别的现代 JSON-RPC 错误说明对方是现代服务器（按其 supported 版本重试）；体为空或不可识别才回落 initialize，乃至旧 HTTP+SSE（先 GET 等 endpoint 事件）。</li>
+          <li>时代判定是服务器属性：按进程（stdio）或源站（HTTP）缓存，可在同配置重启间持久化。</li>
+          <li>只支持现代版的服务器收到旧客户端 <code>initialize</code> 时，应在错误信息中列出自己支持的版本——旧客户端没有前向升级机制，这可能是用户能看到的唯一诊断。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ 8 ============ -->
+    <section id="security">
+      <div class="head"><h2>8. 授权（OAuth 2.1）与安全</h2><p>MCP 服务器即 OAuth 资源服务器；攻击面文档值得整篇读，这里浓缩成可执行的清单。</p></div>
+      <div class="grid3">
+        <div class="mini"><h3>角色映射</h3><p>MCP 服务器 = OAuth 2.1 <strong>资源服务器</strong>；MCP 客户端 = OAuth <strong>客户端</strong>；授权服务器独立部署（RFC 8414 / OIDC Discovery 元数据发现）。</p></div>
+        <div class="mini"><h3>依赖的 RFC</h3><p>OAuth 2.1 草案、RFC 6750（Bearer）、RFC 9728（受保护资源元数据，服务器必须实现）、RFC 8707（resource 指示符，客户端必须实现）、RFC 9207（iss 防混淆）、CIMD 草案。</p></div>
+        <div class="mini"><h3>适用范围</h3><p>仅 HTTP 传输。stdio <strong>不应</strong>走这套流程，凭据从环境获取；双方亦可协商自定义认证。</p></div>
+      </div>
+      <div class="card pad" style="margin-top:15px">
+        <h3 style="margin-top:0">授权全流程</h3>
+        <ul class="clean">
+          <li>① 无令牌请求 → 服务器回 <code>401</code> + <code>WWW-Authenticate</code>（含 <code>resource_metadata</code> URL 与可选 <code>scope</code> 提示）。</li>
+          <li>② 客户端抓取受保护资源元数据（RFC 9728）→ 得到授权服务器列表与 <code>scopes_supported</code>。</li>
+          <li>③ 抓授权服务器元数据（先试 OAuth 2.0 再试 OIDC 端点）。</li>
+          <li>④ 客户端注册：优先 <strong>Client ID Metadata Documents</strong>（用 HTTPS URL 当 client_id，服务器反抓元数据验证 redirect_uris）；RFC 7591 动态注册已废弃但保留兼容；或预注册。</li>
+          <li>⑤ 生成 PKCE，带上 <code>resource</code> 参数（服务器规范化 URI，如 <code>https://mcp.example.com/mcp</code>），按 scope 选择策略定 scope，记录期望 issuer。</li>
+          <li>⑥ 浏览器走授权 → 回调带授权码 + <code>iss</code>；客户端按 RFC 9207 校验 iss 与记录值<strong>字符串精确比对</strong>（不做大小写/端口/斜杠归一），不匹配不得兑换。</li>
+          <li>⑦ 换令牌（code_verifier + resource）→ 后续每个请求带 <code>Authorization: Bearer</code>（令牌绝不能进 URL 查询串）。</li>
+          <li>⑧ 运行中权限不足 → <code>403</code> + <code>error="insufficient_scope"</code> + <code>scope="…"</code> → 客户端取「历史已授权 scope ∪ 本次挑战 scope」做 <strong>step-up</strong> 重新授权，重试有上限。</li>
+        </ul>
+      </div>
+      <div class="card pad table" style="margin-top:15px">
+        <table>
+          <thead><tr><th>攻击面</th><th>一句话机理</th><th>核心缓解</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Confused Deputy</strong>（混淆代理人）</td><td>代理服务器对第三方用静态 client_id，第三方同意 cookie 使恶意动态注册客户端跳过同意页，授权码流向攻击者</td><td>代理必须在转发第三方授权<strong>之前</strong>做每客户端同意；state 仅在同意后落 cookie、单次短时效；redirect_uri 精确匹配</td></tr>
+            <tr><td><strong>Token Passthrough</strong></td><td>服务器不加校验地把客户端令牌透传给下游 API</td><td>明令禁止：服务器必须校验令牌受众（audience，RFC 9068/8707）是发给自己的，只接受自己的令牌</td></tr>
+            <tr><td><strong>SSRF</strong></td><td>恶意服务器把元数据 URL 指向内网/云元数据端点（169.254.169.254 等），借客户端之手探测</td><td>客户端强制 HTTPS（环回除外）、封私网/链路本地段、逐跳校验重定向、出网走 egress 代理、防 DNS TOCTOU；CIMD 场景授权服务器同样适用</td></tr>
+            <tr><td><strong>State Handle 劫持</strong></td><td>猜到/窃取无状态服务器的状态句柄（购物车 ID、requestState）冒用他人状态</td><td>句柄≠认证：安全随机、不透明、绑定 <code>user_id:handle</code>、每次调用重新鉴权、有期限</td></tr>
+            <tr><td><strong>本地服务器失陷</strong></td><td>本地 stdio 服务器是普通进程，可读环境变量、SSH 私钥、任意出网；恶意启动命令混进配置</td><td>一键安装前必须完整展示将执行的命令；沙箱/容器运行；高亮危险模式（sudo、rm -rf、敏感目录）</td></tr>
+            <tr><td><strong>授权 URL 注入</strong></td><td><code>javascript:</code> URL 造成 XSS；经 shell 打开 URL 造成命令注入，可叠加 stdio 代理升级为 RCE</td><td>只允许 http(s) scheme、拒绝 shell 打开 URL、CSP 限制脚本、严格 URL 解析与日志告警</td></tr>
+            <tr><td><strong>Mix-Up 攻击</strong></td><td>攻击者控制的授权服务器骗客户端把别家发的授权码发给自己</td><td>响应 iss 校验（绑定重定向前记录的 issuer）；PKCE 与 resource 参数单独都不够</td></tr>
+            <tr><td><strong>localhost redirect 冒充</strong></td><td>CIMD 只能证明域名，不能证明哪个本地进程在监听 localhost 回调</td><td>授权服务器对仅 localhost 的 redirect_uri 显示额外警告、明示回调主机名</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">Scope 最小化</h3>
+          <ul class="clean">
+            <li>渐进式授权：初始只要低风险 scope（如 <code>mcp:tools-basic</code>），高危操作首次触发时按 <code>WWW-Authenticate</code> 挑战递增。</li>
+            <li>初始挑战无 scope 参数时，回退请求 <code>scopes_supported</code> 全集（由 AS 与用户在同意页裁剪）。</li>
+            <li>避免通配/大杂烩 scope（<code>*</code>、<code>all</code>）；一次挑战应给全当前操作所需，别挤牙膏式逐个加。</li>
+            <li>令牌被盗时窄 scope 限制横向爆炸半径、简化撤销、让审计可读。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">本地服务器安全清单（官方指南精华）</h3>
+          <ul class="clean">
+            <li><strong>能远程就别本地</strong>：只包远程 API 的服务器在本机运行毫无收益；Streamable HTTP 版不在你机器上跑代码。</li>
+            <li><strong>装前查来源</strong>：可追到真实维护者的仓库、精确包名防抢注、固定版本（容器按 digest 固定整棵依赖树）、优先有签名/证明/SBOM 的产物。</li>
+            <li><strong>工具定义是运行时输入</strong>：安装不是最后一次信任决策——用 Inspector 读一遍工具描述，描述里藏着与功能无关的指令就移除；警惕安装后悄悄改定义的 rug pull。</li>
+            <li><strong>容器隔离是最高杠杆</strong>：第三方服务器进容器跑、只挂必要目录；stdio 语义在容器上不变。</li>
+            <li><strong>凭据按服务器隔离</strong>：用每服务器 env 配置而非全局导出；令牌最小 scope；限文件系统与出网。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout warn" style="margin-top:14px"><p><strong>两条铁律：</strong>① stdio 客户端与服务器共享同一信任域——stdio 不是沙箱，隔离责任在宿主与运维；② 每多装一个服务器，所有服务器共享的模型上下文就多一分被投毒的面（tool poisoning / shadowing）——保持清单最小。</p></div>
+    </section>
+
+    <!-- ============ 9 ============ -->
+    <section id="utilities">
+      <div class="head"><h2>9. 缓存、分页、补全与可观测性</h2><p>四个横切工具类能力，其中缓存提示是本版新要求。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>能力</th><th>机制</th><th>要点</th></tr></thead>
+          <tbody>
+            <tr><td><strong>缓存</strong>（CacheableResult）</td><td><code>server/discover</code>、<code>tools/list</code>、<code>prompts/list</code>、<code>resources/list</code>、<code>resources/templates/list</code>、<code>resources/read</code> 的 complete 结果<strong>必须</strong>带 <code>ttlMs</code> + <code>cacheScope</code></td><td><code>ttlMs</code> 是新鲜度提示（类比 max-age）：0/缺失/负值都按立即过期；<code>cacheScope</code>：<code>"public"</code> 可被共享缓存跨用户复用，<code>"private"</code> 只能同一授权上下文复用。缓存键 = 方法 + 影响结果的参数；MRTR 重试（带 inputResponses/requestState）的结果禁止缓存。通知到达即失效缓存；TTL 不是轮询间隔</td></tr>
+            <tr><td><strong>分页</strong></td><td>四个 list 方法支持不透明 <code>cursor</code> / <code>nextCursor</code></td><td>页大小由服务器定；游标必须当黑盒（空串也是合法游标）；无 nextCursor 即结尾；无效游标回 <code>-32602</code>；每页独立缓存、无跨页一致性保证，要快照就从头重拉</td></tr>
+            <tr><td><strong>补全</strong>（completion/complete）</td><td>对 prompt 参数与资源模板参数提供 IDE 式自动补全，<code>ref/prompt</code> 或 <code>ref/resource</code> 引用目标</td><td>可带 <code>context.arguments</code> 已填参数做上下文；单次最多 100 条建议，按相关性排序，<code>hasMore</code> 标记更多；客户端应防抖、缓存</td></tr>
+            <tr><td><strong>日志</strong>（已废弃）</td><td>每请求经 <code>_meta</code> 的 <code>io.modelcontextprotocol/logLevel</code> 开启，服务器在<strong>该请求</strong>的响应流上发 <code>notifications/message</code>（RFC 5424 八级）</td><td>未带该字段的请求服务器不得发日志通知；日志是请求作用域的，不进订阅流。迁移：stdio 写 stderr，通用可观测走 OpenTelemetry（配合 _meta 的 W3C trace 上下文透传）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>调试入口：</strong>stdio 服务器的 stderr 日志会被宿主自动捕获——千万别写 stdout（会污染 JSON-RPC 流，Python 里 <code>print()</code> 是雷区）；HTTP 服务器用自身日志聚合 / OpenTelemetry，配合 curl 与浏览器 DevTools 看请求和 SSE 流。常见坑：客户端拉起的服务器工作目录可能未定义，配置里一律用绝对路径。</p></div>
+    </section>
+
+    <!-- ============ 10 ============ -->
+    <section id="ecosystem">
+      <div class="head"><h2>10. 版本兼容与开发者生态</h2><p>版本即日期、兼容靠探测；SDK、Inspector 与示例服务器构成工具链闭环。</p></div>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">版本与兼容模型</h3>
+          <ul class="clean">
+            <li>版本号 <code>YYYY-MM-DD</code>，表示最后一次破坏性变更的日期；向后兼容的更新不升版本。修订版标记 Draft / Current / Final，当前 Current 为 2026-07-28。</li>
+            <li><strong>Modern</strong>（2026-07-28+，每请求元数据）/ <strong>Legacy</strong>（≤2025-11-25，initialize 握手）/ <strong>Dual-era</strong>（两者皆支持）三词贯穿全部互通文档。</li>
+            <li>双时代服务器按开场自动选边：带现代 _meta 的请求按无状态处理；<code>initialize</code> 则进入旧语义，同一端点可并发服务两个时代。</li>
+            <li>兼容矩阵要点：Modern×Modern 直接工作（discover 可选）；Modern×Legacy 失败（stdio 先探测拿确定性错误）；Legacy×Modern 失败（旧客户端无前向机制）；Dual-era 与谁都能通。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">官方 SDK（按支持层级）</h3>
+          <ul class="clean">
+            <li><strong>Tier 1</strong>：TypeScript、Python、C#、Go、Rust、Ruby——功能与协议支持最完整。</li>
+            <li><strong>Tier 2</strong>：Java。</li>
+            <li><strong>Tier 3</strong>：Swift、PHP、Kotlin。</li>
+            <li>全部 SDK 都支持：创建暴露 tools/resources/prompts 的服务器、构建可连任意服务器的客户端、本地与远程传输、类型安全的协议合规。</li>
+            <li>官方教程主线：Python SDK 2.0+ 构建天气服务器（<code>get_alerts</code> / <code>get_forecast</code>）与 LLM 聊天机器人客户端；服务器用 <code>MCPServer("name")</code> 起步，客户端用 <code>Client</code> + <code>stdio_client</code>。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">MCP Inspector：一个包、四种形态</h3>
+          <ul class="clean">
+            <li><code>npx @modelcontextprotocol/inspector</code>（Web 图形界面，默认）、<code>--cli</code>（可脚本化、JSON 输出、退出码可进 CI）、<code>--tui</code>（终端 UI）；同核共享传输、配置、OAuth 状态与新旧协议协商。</li>
+            <li>另附实验性 <code>mcpdo</code>：连一次、按命名连接跑多条命令。</li>
+            <li>要求 Node ≥ 22.19.0；启动器只认 <code>--web/--cli/--tui</code> 与 <code>-h</code>，其余参数全归各客户端。</li>
+            <li>密钥（OAuth 令牌、stdio env）优先存 OS 钥匙串，无钥匙串环境落 <code>~/.mcp-inspector/secrets.json</code>（未加密，除非自带密钥）。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">示例服务器与社区</h3>
+          <ul class="clean">
+            <li>官方参考实现（modelcontextprotocol/servers 仓库）：Filesystem、Git、Fetch 等当前参考服务器，另有归档示例集。</li>
+            <li>官方集成：Brave Search、Cloudflare、GitHub、GitLab、Google Drive/Maps、PostgreSQL、Puppeteer、Slack 等由服务方维护。</li>
+            <li>社区实现覆盖 AWS、Kubernetes、浏览器自动化、数据库等长尾场景。</li>
+            <li>启动姿势：Python 用 <code>uvx mcp-server-git …</code>，npm 用 <code>npx @modelcontextprotocol/server-filesystem ~/Desktop</code>，配置进宿主的 MCP 配置文件。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>推荐路径：</strong>先用 Inspector 裸测服务器（无模型在环，能逐个看工具/资源/提示与 JSON-RPC 交换），再接宿主配置；客户端侧聚合多服务器时考虑渐进式工具发现而非一次全量加载。规范仓库（github.com/modelcontextprotocol）以 SEP 流程演进，社区可经 GitHub Discussions 与贡献指南参与。</p></div>
+    </section>
+  </main>
+  <footer><div class="shell">MCP 官方文档全解：Model Context Protocol 2026-07-28 深度导读 · 依据 modelcontextprotocol.io 官方文档整理</div></footer>
+  <nav class="dock" aria-label="页面快捷导航"><a href="../index.html">首页</a><a href="#">↑ 顶部</a></nav>
+  <script>
+    (()=>{const root=document.documentElement,key="html-docs-theme";/* 全站共享主题 key，值：paper / dark，勿改成文档专属 */
+      const saved=localStorage.getItem(key);
+      if(saved)root.dataset.theme=saved==="dark"?"dark":"paper";document.getElementById("theme").addEventListener("click",()=>{
+        const next=root.dataset.theme==="dark"?"paper":"dark";root.dataset.theme=next;localStorage.setItem(key,next)})})();
+  </script>
+</body>
+</html>
