@@ -6,68 +6,8 @@
     "url": "documents/foundations-os-network-column.html"
   },
   {
-    "title": "简历技术原理 · Java、JVM 与并发",
-    "description": "按简历技术栈组织的Java、JVM 与并发原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。",
-    "date": "2026-10-13",
-    "url": "documents/resume-tech-java-principles.html"
-  },
-  {
-    "title": "简历技术原理 · K8S、可观测性与工程交付",
-    "description": "按简历技术栈组织的K8S、可观测性与工程交付原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。",
-    "date": "2026-10-13",
-    "url": "documents/resume-tech-delivery-principles.html"
-  },
-  {
-    "title": "简历技术原理 · Kafka、RabbitMQ 与事件驱动",
-    "description": "按简历技术栈组织的Kafka、RabbitMQ 与事件驱动原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。",
-    "date": "2026-10-13",
-    "url": "documents/resume-tech-messaging-principles.html"
-  },
-  {
-    "title": "简历技术原理 · LLM、Agent 与工具协议",
-    "description": "按简历技术栈组织的LLM、Agent 与工具协议原理专栏：8个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。",
-    "date": "2026-10-13",
-    "url": "documents/resume-tech-agent-principles.html"
-  },
-  {
-    "title": "简历技术原理 · MySQL 与 Elasticsearch",
-    "description": "按简历技术栈组织的MySQL 与 Elasticsearch原理专栏：7个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。",
-    "date": "2026-10-13",
-    "url": "documents/resume-tech-data-principles.html"
-  },
-  {
-    "title": "简历技术原理 · Python 与视觉 AI 工程",
-    "description": "按简历技术栈组织的Python 与视觉 AI 工程原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。",
-    "date": "2026-10-13",
-    "url": "documents/resume-tech-vision-principles.html"
-  },
-  {
-    "title": "简历技术原理 · Redis 与分布式一致性",
-    "description": "按简历技术栈组织的Redis 与分布式一致性原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。",
-    "date": "2026-10-13",
-    "url": "documents/resume-tech-redis-principles.html"
-  },
-  {
-    "title": "简历技术原理 · Spring 与服务工程",
-    "description": "按简历技术栈组织的Spring 与服务工程原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。",
-    "date": "2026-10-13",
-    "url": "documents/resume-tech-spring-principles.html"
-  },
-  {
-    "title": "简历技术原理 · Temporal 与持久工作流",
-    "description": "按简历技术栈组织的Temporal 与持久工作流原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。",
-    "date": "2026-10-13",
-    "url": "documents/resume-tech-temporal-principles.html"
-  },
-  {
-    "title": "简历技术原理 · Vue、TypeScript 与流式通信",
-    "description": "按简历技术栈组织的Vue、TypeScript 与流式通信原理专栏：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、项目推演与原始资料。",
-    "date": "2026-10-13",
-    "url": "documents/resume-tech-fullstack-principles.html"
-  },
-  {
-    "title": "简历技术原理专栏 · 分类地图与项目推演",
-    "description": "根据简历技术栈组织的原理学习系列：10个独立专栏、63个深挖主题、21幅机制与故障图、10个可运行练习，附记忆关键词、项目映射和官方资料。",
+    "title": "技术原理解析 · 分类导航与实践",
+    "description": "技术原理解析系列：10个独立专栏、63个深挖主题、21幅机制与故障图、10个可运行练习，附记忆关键词、工程场景和官方资料。",
     "date": "2026-10-13",
     "url": "documents/resume-tech-columns.html"
   },
@@ -90,10 +30,70 @@
     "url": "documents/java-agent-ai-interview-illustrated.html"
   },
   {
+    "title": "Java、JVM 与并发 · 原理解析",
+    "description": "Java、JVM 与并发原理解析：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、场景推演与原始资料。",
+    "date": "2026-10-13",
+    "url": "documents/resume-tech-java-principles.html"
+  },
+  {
+    "title": "K8S、可观测性与工程交付 · 原理解析",
+    "description": "K8S、可观测性与工程交付原理解析：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、场景推演与原始资料。",
+    "date": "2026-10-13",
+    "url": "documents/resume-tech-delivery-principles.html"
+  },
+  {
+    "title": "Kafka、RabbitMQ 与事件驱动 · 原理解析",
+    "description": "Kafka、RabbitMQ 与事件驱动原理解析：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、场景推演与原始资料。",
+    "date": "2026-10-13",
+    "url": "documents/resume-tech-messaging-principles.html"
+  },
+  {
+    "title": "LLM、Agent 与工具协议 · 原理解析",
+    "description": "LLM、Agent 与工具协议原理解析：8个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、场景推演与原始资料。",
+    "date": "2026-10-13",
+    "url": "documents/resume-tech-agent-principles.html"
+  },
+  {
     "title": "MCP 官方文档全解：Model Context Protocol 2026-07-28 深度导读",
     "description": "基于 modelcontextprotocol.io 官方文档的中文全解：覆盖 MCP 2026-07-28 版核心架构、无状态协议设计、三大服务器原语、Elicitation 与 MRTR 多轮往返、stdio 与 Streamable HTTP 传输、OAuth 2.1 授权、安全攻防与开发者生态。",
     "date": "2026-10-13",
     "url": "documents/mcp-official-docs-guide.html"
+  },
+  {
+    "title": "MySQL 与 Elasticsearch · 原理解析",
+    "description": "MySQL 与 Elasticsearch原理解析：7个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、场景推演与原始资料。",
+    "date": "2026-10-13",
+    "url": "documents/resume-tech-data-principles.html"
+  },
+  {
+    "title": "Python 与视觉 AI 工程 · 原理解析",
+    "description": "Python 与视觉 AI 工程原理解析：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、场景推演与原始资料。",
+    "date": "2026-10-13",
+    "url": "documents/resume-tech-vision-principles.html"
+  },
+  {
+    "title": "Redis 与分布式一致性 · 原理解析",
+    "description": "Redis 与分布式一致性原理解析：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、场景推演与原始资料。",
+    "date": "2026-10-13",
+    "url": "documents/resume-tech-redis-principles.html"
+  },
+  {
+    "title": "Spring 与服务工程 · 原理解析",
+    "description": "Spring 与服务工程原理解析：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、场景推演与原始资料。",
+    "date": "2026-10-13",
+    "url": "documents/resume-tech-spring-principles.html"
+  },
+  {
+    "title": "Temporal 与持久工作流 · 原理解析",
+    "description": "Temporal 与持久工作流原理解析：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、场景推演与原始资料。",
+    "date": "2026-10-13",
+    "url": "documents/resume-tech-temporal-principles.html"
+  },
+  {
+    "title": "Vue、TypeScript 与流式通信 · 原理解析",
+    "description": "Vue、TypeScript 与流式通信原理解析：6个深挖主题、2幅机制/故障图、1个可运行练习，附记忆关键词、场景推演与原始资料。",
+    "date": "2026-10-13",
+    "url": "documents/resume-tech-fullstack-principles.html"
   },
   {
     "title": "Agent / AI 应用面试题全集：手撕代码与场景题精讲",
