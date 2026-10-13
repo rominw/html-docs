@@ -1,5 +1,11 @@
 [
   {
+    "title": "Java 后端与 Agent / AI 应用 · 面试图解手册",
+    "description": "Java 后端与 Agent / AI 应用面试图解手册：190 道深度题、54 幅原理图，覆盖 JVM、并发、Spring、MySQL、RAG、Agent、前端与通信协议。",
+    "date": "2026-10-13",
+    "url": "documents/java-agent-ai-interview-illustrated.html"
+  },
+  {
     "title": "MCP 官方文档全解：Model Context Protocol 2026-07-28 深度导读",
     "description": "基于 modelcontextprotocol.io 官方文档的中文全解：覆盖 MCP 2026-07-28 版核心架构、无状态协议设计、三大服务器原语、Elicitation 与 MRTR 多轮往返、stdio 与 Streamable HTTP 传输、OAuth 2.1 授权、安全攻防与开发者生态。",
     "date": "2026-10-13",
@@ -28,12 +34,6 @@
     "description": "深入解析 Agent 领域 Human-in-the-Loop 的机制与架构：中断与恢复的状态机本质、审批策略纯函数、异步持久化执行、MCP elicitation 协议、审批疲劳实证与对策，并巡礼 AutoGen、OpenAI Agents SDK、Codex CLI、Claude Agent SDK、smolagents、CrewAI、OpenClaw、nanobot、pi、AgentScope 等开源实现与选型决策框架。",
     "date": "2026-10-12",
     "url": "documents/agent-hitl-deep-dive.html"
-  },
-  {
-    "title": "Java 后端与 Agent / AI 应用 · 面试图解手册",
-    "description": "Java 后端与 Agent / AI 应用面试图解手册：190 道深度题、54 幅原理图，覆盖 JVM、并发、Spring、MySQL、RAG、Agent、前端与通信协议。",
-    "date": "2026-10-12",
-    "url": "documents/java-agent-ai-interview-illustrated.html"
   },
   {
     "title": "OpenClaw 完整剖析：从 Gateway 到 Agent 执行与恢复",
