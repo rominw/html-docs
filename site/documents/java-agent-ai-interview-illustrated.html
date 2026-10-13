@@ -1818,6 +1818,7 @@ PUBLIC_API_BASE可下发，PRIVATE_MODEL_KEY仅留服务端
 <p><strong>验证与关联：</strong>使用本题验收表逐项做故障演练，截图/日志保留版本和预期结果，不以功能点数量衡量。</p>
 
 <a class="back-link" href="#q-85">↑ 回到本题</a></div></details></section><section class="chapter" id="chapter-14"><h2>第十三章：通信协议与实时系统</h2><p>本章覆盖 25 道题。先理解协议解决的层次，再讨论性能与可靠性。SSE、WebSocket、gRPC 重点深入；MQTT、AMQP、WebRTC、WebTransport 建立可用于选型的认识。规范引用按所标版本理解，框架与浏览器的实际支持还需核对部署环境。</p>
+<p class="note"><strong>补齐系统与网络基础：</strong>先读<a href="foundations-os-network-column.html">基础能力专栏</a>，串起 CPU、内存、I/O、DNS、TCP 与 TLS，再回到本章讨论应用协议和恢复语义。</p>
 <details class="question" id="q-86"><summary><span class="qnum">86</span><span class="question-title">TCP、HTTP、WebSocket、JSON、REST，为什么不能放在同一层比较？</span></summary><div class="answer">
 <p><strong>先这样回答：</strong>TCP/QUIC承担传输，TLS保护通道，HTTP/WebSocket定义交互，JSON/Protobuf编码，REST/RPC组织接口语义。选型先说职责与需求，不能跨层比较“谁替代谁”。</p>
 <p><strong>机制与边界：</strong></p>

@@ -1323,17 +1323,18 @@ function renderModelOutput(raw: string): string {
 
     <section id="s-cs">
       <div class="head"><h2>12. 基础 · OS 与网络</h2><p>AI 全栈的地下层：这些题在面试里全部挂在 AI 应用场景上考，纯背八股的答法在这套题里行不通。</p></div>
+      <div class="callout"><p><strong>基础能力专栏：</strong>从 CPU、内存与 I/O 到 DNS、TCP、HTTP / TLS，按机制与故障推演阅读<a href="foundations-os-network-column.html">独立专栏</a>，配有图解、记忆关键词和验证思路。</p></div>
 
       <div class="card pad q">
         <h3>12.1 IO 多路复用：select / poll / epoll <span class="pill g">后端必考</span></h3>
-        <p class="tagline">场景包装：「SSE 网关怎么扛一万条长连接？」——Redis、Netty、Node、Nginx 给的是同一个答案。</p>
+        <p class="tagline">场景包装：「SSE 网关怎么扛一万条长连接？」——先解释事件驱动与资源预算，再核对框架、操作系统和部署配置。</p>
         <ul class="clean">
-          <li><strong>演进一句话：</strong>select 用固定 fd 数组（1024 上限），每次唤醒 O(n) 全量扫；poll 换链表去掉数量限制，仍是 O(n)；epoll 红黑树注册 + 就绪链表，事件回调把就绪 fd 直接挂链表，取用 O(1)。</li>
+          <li><strong>演进一句话：</strong>select 使用 fd_set，常见实现受 FD_SETSIZE 限制；poll 使用描述符数组，扫描成本随集合大小增长；epoll 在内核维护兴趣集合与就绪状态，减少反复提交和扫描大量未就绪 fd，但返回并处理 k 个事件仍有成本，不能概括为严格 O(1)。</li>
           <li><strong>核心思想：</strong>一个线程盯一万条连接不是靠快，是靠<strong>只在 fd 就绪时才干活</strong>——事件驱动，阻塞等待交给内核。</li>
-          <li><strong>LT vs ET：</strong>水平触发没读完下次还通知（宽容）；边缘触发只通知一次，必须配合非阻塞 fd 一次读到 EAGAIN（高性能但易丢事件）。</li>
+          <li><strong>LT vs ET：</strong>水平触发在仍然就绪时可继续通知；边缘触发关注就绪状态的变化，要使用非阻塞 fd，通常读写到 EAGAIN。若为公平性限制单次处理量，需要自行调度剩余工作，不能只等下一次边缘；ET 并不保证更快。</li>
           <li><strong>AI 场景落点：</strong>SSE/WS 长连接网关、LLM 代理的并发流转发，底层全是这套。</li>
         </ul>
-        <div class="callout"><p><strong>答题技巧：</strong>先答「C10K 的本质是阻塞 IO 每连接一线程，内存和上下文切换先爆」，再讲 epoll 怎么把模型变成事件驱动——从问题出发而不是背参数。追问「Java 里对应什么」：NIO/Netty 是 epoll 封装，虚拟线程则是另一种解法（见 12.2）。</p></div>
+        <div class="callout"><p><strong>答题技巧：</strong>先分析每连接一平台线程的内存与调度成本，再讲事件驱动如何组织等待，以及连接、缓冲与业务队列的预算。Java NIO 提供选择器抽象，Netty 可使用平台原生传输；是否使用 epoll 取决于平台与配置。虚拟线程是另一种组织等待的方式（见 12.2），仍需限制实际业务并发。</p></div>
       </div>
 
       <div class="card pad q">

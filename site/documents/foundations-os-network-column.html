@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="description" content="独立基础能力专栏：43 道深度题、12 幅图解、5 个故障场景，串起 CPU、进程与并发、虚拟内存、I/O、文件持久化、DNS、TCP、HTTP 与 TLS，附记忆关键词和验证思路。"><meta name="date" content="2026-10-13"><title>基础能力专栏 · 操作系统、网络与故障推演</title>
+<style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .decision{fill:var(--amber2);stroke:var(--amber);stroke-width:1.6}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    .active{fill:var(--blue2);stroke:var(--blue);stroke-width:1.2}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    .dock{position:fixed;right:18px;bottom:18px;z-index:99;display:flex;gap:4px;padding:6px;border-radius:999px;background:rgba(15,23,42,.82);backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(15,23,42,.28)}
+    .dock a{padding:7px 13px;border-radius:999px;color:#fff;text-decoration:none;font:600 13px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+    .dock a:hover{background:rgba(255,255,255,.16)}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+
+    :focus-visible{outline:3px solid var(--blue);outline-offset:4px}
+    html{scroll-padding-top:76px} .diagram{margin:18px 0}.dock{top:auto}
+    .diagram figcaption{margin-top:14px;color:var(--muted);font-size:13px;line-height:1.7}
+    .q{margin-top:16px;scroll-margin-top:78px}.q h3{margin:0 0 14px;font-size:22px;line-height:1.5}
+    .q h4{margin:18px 0 7px;font-size:16px}.q p{margin:10px 0}.q .pill{vertical-align:middle;margin-right:8px}
+    .q .memory-cue{margin:0 0 16px;padding:10px 13px;border-left:3px solid var(--green);border-radius:8px;background:var(--green2);font-size:14px}
+    .memory-cue strong{color:var(--green)}.verify{color:var(--muted);font-size:14px}
+    .sources{margin-top:18px;color:var(--muted);font-size:13px}.sources a{display:inline-block;margin:0 16px 6px 0}
+    .jump-list{display:flex;flex-wrap:wrap;gap:6px 18px;padding:0;list-style:none;font-size:14px;margin:16px 0}
+    p,li,a{overflow-wrap:anywhere}.practice{margin-top:20px}.practice h3{margin-top:0}
+    pre{overflow:auto;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);font:14px/1.75 Consolas,monospace}
+    pre code{padding:0;border:0;border-radius:0;color:var(--ink);background:transparent;font:inherit}
+    .read-map .mini a{display:block;font-weight:700;margin-bottom:6px}
+    @media(max-width:820px){.pad{padding:18px}.q h3{font-size:19px}.diagram{padding:12px}.lead{font-size:17px}}
+
+@page{margin:14mm}@media print{:root,[data-theme=dark]{
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }body{background:var(--panel)}header{padding:0 0 24px}.stats{grid-template-columns:repeat(4,1fr);gap:8px}.stat{padding:12px}.dock{display:none}.diagram svg{min-width:0}.diagram{overflow:visible;padding:10px;break-inside:avoid}.table table{min-width:0}.q h3{break-after:avoid}.head{break-after:avoid}pre{white-space:pre-wrap;overflow:visible}a{color:var(--ink)}}
+</style></head>
+<body>
+<header><div class="shell"><div class="kicker">COMPUTER SYSTEMS / NETWORKING / ENGINEERING</div><h1>基础能力专栏</h1><p class="lead">从操作系统到网络，把“名词认识”练成“机制能讲、故障能推、证据能找”。围绕一次请求，串起执行、内存、I/O、通信与真实业务结果。</p><div class="doc-meta"><time datetime="2026-10-13">2026年10月13日</time><span>操作系统 · 网络 · 并发 · 排查</span><span>独立阅读 / 面试复习</span></div><div class="actions"><a class="btn" href="#map">开始阅读</a><button class="btn" id="theme" type="button">切换主题</button><button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button></div><div class="stats"><div class="stat"><b>12</b><span>阅读模块，按链路串联</span></div><div class="stat"><b>43</b><span>深度题，配记忆关键词</span></div><div class="stat"><b>12</b><span>机制与故障图解</span></div><div class="stat"><b>5</b><span>综合故障场景</span></div></div></div></header>
+<nav aria-label="专栏章节"><div class="shell"><a href="#map">阅读地图</a><a href="#cpu">CPU、缓存与执行顺序</a><a href="#process">进程、线程、协程与调度</a><a href="#concurrency">并发与同步的正确性</a><a href="#memory">虚拟内存、缺页与容器内存</a><a href="#io">I/O 模型、epoll 与背压</a><a href="#storage">文件、页缓存与持久化</a><a href="#network">网络分层、路由与 DNS</a><a href="#tcp">TCP</a><a href="#http">HTTP、TLS 与实时通信</a><a href="#cases">五个故障场景</a><a href="#recall">自测与串联</a></div></nav>
+<main class="shell"><section id="map"><div class="head"><h2>1. 先建立一张完整的能力地图</h2><p>目标是解释一次请求的执行、等待、资源与结果，而不仅是认出名词。</p></div>
+<div class="grid3"><div class="mini"><h3>能说机制</h3><p>说明状态在哪里，执行者是谁，数据何时移动，哪一步需要等待。比较概念时先指出层级与保证范围。</p></div><div class="mini"><h3>能推故障</h3><p>把同一流程放到重试、丢响应、进程退出、慢消费者和资源受限的条件下，推演留下什么事实。</p></div><div class="mini"><h3>能拿证据</h3><p>给出可反驳的假设、观察对象和验证步骤。区分真实结果、受理状态、传输确认与客户端的未知。</p></div></div>
+<div class="callout" style="margin-top:16px"><p><strong>阅读方法：</strong>先按每题关键词复述，再展开机制、例子和边界。目录可直接跳到专题，浏览器查找可定位题目。按图解释一遍之后，再做最后五个故障场景。</p></div>
+<div class="grid2 read-map" style="margin-top:16px"><div class="mini"><h3>第一条主线：系统如何执行</h3><p>CPU 与缓存 → 进程调度 → 并发同步 → 虚拟内存 → I/O 与文件。把“正在算”和“正在等”分开。</p></div><div class="mini"><h3>第二条主线：请求如何抵达</h3><p>DNS 与路由 → TCP → TLS / HTTP → 实时事件与业务结果。把“连接可靠”和“业务可靠”分开。</p></div></div>
+<p class="verify"><strong>适用范围：</strong>以 Linux 常见实现路径及 TCP / HTTP 标准为基础，Java、Node.js 与 AI 流式链路作为应用例子。硬件布局、内核、库和部署策略须按实际环境核对。所有演算数值都是假设，验证段落是练习方法，不代表线上评测。</p>
+<figure class="card diagram" id="fig-map"><svg viewBox="0 0 1040 360" role="img" aria-labelledby="map-title map-desc"><title id="map-title">一次请求如何贯穿基础能力</title><desc id="map-desc">复用与缓存会跳过部分步骤；图中连接路径按实际协议区分。</desc><defs><marker id="ar-map-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="ar-map-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker><marker id="ar-map-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--red)"/></marker></defs><g class="diagram-node"><rect class="node " x="45" y="65" width="250" height="76" rx="10"/><text class="title" x="170.0" y="96" text-anchor="middle">浏览器与名称</text><text class="sub" x="170.0" y="120" text-anchor="middle">URL / 缓存 / DNS / 下一跳</text></g><g class="diagram-node"><rect class="node " x="395" y="65" width="250" height="76" rx="10"/><text class="title" x="520.0" y="96" text-anchor="middle">连接与安全</text><text class="sub" x="520.0" y="120" text-anchor="middle">TCP 或 QUIC / TLS</text></g><g class="diagram-node"><rect class="node " x="745" y="65" width="250" height="76" rx="10"/><text class="title" x="870.0" y="96" text-anchor="middle">内核 I/O</text><text class="sub" x="870.0" y="120" text-anchor="middle">socket / 缓冲 / 事件</text></g><g class="diagram-node"><rect class="node g" x="745" y="230" width="250" height="76" rx="10"/><text class="title" x="870.0" y="261" text-anchor="middle">应用执行</text><text class="sub" x="870.0" y="285" text-anchor="middle">线程 / 调度 / 同步</text></g><g class="diagram-node"><rect class="node g" x="395" y="230" width="250" height="76" rx="10"/><text class="title" x="520.0" y="261" text-anchor="middle">数据与持久状态</text><text class="sub" x="520.0" y="285" text-anchor="middle">数据库 / 文件 / 回写</text></g><g class="diagram-node"><rect class="node g" x="45" y="230" width="250" height="76" rx="10"/><text class="title" x="170.0" y="261" text-anchor="middle">用户得到结果</text><text class="sub" x="170.0" y="285" text-anchor="middle">响应 / 重连 / 查证</text></g><path class="edge " d="M295 103H395" marker-end="url(#ar-map-blue)"/><path class="edge " d="M645 103H745" marker-end="url(#ar-map-blue)"/><path class="edge " d="M870 141V230" marker-end="url(#ar-map-blue)"/><path class="edge " d="M745 268H645" marker-end="url(#ar-map-blue)"/><path class="edge " d="M395 268H295" marker-end="url(#ar-map-blue)"/><text class="sub" x="520" y="190" text-anchor="middle">每一段都问：谁等待、占什么资源、确认了什么、失败如何恢复？</text></svg><figcaption>一次请求如何贯穿基础能力。复用与缓存会跳过部分步骤；图中连接路径按实际协议区分。</figcaption></figure></section>
+<section id="cpu"><div class="head"><h2>2. CPU、缓存与执行顺序</h2><p>从一条读写指令讲到跨核竞争，分清快、正确和可见。</p></div>
+<ul class="jump-list"><li><a href="#q-1">01 · CPU 很快，程序为什么仍会被内存拖慢？</a></li><li><a href="#q-2">02 · 两个线程改不同变量，为什么也可能互相拖慢？</a></li><li><a href="#q-3">03 · 缓存一致性、内存屏障、语言内存模型是一回事吗？</a></li><li><a href="#q-4">04 · count++ 为什么不是原子操作？原子指令又为什么不是事务？</a></li></ul>
+<figure class="card diagram" id="fig-cpu"><svg viewBox="0 0 1040 360" role="img" aria-labelledby="cpu-title cpu-desc"><title id="cpu-title">伪共享：变量独立，硬件争用仍可能存在</title><desc id="cpu-desc">是否发生及影响大小需结合真实布局、架构与负载验证。</desc><defs><marker id="ar-cpu-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="ar-cpu-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker><marker id="ar-cpu-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--red)"/></marker></defs><g class="diagram-node"><rect class="node " x="70" y="55" width="330" height="76" rx="10"/><text class="title" x="235.0" y="86" text-anchor="middle">核 A / 私有缓存</text><text class="sub" x="235.0" y="110" text-anchor="middle">线程 A 写 counterA</text></g><g class="diagram-node"><rect class="node " x="640" y="55" width="330" height="76" rx="10"/><text class="title" x="805.0" y="86" text-anchor="middle">核 B / 私有缓存</text><text class="sub" x="805.0" y="110" text-anchor="middle">线程 B 写 counterB</text></g><g class="diagram-node"><rect class="node a" x="300" y="220" width="440" height="76" rx="10"/><text class="title" x="520.0" y="251" text-anchor="middle">同一逻辑缓存行</text><text class="sub" x="520.0" y="275" text-anchor="middle">counterA 与 counterB：业务变量独立</text></g><path class="edge " d="M235 131V180H410V220" marker-end="url(#ar-cpu-blue)"/><path class="edge " d="M805 131V180H630V220" marker-end="url(#ar-cpu-blue)"/><path class="edge a" d="M400 90H640" marker-end="url(#ar-cpu-amber)"/><text class="sub" x="520" y="73" text-anchor="middle">一致性通信 / 写所有权</text><text class="sub" x="520" y="330" text-anchor="middle">一致性按硬件粒度协调；可见性约束与伪共享性能问题要分别处理。</text></svg><figcaption>伪共享：变量独立，硬件争用仍可能存在。是否发生及影响大小需结合真实布局、架构与负载验证。</figcaption></figure>
+<article class="card pad q" id="q-1">
+<h3><span class="pill g">01</span>CPU 很快，程序为什么仍会被内存拖慢？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 局部性 · 缓存层级 · 工作集 · 延迟与带宽</p>
+<p><strong>先这样回答：</strong>CPU 执行指令的速度不等于获取数据的速度。缓存利用时间和空间局部性减少昂贵访问；程序是否快，取决于工作集、访问模式和实际瓶颈。</p>
+<h4>机制与边界</h4><p>顺序遍历连续数组通常更容易利用缓存行与预取；追逐链表指针需要等待下一地址，可能形成串行依赖。缓存容量、关联冲突和并发访问都会影响命中率，不能只根据算法的大 O 比较真实耗时。</p>
+<p>延迟描述一次访问等待多久，带宽描述单位时间搬多少数据。多核扫描大数组可能耗尽内存带宽；增加线程不能让共享带宽无限增长。</p>
+<p><strong>例子与时序：</strong>同样访问一百万个元素，数组顺扫与随机索引可能有不同缓存行为；这是待测的机制假设，不是固定倍数的性能承诺。</p>
+<p><strong>追问接答：</strong>“缓存越大越快？”还要看访问延迟和工作集。“把所有数据预加载？”会竞争容量，也增加分配与生命周期成本。</p>
+<p class="verify"><strong>如何验证：</strong>固定数据量与业务结果，分别测顺扫、乱序和多线程；同时记录吞吐、CPU、缓存未命中与内存带宽，避免只比较一次耗时。</p>
+</article>
+<article class="card pad q" id="q-2">
+<h3><span class="pill g">02</span>两个线程改不同变量，为什么也可能互相拖慢？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 独立变量 · 同一缓存行 · 一致性争用 · 布局/分片</p>
+<p><strong>先这样回答：</strong>这可能是伪共享：逻辑上独立的可写数据处在同一缓存行，不同核反复争取写入所有权。没有共享业务变量，也可能共享硬件一致性粒度。</p>
+<h4>机制与边界</h4><p>假设两个热点计数器落在同一条缓存行，核 A 改第一个、核 B 改第二个，缓存行会产生一致性通信与所有权转移。真实共享是争同一个逻辑对象，伪共享则是数据布局造成的额外争用。</p>
+<p>可尝试按线程分片、降低共享写频率或隔离热点字段，但会增加空间、汇总成本与布局依赖。常见缓存行大小不能直接当作所有架构、所有运行时对象布局的保证。</p>
+<p><strong>例子与时序：</strong>每线程累加本地计数，最后汇总，可以减少共享写；运行中的分片总和未必是同一时刻的原子快照，不能直接用于严格额度裁决。</p>
+<p><strong>追问接答：</strong>“加 volatile 就能修复？”可见性不会消除缓存行争用。“字段填充一定有效？”要验证真实布局与优化结果。</p>
+<p class="verify"><strong>如何验证：</strong>用相同工作量比较相邻计数、隔离布局与分片；检查编译优化、核数和实际布局，不能把无竞争的单线程结果当证据。</p>
+</article>
+<article class="card pad q" id="q-3">
+<h3><span class="pill g">03</span>缓存一致性、内存屏障、语言内存模型是一回事吗？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 单位置一致性 · 跨位置顺序 · 编译器 · 发布关系</p>
+<p><strong>先这样回答：</strong>缓存一致性协调同一位置的观察，内存顺序还涉及多个位置、编译器和处理器。应用要依赖语言规定的同步关系，不能拿某台机器上的观察替代正确性证明。</p>
+<h4>机制与边界</h4><p>发布一个对象包含“写数据，再发布可见标志”。读取方应通过相应同步手段观察发布，再使用数据。没有正确关系，跨位置观察可能不符合源码直觉；编译器也可以作不改变单线程语义的优化。</p>
+<p>屏障限制某类访问重排或观察顺序，不自动把整个业务动作变成原子操作。Java volatile、C/C++ 原子、内核屏障属于不同契约层，不能逐字照搬；要从所用语言与 API 推导。</p>
+<p><strong>例子与时序：</strong>读取方先读数据、后检查发布标志，可能已经错过保护该次读取所需的顺序。改变代码顺序后“暂时没出错”，也不是反例不存在的证明。</p>
+<p><strong>追问接答：</strong>“CPU 缓存一致就不需要锁？”不成立，跨变量不变量与读改写仍需同步。“屏障会把所有缓存都清空？”不是通用模型。</p>
+<p class="verify"><strong>如何验证：</strong>画出发布方写入、同步动作、读取方观察和数据读取的关系；使用对应语言的并发测试工具，明确压力测试只辅助验证，不替代模型证明。</p>
+</article>
+<article class="card pad q" id="q-4">
+<h3><span class="pill g">04</span>count++ 为什么不是原子操作？原子指令又为什么不是事务？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 读 → 算 → 写 · 丢失更新 · 原子边界 · 多字段不变量</p>
+<p><strong>先这样回答：</strong>count++ 是读改写组合，多个线程可能覆盖结果。原子类或指令保护指定操作，但两个原子字段各自安全，不等于它们之间的业务约束也安全。</p>
+<h4>机制与边界</h4><p>A、B 都读到 10，各算出 11 并写回，最后是 11 而非 12。锁可覆盖整段临界区，原子读改写可裁决某个状态位置；关键是把需要同时成立的条件纳入同一保护边界。</p>
+<p>从余额 A 扣款和给 B 加款，是跨状态的不变量。分别对两个字段做 CAS，不能自动得到全部成功或全部回滚；还要考虑失败恢复、死锁与外部副作用。</p>
+<p><strong>例子与时序：</strong>库存条件扣减要把“库存足够”和“减一”合成一个裁决；若先读取再原子覆盖固定结果，仍可能丢失更新。</p>
+<p><strong>追问接答：</strong>“64 位读写不撕裂就足够？”不撕裂不是复合原子。“所有问题都用 CAS？”竞争重试、ABA 和跨对象约束仍要处理。</p>
+<p class="verify"><strong>如何验证：</strong>手算两个参与者的读写交错，再明确采用原子读改写或锁后的线性化点；单次运行碰巧得到正确总数不能证明无竞态。</p>
+</article>
+<p class="sources"><strong>核对资料：</strong> <a href="https://docs.kernel.org/core-api/wrappers/memory-barriers.html">Linux 内核：内存屏障</a></p></section>
+<section id="process"><div class="head"><h2>3. 进程、线程、协程与调度</h2><p>谁拥有资源，谁获得 CPU，谁在等待？先把三个问题分开。</p></div>
+<ul class="jump-list"><li><a href="#q-5">05 · 程序、进程、线程和协程分别是什么？</a></li><li><a href="#q-6">06 · 系统调用、用户态/内核态切换和上下文切换有什么区别？</a></li><li><a href="#q-7">07 · CPU 低但负载高，或者机器空闲却被限速，怎么解释？</a></li><li><a href="#q-8">08 · fork、exec、IPC 和优雅退出，怎样连成完整生命周期？</a></li></ul>
+<figure class="card diagram" id="fig-process"><svg viewBox="0 0 1040 360" role="img" aria-labelledby="process-title process-desc"><title id="process-title">调度状态与等待</title><desc id="process-desc">这是概念模型，不替代 Linux 或语言运行时的完整状态枚举。</desc><defs><marker id="ar-process-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="ar-process-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker><marker id="ar-process-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--red)"/></marker></defs><g class="diagram-node"><rect class="node " x="50" y="115" width="270" height="76" rx="10"/><text class="title" x="185.0" y="146" text-anchor="middle">可运行</text><text class="sub" x="185.0" y="170" text-anchor="middle">有资格运行，不等于正在运行</text></g><g class="diagram-node"><rect class="node g" x="385" y="115" width="270" height="76" rx="10"/><text class="title" x="520.0" y="146" text-anchor="middle">运行中</text><text class="sub" x="520.0" y="170" text-anchor="middle">获得 CPU 执行指令</text></g><g class="diagram-node"><rect class="node a" x="720" y="115" width="270" height="76" rx="10"/><text class="title" x="855.0" y="146" text-anchor="middle">等待事件/资源</text><text class="sub" x="855.0" y="170" text-anchor="middle">当前条件未满足</text></g><path class="edge " d="M320 153H385" marker-end="url(#ar-process-blue)"/><text class="sub" x="352" y="137" text-anchor="middle">调度</text><path class="edge a" d="M655 153H720" marker-end="url(#ar-process-amber)"/><text class="sub" x="687" y="137" text-anchor="middle">等待</text><path class="edge a" d="M520 115V65H185V115" marker-end="url(#ar-process-amber)"/><text class="sub" x="350" y="48" text-anchor="middle">抢占 / 主动让出后重新竞争 CPU</text><path class="edge " d="M855 191V255H185V191" marker-end="url(#ar-process-blue)"/><text class="sub" x="520" y="279" text-anchor="middle">条件满足 → 重新可运行；不保证立即执行</text><text class="sub" x="520" y="326" text-anchor="middle">系统调用可以在当前任务内完成，不必进入等待；语言线程状态也不等于这张简化图。</text></svg><figcaption>调度状态与等待。这是概念模型，不替代 Linux 或语言运行时的完整状态枚举。</figcaption></figure>
+<article class="card pad q" id="q-5">
+<h3><span class="pill g">05</span>程序、进程、线程和协程分别是什么？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 程序是代码 · 进程是资源环境 · 线程是执行流 · 协程由运行时调度</p>
+<p><strong>先这样回答：</strong>程序是静态代码与数据，进程是运行中的资源环境，线程是执行流。协程把可挂起的执行上下文交给运行时管理，但最终仍需要操作系统线程执行指令。</p>
+<h4>机制与边界</h4><p>同进程线程共享地址空间、文件描述符等资源，各自保存执行上下文与栈。进程通常有独立地址空间，仍可通过共享映射或 IPC 通信；隔离不是“不可能共享”。</p>
+<p>协程是否可迁移、如何调度以及阻塞调用如何处理，取决于运行时。await 暂停后续执行，不自动使 CPU 密集代码并行，也不保证任何阻塞调用都能释放底层线程。</p>
+<p><strong>例子与时序：</strong>一个事件循环处理一千个等待中的网络请求，不代表一千个 CPU 任务在同时执行；一个长时间 JSON 转换仍可能拖住同线程的其他回调。</p>
+<p><strong>追问接答：</strong>“多进程一定比线程慢？”要看隔离、IPC 和工作量。“协程都是栈复制？”实现可用不同策略，先说明运行时。</p>
+<p class="verify"><strong>如何验证：</strong>分别增加等待时间与纯计算量，观察并发数、线程数、事件循环延迟和 CPU；不要把等待并发与计算并行混成一个数字。</p>
+</article>
+<article class="card pad q" id="q-6">
+<h3><span class="pill g">06</span>系统调用、用户态/内核态切换和上下文切换有什么区别？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 权限边界 · 内核执行 · 任务切换 · 保存状态 · 缓存影响</p>
+<p><strong>先这样回答：</strong>系统调用让当前执行流请求内核服务，不必然换成另一个任务。上下文切换是调度到不同执行任务，需要保存与恢复状态；两种成本会相互影响，却不是同一件事。</p>
+<h4>机制与边界</h4><p>read、write、socket 等接口进入内核执行相关操作；数据已经可用时，调用可能返回而不发生任务切换。若要等待 I/O，调度器可以让别的任务运行，之后再恢复等待者。</p>
+<p>任务切换会处理寄存器、栈与调度状态；跨地址空间切换还涉及映射上下文。TLB、缓存和分支预测受到的影响随硬件与路径变化，不是每次都把全部缓存清空。</p>
+<p><strong>例子与时序：</strong>读内存中的缓存数据和等待远端报文，虽然都可能经过 read，产生的等待与切换行为不同。优化要先确认时间花在内核工作、调度还是业务处理。</p>
+<p><strong>追问接答：</strong>“一次系统调用等于两次线程切换？”错误。“减少 syscall 一定更快？”批处理可能增加等待、内存与延迟。</p>
+<p class="verify"><strong>如何验证：</strong>结合系统调用采样、上下文切换速率与线程栈，比较相同吞吐下的变化；采样或跟踪本身有开销，先在受控环境观察。</p>
+</article>
+<article class="card pad q" id="q-7">
+<h3><span class="pill g">07</span>CPU 低但负载高，或者机器空闲却被限速，怎么解释？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 可运行 · 不可中断等待 · load 非 CPU% · 配额 · throttling</p>
+<p><strong>先这样回答：</strong>Linux load average 不是 CPU 使用率：它包含可运行任务及部分不可中断等待。容器还可能受 CPU 配额限制，宿主机有空闲不代表该容器有可用预算。</p>
+<h4>机制与边界</h4><p>可运行不等于正在运行，线程可能排队等 CPU；不可中断等待常与内核等待路径相关，但不能只凭 D 状态就断定某块磁盘故障。需要结合 I/O、调用栈与持续时间定位。</p>
+<p>CPU 配额限制在时间窗口内可消耗的执行预算，权重则影响竞争时的分配。cpu.stat 的节流统计、祖先限制和部署策略要一起看，不能套一个“核数×线程数”公式。</p>
+<p><strong>例子与时序：</strong>服务有 32 个忙碌线程，但容器仅获约 2 核预算，更多线程可能增加排队与切换；持续限速会拉长延迟，即使宿主机总 CPU 不高。</p>
+<p><strong>追问接答：</strong>“load 超过核数一定报警？”要看是否持续及等待来源。“线程 RUNNABLE 就正在烧 CPU？”语言运行时状态与 OS 状态也不能直接一一对应。</p>
+<p class="verify"><strong>如何验证：</strong>同时记录 CPU 使用、可运行队列、切换、I/O 等待及 cgroup 节流；以同负载调整单个限制，验证尾延迟与节流是否同向变化。</p>
+</article>
+<article class="card pad q" id="q-8">
+<h3><span class="pill g">08</span>fork、exec、IPC 和优雅退出，怎样连成完整生命周期？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 创建 → COW → 替换映像 → 通信 → 停受理 → 排空/恢复</p>
+<p><strong>先这样回答：</strong>fork 创建子进程，Linux 常以写时复制避免立即复制全部私有页；exec 替换当前进程的程序映像。运行后通过 IPC 协作，退出前还要处理受理、在途任务和结果恢复。</p>
+<h4>机制与边界</h4><p>COW 将复制成本推迟到相关私有页被写时，页表与任务结构仍有成本；共享映射另有语义。多线程进程 fork 后，子进程只保留调用线程，继承的锁状态使 exec 前可安全调用的操作受到限制。</p>
+<p>管道、Unix socket、共享内存等有不同边界与同步成本，共享内存不会附赠互斥。优雅退出通常先停止接收新任务，再在预算内排空、记录未知结果和释放资源；SIGKILL 不能指望 finally 收口。</p>
+<p><strong>例子与时序：</strong>父进程写时复制快照期间持续修改大量页，可能增加实际内存；服务被强制终止后，远端已完成的退款并不会被本地退出自动撤销。</p>
+<p><strong>追问接答：</strong>“exec 会启动新 PID？”不是通常语义。“发送 SIGTERM 就一定优雅？”还取决于处理器、超时和编排器的强杀行为。</p>
+<p class="verify"><strong>如何验证：</strong>在测试环境观察创建、写入与退出的资源变化；分别测试排空成功、排空超时和强制终止，核对已受理任务是否有可查询结果。</p>
+</article>
+<p class="sources"><strong>核对资料：</strong> <a href="https://man7.org/linux/man-pages/man7/pthreads.7.html">Linux：pthreads</a><a href="https://man7.org/linux/man-pages/man2/fork.2.html">Linux：fork</a><a href="https://man7.org/linux/man-pages/man2/execve.2.html">Linux：execve</a><a href="https://man7.org/linux/man-pages/man7/sched.7.html">Linux：调度</a><a href="https://man7.org/linux/man-pages/man5/proc_loadavg.5.html">Linux：load average</a><a href="https://docs.kernel.org/admin-guide/cgroup-v2.html#cpu">Linux 内核：cgroup v2 CPU 控制</a></p></section>
+<section id="concurrency"><div class="head"><h2>4. 并发与同步的正确性</h2><p>不是“加一个锁”就结束，而是明确保护什么、等待什么、如何恢复。</p></div>
+<ul class="jump-list"><li><a href="#q-9">09 · 互斥锁、信号量、条件变量分别保护什么？</a></li><li><a href="#q-10">10 · CAS、自旋、ABA 与版本号有什么关系？</a></li><li><a href="#q-11">11 · 死锁、活锁、饥饿怎样区分？</a></li><li><a href="#q-12">12 · 线程、协程都便宜了，为什么还必须限制队列与并发？</a></li></ul>
+<figure class="card diagram" id="fig-concurrency"><svg viewBox="0 0 1040 360" role="img" aria-labelledby="concurrency-title concurrency-desc"><title id="concurrency-title">丢失更新：逐个操作完成，不代表整体正确</title><desc id="concurrency-desc">图示是刻意安排的交错，用来分析不变量与原子边界。</desc><defs><marker id="ar-concurrency-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="ar-concurrency-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker><marker id="ar-concurrency-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--red)"/></marker></defs><text class="title" x="140" y="35" text-anchor="middle">请求 A</text><text class="title" x="520" y="35" text-anchor="middle">共享库存 = 100</text><text class="title" x="900" y="35" text-anchor="middle">请求 B</text><path class="life" d="M140 55V305"/><path class="life" d="M520 55V305"/><path class="life" d="M900 55V305"/><path class="edge " d="M140 85H520" marker-end="url(#ar-concurrency-blue)"/><path class="edge " d="M520 115H140" marker-end="url(#ar-concurrency-blue)"/><path class="edge " d="M900 145H520" marker-end="url(#ar-concurrency-blue)"/><path class="edge " d="M520 175H900" marker-end="url(#ar-concurrency-blue)"/><path class="edge " d="M140 215H520" marker-end="url(#ar-concurrency-blue)"/><path class="edge " d="M900 265H520" marker-end="url(#ar-concurrency-blue)"/><text class="sub" x="330" y="76" text-anchor="middle">读库存</text><text class="sub" x="330" y="107" text-anchor="middle">返回 100</text><text class="sub" x="710" y="137" text-anchor="middle">读库存</text><text class="sub" x="710" y="166" text-anchor="middle">返回 100</text><text class="sub" x="330" y="207" text-anchor="middle">写回 99</text><text class="sub" x="710" y="257" text-anchor="middle">写回 99</text><text class="title" x="520" y="331" text-anchor="middle">两次都减一，最终却是 99；应把条件与更新纳入同一裁决边界。</text></svg><figcaption>丢失更新：逐个操作完成，不代表整体正确。图示是刻意安排的交错，用来分析不变量与原子边界。</figcaption></figure>
+<article class="card pad q" id="q-9">
+<h3><span class="pill g">09</span>互斥锁、信号量、条件变量分别保护什么？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 锁保临界区 · 信号量保许可 · 条件变量等谓词 · 醒后重查</p>
+<p><strong>先这样回答：</strong>互斥锁保护共享状态的临界区，信号量管理一定数量的许可，条件变量用于等待受锁保护的业务条件。唤醒只表示可以重新检查，不是业务条件已经永久满足。</p>
+<h4>机制与边界</h4><p>消费者发现队列空，应在持锁检查后使用条件等待；等待操作按其契约释放锁，返回前重新获得锁。使用循环重查，因为有虚假唤醒，也可能被其他消费者先取走数据。</p>
+<p>信号量可限制远端调用并发，但所有入口都必须遵守，异常路径也须归还许可。锁的范围应覆盖同一个不变量，不能一处写字段 A、一处只锁字段 B。</p>
+<p><strong>例子与时序：</strong>库存剩一件，两个等待线程都被唤醒；第一个取得锁后消费库存，第二个醒来仍应发现库存为空并继续等待，而不是凭通知再扣一次。</p>
+<p><strong>追问接答：</strong>“notify 等于交出锁？”不是。“信号量限制线程总数？”只限制遵守该许可协议的操作范围。</p>
+<p class="verify"><strong>如何验证：</strong>测试虚假/重复通知、多个消费者争同一资源、异常归还与超时；核对许可数和业务状态都不会漂移。</p>
+</article>
+<article class="card pad q" id="q-10">
+<h3><span class="pill g">10</span>CAS、自旋、ABA 与版本号有什么关系？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 比较并交换 · 失败重试 · ABA · 版本绑定 · 竞争成本</p>
+<p><strong>先这样回答：</strong>CAS 原子比较当前值与预期值，匹配才更新。它能构建某些无锁算法，但业务仍要处理重试、状态历史和资源生命期；看到 A 不代表从未变化过。</p>
+<h4>机制与边界</h4><p>A→B→A 后，只比当前值的 CAS 可能成功，却无法察觉中间发生过变化。把版本与状态放在同一原子比较边界，可区分历史；分两次读取版本和值则重新引入竞态。</p>
+<p>自旋适合预计很短、竞争有限的等待；长时间无效重试会占 CPU。算法还要处理节点回收、版本回绕和进展保证，不能把“用了 CAS”直接称为整套系统无锁。</p>
+<p><strong>例子与时序：</strong>任务状态再次回到 READY，不代表它还是第一次的任务版本。迟到执行者应比较任务版本与持有身份，避免覆盖新一轮结果。</p>
+<p><strong>追问接答：</strong>“版本号解决所有问题？”还需原子绑定和寿命管理。“高竞争就继续自旋？”可改退避、分片或锁，取舍要实测。</p>
+<p class="verify"><strong>如何验证：</strong>刻意安排 A→B→A，再让旧观察者提交；验证原子版本校验会拒绝。记录竞争下的失败重试、CPU 与吞吐。</p>
+</article>
+<article class="card pad q" id="q-11">
+<h3><span class="pill g">11</span>死锁、活锁、饥饿怎样区分？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 等待环 · 重试无进展 · 长期拿不到 · 资源图 · 进展指标</p>
+<p><strong>先这样回答：</strong>死锁是相关任务相互等待而无法推进，活锁是持续动作却没有有效进展，饥饿是某个任务长期得不到资源。它们的现象、证据与修复方法不同。</p>
+<h4>机制与边界</h4><p>常见死锁讨论关注互斥、占有并等待、不可抢占、循环等待；实际排查要画线程持有与等待的资源图。统一锁顺序、缩短持锁范围或失败时释放资源，才是针对依赖环的措施。</p>
+<p>双方检测冲突后同时退让、又同时重试，可能形成活锁；退避与明确裁决帮助打破同步重试。资源总被高优先级任务抢走则可能饥饿；单个任务等待时长比系统总吞吐更能暴露它。</p>
+<p><strong>例子与时序：</strong>A 持锁 X 等 Y，B 持 Y 等 X，是等待环；两个客户端反复撤销彼此的预约而无人完成，是有动作但无进展。</p>
+<p><strong>追问接答：</strong>“超时即可恢复？”超时能退出等待，不自动回滚已发生的副作用。“公平锁绝无饥饿？”还要看调度和旁路获取策略。</p>
+<p class="verify"><strong>如何验证：</strong>重复抓取等待栈，画资源依赖；同时监控重试次数、任务完成数和最大等待时间，区分忙碌与真实进展。</p>
+</article>
+<article class="card pad q" id="q-12">
+<h3><span class="pill g">12</span>线程、协程都便宜了，为什么还必须限制队列与并发？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 到达率×停留时间 · 在途数量 · 下游上限 · 有界排队 · 受理语义</p>
+<p><strong>先这样回答：</strong>执行上下文更便宜，不会让数据库、带宽、内存和远端容量无限增长。并发限制与队列容量应由完整链路的资源预算决定，而不是只看线程是否创建得出来。</p>
+<h4>机制与边界</h4><p>在稳定系统的平均量关系下，在途数量约为到达率乘停留时间。每秒 200 个请求、平均停留 0.5 秒，约有 100 个在途请求；这不是直接设成 100 个线程的公式，也不描述突发和 P99。</p>
+<p>请求变慢会增加在途量，重试又抬高实际到达率。队列必须有长度与等待预算，过载时明确拒绝、降级或持久受理；仅把同步等待改成无界异步队列，只是换个位置积压。</p>
+<p><strong>例子与时序：</strong>数据库只有 30 个连接，放入一万个协程查询不会得到一万个数据库并发；大量等待者还会保留参数、缓冲和超时状态。</p>
+<p><strong>追问接答：</strong>“池最大 10 就是下游硬上限？”提交线程执行或旁路调用可突破；限制必须放在共享调用边界。“超时后资源都释放？”需要底层协作取消与清理。</p>
+<p class="verify"><strong>如何验证：</strong>注入慢下游，观察在途、排队时间、拒绝、内存和健康接口延迟；恢复后队列应能收敛，不依赖无限等待或手工清空。</p>
+</article>
+<p class="sources"><strong>核对资料：</strong> <a href="https://docs.kernel.org/core-api/wrappers/memory-barriers.html">Linux 内核：内存屏障</a><a href="https://man7.org/linux/man-pages/man2/futex.2.html">Linux：futex</a></p></section>
+<section id="memory"><div class="head"><h2>5. 虚拟内存、缺页与容器内存</h2><p>看清地址、映射、驻留和限制，再解释“还有内存却被杀”。</p></div>
+<ul class="jump-list"><li><a href="#q-13">13 · 虚拟地址、页表、TLB 和缺页怎样协作？</a></li><li><a href="#q-14">14 · malloc 成功、RSS 增长与写时复制，为什么不是同一事件？</a></li><li><a href="#q-15">15 · Java 堆只用了一半，容器为什么会 OOMKilled？</a></li><li><a href="#q-16">16 · 怎样区分内存泄漏、缓存增长、队列积压和回收压力？</a></li></ul>
+<figure class="card diagram" id="fig-memory"><svg viewBox="0 0 1040 395" role="img" aria-labelledby="memory-title memory-desc"><title id="memory-title">地址翻译与缺页边界</title><desc id="memory-desc">不同架构与系统路径有差异；本图强调概念之间不能直接画等号。</desc><defs><marker id="ar-memory-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="ar-memory-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker><marker id="ar-memory-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--red)"/></marker></defs><g class="diagram-node"><rect class="node " x="35" y="70" width="250" height="76" rx="10"/><text class="title" x="160.0" y="101" text-anchor="middle">虚拟页 + 偏移</text><text class="sub" x="160.0" y="125" text-anchor="middle">程序使用的地址</text></g><g class="diagram-node"><rect class="node g" x="365" y="70" width="250" height="76" rx="10"/><text class="title" x="490.0" y="101" text-anchor="middle">TLB</text><text class="sub" x="490.0" y="125" text-anchor="middle">缓存地址翻译</text></g><g class="diagram-node"><rect class="node g" x="755" y="70" width="250" height="76" rx="10"/><text class="title" x="880.0" y="101" text-anchor="middle">物理页 + 偏移</text><text class="sub" x="880.0" y="125" text-anchor="middle">映射已可使用</text></g><g class="diagram-node"><rect class="node " x="365" y="235" width="250" height="76" rx="10"/><text class="title" x="490.0" y="266" text-anchor="middle">页表检查</text><text class="sub" x="490.0" y="290" text-anchor="middle">TLB miss 可在此解决</text></g><g class="diagram-node"><rect class="node a" x="755" y="235" width="250" height="76" rx="10"/><text class="title" x="880.0" y="266" text-anchor="middle">内核缺页处理</text><text class="sub" x="880.0" y="290" text-anchor="middle">建映射 / 读后备存储 / 异常</text></g><path class="edge " d="M285 108H365" marker-end="url(#ar-memory-blue)"/><path class="edge " d="M615 108H755" marker-end="url(#ar-memory-blue)"/><text class="sub" x="685" y="92" text-anchor="middle">命中</text><path class="edge " d="M490 146V235" marker-end="url(#ar-memory-blue)"/><text class="sub" x="545" y="195" text-anchor="middle">未命中</text><path class="edge a" d="M615 273H755" marker-end="url(#ar-memory-amber)"/><text class="sub" x="685" y="300" text-anchor="middle">需处理</text><path class="edge " d="M615 253H690V125H755" marker-end="url(#ar-memory-blue)"/><text class="sub" x="650" y="178" text-anchor="middle">已有有效映射</text><text class="sub" x="520" y="365" text-anchor="middle">TLB miss、缺页和磁盘 I/O 是不同事件；缺页不必读盘，也可能是非法访问。</text></svg><figcaption>地址翻译与缺页边界。不同架构与系统路径有差异；本图强调概念之间不能直接画等号。</figcaption></figure>
+<article class="card pad q" id="q-13">
+<h3><span class="pill g">13</span>虚拟地址、页表、TLB 和缺页怎样协作？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 虚拟页 → 地址翻译 → 物理页；TLB 未命中不等于缺页</p>
+<p><strong>先这样回答：</strong>程序使用虚拟地址，页表描述映射与权限，TLB 缓存地址翻译。TLB 未命中可能通过页表遍历解决；缺页则由内核处理缺少有效映射或权限等情况，二者不能混为一谈。</p>
+<h4>机制与边界</h4><p>地址可以拆为虚拟页号和页内偏移，翻译后得到物理页框加偏移。页表存在不代表所有页已经驻留；首次访问匿名页、文件映射和写时复制都有不同处理路径。</p>
+<p>缺页不必是错误或磁盘读取：可在已有内存页上建立映射，也可能需要从后备存储读取；非法访问或文件映射异常则可能变成进程信号。大小页、TLB 与 NUMA 优化均有适用条件。</p>
+<p><strong>例子与时序：</strong>申请一大段地址后只触碰少量页，虚拟大小与驻留大小可能差很多。再逐页写入，内存、缺页和执行时间才可能明显改变。</p>
+<p><strong>追问接答：</strong>“minor fault 完全没成本？”仍有内核工作。“每次 TLB miss 都读磁盘？”错误。“大页总更好？”还要看碎片、回收与停顿。</p>
+<p class="verify"><strong>如何验证：</strong>区分虚拟映射大小、RSS、minor/major faults；对照首次触碰与再次访问，不把文件页已缓存的试验当冷盘结果。</p>
+</article>
+<article class="card pad q" id="q-14">
+<h3><span class="pill g">14</span>malloc 成功、RSS 增长与写时复制，为什么不是同一事件？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 地址保留 · 实际触碰 · RSS · COW · 共享页计量</p>
+<p><strong>先这样回答：</strong>分配成功不一定立即使相同大小的物理页驻留。实际访问、分配器行为与系统策略决定内存变化；COW 还会在写入时把原来共享的私有页分离。</p>
+<h4>机制与边界</h4><p>分配器可复用已有区域或建立新映射，释放给分配器也不保证立刻归还操作系统。因此 RSS 不回落，可能是活对象、碎片、分配器保留或共享/文件映射，不可只凭一条曲线认定泄漏。</p>
+<p>fork 后的相关私有页可先共享，某一进程写入时复制。RSS 对共享页的计量不适合直接跨进程相加当物理总量；PSS 按共享比例分摊，但同样应说明口径。</p>
+<p><strong>例子与时序：</strong>进程释放一批对象后，业务对象数下降而 RSS 仍高；应先查看映射和分配器，再决定是否为无界持有。相反，持续写 COW 页会增加实际内存压力。</p>
+<p><strong>追问接答：</strong>“malloc 成功说明以后访问都安全？”系统仍可能缺乏资源。“RSS 相加就等于容器用量？”共享、内核与其他计费维度使口径不同。</p>
+<p class="verify"><strong>如何验证：</strong>在测试环境记录申请、触碰、释放三个阶段的对象数与 smaps；区分 RSS/PSS 和 cgroup 用量，避免用进程求和替代容器计费。</p>
+</article>
+<article class="card pad q" id="q-15">
+<h3><span class="pill g">15</span>Java 堆只用了一半，容器为什么会 OOMKilled？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 容器总量 · 堆外/线程/文件页 · cgroup 证据 · 非只有 Xmx</p>
+<p><strong>先这样回答：</strong>容器限制覆盖的内存不只有 Java 活对象。堆、线程栈、直接与原生分配、相关文件页和内核计费都可能影响总量；OOMKilled 与 Java 抛出 OutOfMemoryError 是不同路径。</p>
+<h4>机制与边界</h4><p>Xmx 是堆上限，不是整个进程或容器的上限；堆已提交空间与堆使用空间也不同。内存预算要给元数据、代码、线程、缓冲和负载峰值留空间，不能简单把 Xmx 等于容器限制。</p>
+<p>cgroup v2 可结合 memory.current、memory.stat 与 memory.events 分析；实际部署也可能使用其他版本与层级。退出码 137 只提示被 SIGKILL 终止的常见编码，还需 OOM 事件证据，手工强杀也可能同码。</p>
+<p><strong>例子与时序：</strong>慢客户端让输出缓冲积压，活对象可能增长；线程暴涨会增加栈与运行时开销；大量文件 I/O 还会改变文件页计费。三者不能都用“GC 没回收”解释。</p>
+<p><strong>追问接答：</strong>“NMT 能解释全部 RSS？”只覆盖其可追踪部分。“减 Xmx 必然治本？”可增加余量，但无界缓冲和原生泄漏仍需修复。</p>
+<p class="verify"><strong>如何验证：</strong>对齐被杀前的容器用量、事件、堆提交/使用、线程数与原生指标；在受控环境限制单类资源，验证其变化是否解释峰值。</p>
+</article>
+<article class="card pad q" id="q-16">
+<h3><span class="pill g">16</span>怎样区分内存泄漏、缓存增长、队列积压和回收压力？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 持有链 · 业务寿命 · 有界策略 · 流入/流出 · 回收后基线</p>
+<p><strong>先这样回答：</strong>泄漏要证明不再需要的资源仍持续被持有；缓存可能有用却无界，队列则可能因生产快于消费而积压。它们都能耗尽内存，但修复点不同。</p>
+<h4>机制与边界</h4><p>把内存曲线与任务量、缓存条目、队列长度、线程和连接生命周期对齐。回收后基线持续升高是线索，不是根因；需要找到持有者以及本应释放的时刻。</p>
+<p>页缓存增长和分配器保留可能具有可回收性；持续回收、换入换出或缺页也会拖慢业务。不要看到 free 很小就立刻认定泄漏，先看可用量、回收压力与服务延迟。</p>
+<p><strong>例子与时序：</strong>下游慢使请求在队列里保存大图片，消费恢复后内存回落，说明积压是关键；若已完成请求仍被监听器列表永久引用，则要修正注销与寿命管理。</p>
+<p><strong>追问接答：</strong>“堆里最多的类就是泄漏？”需看支配与引用链。“缓存有 TTL 就一定有界？”到达量、淘汰和过期清理也影响峰值。</p>
+<p class="verify"><strong>如何验证：</strong>采样多个时间点的对象/映射与流量，再跟踪持有链；比较停止新增、排空与清理后的基线，避免仅截一张内存图。</p>
+</article>
+<p class="sources"><strong>核对资料：</strong> <a href="https://man7.org/linux/man-pages/man2/mmap.2.html">Linux：mmap</a><a href="https://docs.kernel.org/admin-guide/cgroup-v2.html#memory">Linux 内核：cgroup v2 内存控制</a></p></section>
+<section id="io"><div class="head"><h2>6. I/O 模型、epoll 与背压</h2><p>先判断通知的是就绪还是完成，再决定谁等待、谁搬数据、谁执行业务。</p></div>
+<ul class="jump-list"><li><a href="#q-17">17 · 阻塞、非阻塞、同步、异步，应该怎样比较？</a></li><li><a href="#q-18">18 · select、poll、epoll 与 LT/ET，关键区别在哪里？</a></li><li><a href="#q-19">19 · Reactor、Proactor、事件循环和 io_uring，怎样分层理解？</a></li><li><a href="#q-20">20 · 半包、短写和慢消费者，怎样保证完整消息与有界内存？</a></li></ul>
+<figure class="card diagram" id="fig-io"><svg viewBox="0 0 1040 375" role="img" aria-labelledby="io-title io-desc"><title id="io-title">从 epoll 就绪到完整业务消息</title><desc id="io-desc">内核通知、数据读取、消息解析和业务执行是四个不同边界。</desc><defs><marker id="ar-io-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="ar-io-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker><marker id="ar-io-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--red)"/></marker></defs><g class="diagram-node"><rect class="node " x="35" y="65" width="250" height="76" rx="10"/><text class="title" x="160.0" y="96" text-anchor="middle">监视集合</text><text class="sub" x="160.0" y="120" text-anchor="middle">已注册 fd 与关心的事件</text></g><g class="diagram-node"><rect class="node " x="365" y="65" width="250" height="76" rx="10"/><text class="title" x="490.0" y="96" text-anchor="middle">就绪状态</text><text class="sub" x="490.0" y="120" text-anchor="middle">内核记录可尝试的操作</text></g><g class="diagram-node"><rect class="node " x="745" y="65" width="270" height="76" rx="10"/><text class="title" x="880.0" y="96" text-anchor="middle">事件循环</text><text class="sub" x="880.0" y="120" text-anchor="middle">epoll_wait 后分发</text></g><g class="diagram-node"><rect class="node g" x="365" y="230" width="250" height="76" rx="10"/><text class="title" x="490.0" y="261" text-anchor="middle">非阻塞读写</text><text class="sub" x="490.0" y="285" text-anchor="middle">短读 / 短写 / EAGAIN</text></g><g class="diagram-node"><rect class="node g" x="745" y="230" width="270" height="76" rx="10"/><text class="title" x="880.0" y="261" text-anchor="middle">业务消息与队列</text><text class="sub" x="880.0" y="285" text-anchor="middle">增量分帧 / 长度上限 / 背压</text></g><path class="edge " d="M285 103H365" marker-end="url(#ar-io-blue)"/><path class="edge " d="M615 103H745" marker-end="url(#ar-io-blue)"/><path class="edge " d="M880 141V188H490V230" marker-end="url(#ar-io-blue)"/><path class="edge " d="M615 268H745" marker-end="url(#ar-io-blue)"/><text class="sub" x="520" y="340" text-anchor="middle">通知不代表消息完整；ET 未处理完的 I/O 要继续读取或自行安排后续处理。</text></svg><figcaption>从 epoll 就绪到完整业务消息。内核通知、数据读取、消息解析和业务执行是四个不同边界。</figcaption></figure>
+<article class="card pad q" id="q-17">
+<h3><span class="pill g">17</span>阻塞、非阻塞、同步、异步，应该怎样比较？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 调用是否等待 · 谁完成操作 · 就绪通知 · 完成通知</p>
+<p><strong>先这样回答：</strong>先说明讨论的是哪个 API。阻塞/非阻塞描述调用在条件不满足时是否等待；就绪模型通知可尝试 I/O，完成模型通知已提交操作的结果。异步返回值或回调本身不能证明内核 I/O 采用哪种模型。</p>
+<h4>机制与边界</h4><p>非阻塞 recv 暂无可读数据时可返回 EAGAIN/EWOULDBLOCK，调用方等待事件后再读。就绪时仍要处理短读、关闭与错误，不意味着已经收齐一条业务消息。</p>
+<p>语言库可把阻塞任务放到线程池，再向调用方返回 Future；调用方看见异步，底层仍可能占用线程。框架还要负责取消、缓冲、超时与错误归属。</p>
+<p><strong>例子与时序：</strong>事件循环收到可读通知后执行一次 recv 得到半个 JSON，这是正常情况。反复 busy-poll 非阻塞读，也不等于高效异步。</p>
+<p><strong>追问接答：</strong>“epoll_wait 会阻塞，所以是 BIO？”它可以等多个描述符事件，与每连接单线程等待不同。“有 Promise 就不占线程？”不能如此推出。</p>
+<p class="verify"><strong>如何验证：</strong>沿实际调用链标出线程、等待位置、数据缓冲和回调来源；分别测试暂无数据、短读、EOF、错误与取消。</p>
+</article>
+<article class="card pad q" id="q-18">
+<h3><span class="pill g">18</span>select、poll、epoll 与 LT/ET，关键区别在哪里？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 监视集合 · 就绪集合 · LT 条件仍在 · ET 状态变化 · EAGAIN</p>
+<p><strong>先这样回答：</strong>select/poll 在接口和遍历方式上与 epoll 不同；epoll 维护注册与就绪状态，避免每次由调用方重交并扫描全部监视项。规模优势不等于每次调用和事件处理都严格 O(1)。</p>
+<h4>机制与边界</h4><p>LT 在就绪条件持续存在时继续报告；ET 按状态变化通知，不能依赖残余数据再次触发。常用正确路径是非阻塞读写并处理到 EAGAIN；大量数据需自行安排后续处理，兼顾公平。</p>
+<p>epoll 返回可尝试的操作，不保证数据仍可读或已完成。select 的 fd 集合限制、poll 的数组成本和 epoll 的维护开销都需结合具体平台与活跃比例，不宜仅背“红黑树加链表”。</p>
+<p><strong>例子与时序：</strong>一次到达 2 KB，只读 1 KB 就回到 ET 等待，剩余数据可能无人继续处理。另一方面，不限量处理一个热点连接，也可能饿死其他连接。</p>
+<p><strong>追问接答：</strong>“ET 必比 LT 快？”取决于实现与负载。“惊群都消失了？”还要说明共享监听器、线程与事件配置，不能泛化。</p>
+<p class="verify"><strong>如何验证：</strong>在 Linux 隔离环境复现短读、EAGAIN、关闭和单连接洪流，记录所有连接的进展；本页没有把这些内核实验当作已运行结果。</p>
+</article>
+<article class="card pad q" id="q-19">
+<h3><span class="pill g">19</span>Reactor、Proactor、事件循环和 io_uring，怎样分层理解？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> Reactor 等就绪 · Proactor 等完成 · 业务执行另层 · 支持按操作核对</p>
+<p><strong>先这样回答：</strong>Reactor 围绕就绪事件分发处理，Proactor 围绕操作完成分发处理。事件循环是执行与调度组织方式；具体 API 能否真正异步、如何回退，要看操作类型、内核与库实现。</p>
+<h4>机制与边界</h4><p>Reactor 收到通知后通常由处理者读写；完成模型由提交与完成结果衔接数据状态。但模型名称不保证所有工作都在内核完成，也不保证一个线程不会被业务回调长时间占据。</p>
+<p>io_uring 使用提交/完成队列组织请求，具体操作与执行路径随版本和配置变化，可能涉及内部工作线程。不能说它使所有磁盘操作都永不阻塞，或在任何负载下比 epoll 快。</p>
+<p><strong>例子与时序：</strong>网络收包走事件循环，压缩大文件若也在该线程执行，会拖住其他连接；移到有界计算池仍须安排结果回传与取消。</p>
+<p><strong>追问接答：</strong>“Node 单线程为什么能读文件？”要区分 JavaScript 回调、系统 I/O 与线程池路径。“把全部业务都异步化？”可能只是把等待转成排队。</p>
+<p class="verify"><strong>如何验证：</strong>标出每一步的实际执行线程与队列；比较事件循环延迟、I/O 延迟、业务 CPU 与取消后的遗留工作，而非只比 API 返回速度。</p>
+</article>
+<article class="card pad q" id="q-20">
+<h3><span class="pill g">20</span>半包、短写和慢消费者，怎样保证完整消息与有界内存？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 分帧状态 · 部分读写 · 长度上限 · 累计缓冲 · 背压/恢复</p>
+<p><strong>先这样回答：</strong>字节流读取块不是业务消息。接收端按协议累计并解析，发送端记录未写完的位置；双方限制帧长度、累计缓冲与等待时间，慢消费者时明确暂停、合并或恢复策略。</p>
+<h4>机制与边界</h4><p>长度前缀协议先收够头，再校验长度并等待正文，解析完整帧后继续处理剩余字节。文本协议还要考虑字符跨块、多行与分隔符转义；不能对每个网络块直接 JSON.parse。</p>
+<p>TCP 流控约束传输窗口，不阻止应用提前把一百万条消息放进自己的内存队列。背压应贯穿业务生产、框架缓冲与 socket，每连接和全局都要有上限。</p>
+<p><strong>例子与时序：</strong>两次 write 发出 A、B，接收可能得到半个 A，再得到剩余 A 加完整 B。若正文含中文，字符也可能跨读取块；先处理字节边界，再按协议解码。</p>
+<p><strong>追问接答：</strong>“write 返回成功等于对方业务成功？”不是。“缓冲超限直接丢最旧？”订单、聊天与遥测有不同丢弃契约，必须按业务决定。</p>
+<p class="verify"><strong>如何验证：</strong>把同一报文按每个切割位置喂给解析器，测试多帧、非法长度、EOF 残留与慢消费。本章附可本地运行的字节分帧练习。</p>
+</article>
+<div class="card pad practice" id="frame-exercise"><h3>可运行练习：四字节长度头 + 原始字节正文</h3><p>复制以下 Python 3 代码到本地运行。它遍历所有一次切割位置、逐字节输入、多帧与空正文，并拒绝超长帧、缓冲超限和 EOF 残留；中文只在完整正文得到后按业务解码。</p><pre><code class="language-python">MAX_FRAME = 64 * 1024
+MAX_BUFFER = 2 * MAX_FRAME + 8
+
+class Decoder:
+    def __init__(self):
+        self.buffer = bytearray()
+
+    def feed(self, chunk):
+        if len(self.buffer) + len(chunk) &gt; MAX_BUFFER:
+            raise ValueError(&quot;buffer budget exceeded&quot;)
+        self.buffer.extend(chunk)
+        messages = []
+        while len(self.buffer) &gt;= 4:
+            size = int.from_bytes(self.buffer[:4], &quot;big&quot;)
+            if size &gt; MAX_FRAME:
+                raise ValueError(&quot;frame too large&quot;)
+            if len(self.buffer) &lt; 4 + size:
+                break
+            messages.append(bytes(self.buffer[4:4 + size]))
+            del self.buffer[:4 + size]
+        return messages
+
+    def finish(self):
+        if self.buffer:
+            raise EOFError(&quot;truncated frame&quot;)
+
+def frame(payload):
+    if len(payload) &gt; MAX_FRAME:
+        raise ValueError(&quot;frame too large&quot;)
+    return len(payload).to_bytes(4, &quot;big&quot;) + payload
+
+expected = [&quot;你好&quot;.encode(&quot;utf-8&quot;), b&quot;ok&quot;, b&quot;&quot;]
+wire = b&quot;&quot;.join(frame(payload) for payload in expected)
+for cut in range(len(wire) + 1):
+    d = Decoder()
+    assert d.feed(wire[:cut]) + d.feed(wire[cut:]) == expected
+    d.finish()
+d = Decoder()
+actual = []
+for value in wire:
+    actual += d.feed(bytes([value]))
+assert actual == expected
+d.finish()
+
+def rejects(error, operation):
+    try:
+        operation()
+    except error:
+        return
+    raise AssertionError(&quot;expected rejection&quot;)
+
+rejects(ValueError, lambda: Decoder().feed((MAX_FRAME + 1).to_bytes(4, &quot;big&quot;)))
+rejects(ValueError, lambda: Decoder().feed(bytes(MAX_BUFFER + 1)))
+d = Decoder()
+d.feed(wire[:2])
+rejects(EOFError, d.finish)
+print(&quot;All split positions, byte-by-byte input and rejection cases passed.&quot;)
+</code></pre><p>这是分帧与输入校验练习，没有连接真实 socket。演示允许空正文，feed 受累计预算约束；超预算的合法大块也需要调用侧分片或拒绝。解析错误应终止该连接状态。真实服务还需处理短写、超时、取消、并发和背压。</p></div>
+<p class="sources"><strong>核对资料：</strong> <a href="https://man7.org/linux/man-pages/man7/epoll.7.html">Linux：epoll</a><a href="https://man7.org/linux/man-pages/man2/recv.2.html">Linux：recv</a><a href="https://nodejs.org/learn/asynchronous-work/event-loop-timers-and-nexttick">Node.js：事件循环</a></p></section>
+<section id="storage"><div class="head"><h2>7. 文件、页缓存与持久化</h2><p>从“写成功”追到“恢复后仍存在”，识别每一层的承诺。</p></div>
+<ul class="jump-list"><li><a href="#q-21">21 · write、flush、fsync 和刷脏页分别完成什么？</a></li><li><a href="#q-22">22 · 文件描述符、打开文件状态、inode 和路径是什么关系？</a></li><li><a href="#q-23">23 · mmap、sendfile 和零拷贝，究竟减少了哪一步？</a></li><li><a href="#q-24">24 · 如何让配置文件替换同时考虑原子可见与崩溃持久？</a></li></ul>
+<figure class="card diagram" id="fig-storage"><svg viewBox="0 0 1040 360" role="img" aria-labelledby="storage-title storage-desc"><title id="storage-title">写入路径与持久化承诺</title><desc id="storage-desc">这是常见缓冲文件 I/O 的简化路径；直接 I/O、映射写等需按具体契约核对。</desc><defs><marker id="ar-storage-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="ar-storage-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker><marker id="ar-storage-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--red)"/></marker></defs><g class="diagram-node"><rect class="node " x="25" y="70" width="210" height="76" rx="10"/><text class="title" x="130.0" y="101" text-anchor="middle">用户态缓冲</text><text class="sub" x="130.0" y="125" text-anchor="middle">库 flush 的边界</text></g><g class="diagram-node"><rect class="node " x="285" y="70" width="210" height="76" rx="10"/><text class="title" x="390.0" y="101" text-anchor="middle">内核页缓存</text><text class="sub" x="390.0" y="125" text-anchor="middle">常见 write 后形成脏页</text></g><g class="diagram-node"><rect class="node " x="545" y="70" width="210" height="76" rx="10"/><text class="title" x="650.0" y="101" text-anchor="middle">回写/设备处理</text><text class="sub" x="650.0" y="125" text-anchor="middle">提交存储请求</text></g><g class="diagram-node"><rect class="node " x="805" y="70" width="210" height="76" rx="10"/><text class="title" x="910.0" y="101" text-anchor="middle">持久存储</text><text class="sub" x="910.0" y="125" text-anchor="middle">结果取决于设备契约</text></g><path class="edge " d="M235 108H285" marker-end="url(#ar-storage-blue)"/><path class="edge " d="M495 108H545" marker-end="url(#ar-storage-blue)"/><path class="edge " d="M755 108H805" marker-end="url(#ar-storage-blue)"/><path class="edge a" d="M390 146V235H910V146" marker-end="url(#ar-storage-amber)"/><text class="sub" x="650" y="218" text-anchor="middle">fsync / fdatasync：按契约同步并检查结果</text><text class="sub" x="520" y="300" text-anchor="middle">文件同步与目录项持久化另有边界；进程崩溃测试不等于断电恢复测试。</text></svg><figcaption>写入路径与持久化承诺。这是常见缓冲文件 I/O 的简化路径；直接 I/O、映射写等需按具体契约核对。</figcaption></figure>
+<article class="card pad q" id="q-21">
+<h3><span class="pill g">21</span>write、flush、fsync 和刷脏页分别完成什么？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 用户缓冲 → 页缓存 → 回写；同步持久化 · 设备契约</p>
+<p><strong>先这样回答：</strong>常见缓冲文件 I/O 中，write 成功不等于数据已稳定持久。库的 flush、内核页缓存回写和 fsync/fdatasync 是不同边界，持久性还依赖文件系统与存储设备的实现契约。</p>
+<h4>机制与边界</h4><p>用户态缓冲库可先把数据留在进程内，flush 将其交给更下层；常见 write 路径可在页缓存形成脏数据，内核随后回写。不能把这几层都称为一次“落盘”。</p>
+<p>fsync 请求同步文件相关数据与元数据，fdatasync 对不影响数据检索的元数据有不同要求；目录项持久化还要考虑目录同步。直接 I/O、映射写与不同文件系统另有约束，不能机械套相同路径。</p>
+<p><strong>例子与时序：</strong>进程崩溃时 OS 缓存可能仍存在；断电则不同。实验仅杀进程后文件还在，不能据此证明写入已经满足断电恢复目标。</p>
+<p><strong>追问接答：</strong>“flush 一定是磁盘同步？”取决于库 API。“fsync 一次保证所有文件？”只覆盖相应对象与契约，跨文件业务原子性还需协议。</p>
+<p class="verify"><strong>如何验证：</strong>分别设计进程退出与存储故障的恢复目标，核对返回值和恢复内容；把故障边界写清楚，不在生产机器直接做断电实验。</p>
+</article>
+<article class="card pad q" id="q-22">
+<h3><span class="pill g">22</span>文件描述符、打开文件状态、inode 和路径是什么关系？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 路径查找 · inode 对象 · 打开状态 · fd 引用 · 生命周期</p>
+<p><strong>先这样回答：</strong>路径是查找名称，inode 标识文件系统对象，打开文件状态保存偏移等信息，fd 是进程使用的引用。删除路径不一定立即释放仍被打开的文件，复制 fd 也不一定产生独立偏移。</p>
+<h4>机制与边界</h4><p>打开过程解析路径并关联底层对象；dup 或 fork 继承的描述符可引用同一打开文件状态，因而共享文件偏移与部分标志。不同 open 调用通常有各自的打开状态，不能只按文件名判断是否共用偏移。</p>
+<p>unlink 去掉目录中的名称，但打开引用仍可继续使用对象；磁盘空间回收要等相关引用释放。socket、管道与普通文件都可表现为 fd，数量泄漏需要追到创建与关闭的责任方。</p>
+<p><strong>例子与时序：</strong>删除一个正在写入的大日志，目录看不到它，但进程仍持有 fd，磁盘空间可能没有释放。只继续删除路径不解决该打开引用。</p>
+<p><strong>追问接答：</strong>“close 一个复制 fd 就全释放？”还要看其他引用。“fd 数字一直指同一个连接？”关闭后可复用，异步事件要防旧身份误操作。</p>
+<p class="verify"><strong>如何验证：</strong>在隔离环境核对 /proc/PID/fd 与打开对象，观察删除、dup、close 后的变化；不要凭 fd 数量直接认定所有长连接泄漏。</p>
+</article>
+<article class="card pad q" id="q-23">
+<h3><span class="pill g">23</span>mmap、sendfile 和零拷贝，究竟减少了哪一步？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 映射非预加载 · 省用户态搬运 · 缺页成本 · 支持边界</p>
+<p><strong>先这样回答：</strong>mmap 将文件或其他对象映射进地址空间，sendfile 可减少文件到 socket 路径中的用户态搬运。零拷贝是优化路径的简称，不等于没有 DMA、内核处理、缺页或所有形式的数据复制。</p>
+<h4>机制与边界</h4><p>映射后访问仍可能触发缺页；映射本身不保证文件已全部进内存或数据已持久。顺序、随机访问与工作集大小影响映射方案的表现，还要处理映射文件被截断等异常。</p>
+<p>sendfile 避免常见 read 到用户缓冲再 write 的往返，但需处理短发送、阻塞/非阻塞与支持条件。加密、压缩、设备与库配置会改变优化能否应用，不固定承诺“四次变两次”。</p>
+<p><strong>例子与时序：</strong>静态大文件可受益于减少搬运；若业务必须逐字节转换内容，就可能仍需要处理缓冲。Kafka 的吞吐还涉及顺序 I/O、批量与页缓存，不只一个 API。</p>
+<p><strong>追问接答：</strong>“mmap 就不会 I/O？”错误。“HTTPS 必然不能优化？”要看实际 TLS 与内核路径，不能一刀切。</p>
+<p class="verify"><strong>如何验证：</strong>固定文件与吞吐目标，比较 CPU、syscall、缺页、吞吐和首字延迟；冷热缓存分开，记录操作系统与加密配置。</p>
+</article>
+<article class="card pad q" id="q-24">
+<h3><span class="pill g">24</span>如何让配置文件替换同时考虑原子可见与崩溃持久？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 同文件系统临时文件 → 完整写入 → 同步 → rename → 目录同步</p>
+<p><strong>先这样回答：</strong>原子替换名称与崩溃后保留结果是不同承诺。常见本地文件系统方案是写同文件系统临时文件、同步文件、rename 替换，再按所需持久性同步父目录，并处理每一步错误。</p>
+<h4>机制与边界</h4><p>同文件系统 rename 可提供名称替换的原子观察边界，但不能只凭 rename 成功就忽略文件数据与目录项的持久性；跨文件系统也不能直接套该原子替换模型。</p>
+<p>读者已打开旧文件可能仍读旧对象，新打开者读新对象，这是不同资源寿命。多个写者还要裁决版本与所有权；文件替换不自动构成数据库、文件和通知的联合事务。</p>
+<p><strong>例子与时序：</strong>先截断原配置再写新配置，进程中途退出可能留下半文件。临时文件方案应让读者见到完整旧版或完整新版，而不是混合字节。</p>
+<p><strong>追问接答：</strong>“有 journaling 就不用 fsync？”不是通用保证。“失败后删临时文件即可？”需区分替换是否已发生及读者可见状态。</p>
+<p class="verify"><strong>如何验证：</strong>在各步骤设置中断点，检查重启后可见版本、校验和与残留文件；明确文件系统和故障类型，不把名称原子性写成全系统事务。</p>
+</article>
+<p class="sources"><strong>核对资料：</strong> <a href="https://man7.org/linux/man-pages/man2/fsync.2.html">Linux：fsync</a><a href="https://man7.org/linux/man-pages/man2/mmap.2.html">Linux：mmap</a><a href="https://man7.org/linux/man-pages/man2/sendfile.2.html">Linux：sendfile</a><a href="https://man7.org/linux/man-pages/man2/open.2.html">Linux：open 与打开文件状态</a><a href="https://man7.org/linux/man-pages/man2/rename.2.html">Linux：rename</a></p></section>
+<section id="network"><div class="head"><h2>8. 网络分层、路由与 DNS</h2><p>地址找到谁，路由如何到达，身份又由哪一层确认？</p></div>
+<ul class="jump-list"><li><a href="#q-25">25 · 从输入 URL 到服务处理，怎样按层追踪？</a></li><li><a href="#q-26">26 · DNS 怎样解析？TTL 能保证切换立刻生效吗？</a></li><li><a href="#q-27">27 · 同网段与跨网段通信，为什么要先找到下一跳？</a></li><li><a href="#q-28">28 · NAT、负载均衡、反向代理与可信身份分别管什么？</a></li></ul>
+<figure class="card diagram" id="fig-network"><svg viewBox="0 0 1040 375" role="img" aria-labelledby="network-title network-desc"><title id="network-title">DNS 解析与连接复用</title><desc id="network-desc">图中权威与委派链合并表示；并非每次查询都访问根与全部层级。</desc><defs><marker id="ar-network-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="ar-network-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker><marker id="ar-network-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--red)"/></marker></defs><g class="diagram-node"><rect class="node " x="45" y="70" width="250" height="76" rx="10"/><text class="title" x="170.0" y="101" text-anchor="middle">应用/本地缓存</text><text class="sub" x="170.0" y="125" text-anchor="middle">名称、解析器与运行时策略</text></g><g class="diagram-node"><rect class="node " x="395" y="70" width="250" height="76" rx="10"/><text class="title" x="520.0" y="101" text-anchor="middle">递归解析器</text><text class="sub" x="520.0" y="125" text-anchor="middle">缓存命中或继续查询</text></g><g class="diagram-node"><rect class="node " x="745" y="70" width="250" height="76" rx="10"/><text class="title" x="870.0" y="101" text-anchor="middle">委派链 / 权威答案</text><text class="sub" x="870.0" y="125" text-anchor="middle">按需查找负责区域的服务器</text></g><g class="diagram-node"><rect class="node a" x="395" y="235" width="250" height="76" rx="10"/><text class="title" x="520.0" y="266" text-anchor="middle">实际连接目标</text><text class="sub" x="520.0" y="290" text-anchor="middle">新地址不自动替换旧连接</text></g><path class="edge " d="M295 108H395" marker-end="url(#ar-network-blue)"/><path class="edge " d="M645 108H745" marker-end="url(#ar-network-blue)"/><text class="sub" x="695" y="91" text-anchor="middle">未命中</text><path class="edge a" d="M870 146V190H520V146" marker-end="url(#ar-network-amber)"/><text class="sub" x="710" y="212" text-anchor="middle">答案与 TTL / 失败语义</text><path class="edge " d="M520 146V235" marker-end="url(#ar-network-blue)"/><text class="sub" x="250" y="277" text-anchor="middle">客户端缓存与连接池仍需核对</text><text class="sub" x="520" y="340" text-anchor="middle">递归、权威、TTL、应用缓存和连接复用是不同责任，不是一个“DNS 刷新”开关。</text></svg><figcaption>DNS 解析与连接复用。图中权威与委派链合并表示；并非每次查询都访问根与全部层级。</figcaption></figure>
+<article class="card pad q" id="q-25">
+<h3><span class="pill g">25</span>从输入 URL 到服务处理，怎样按层追踪？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> URL/名称 → DNS → 路由/连接 → TLS → HTTP → 应用/存储</p>
+<p><strong>先这样回答：</strong>先区分应用语义、传输、网络与链路层，再沿真实路径追踪。URL 指明协议与资源，DNS 解析名称，路由决定下一跳，连接与 TLS 建立通信和身份边界，应用最后处理业务。</p>
+<h4>机制与边界</h4><p>缓存、连接复用、代理、重定向和服务发现会跳过或增加步骤，因此并非每次请求都重新 DNS、TCP、TLS。HTTP/3 使用 QUIC 路径，不能强行套“任何 HTTP 都先 TCP 握手”。</p>
+<p>REST 是接口设计风格，JSON 是数据表示，HTTP 是应用协议，TCP 是传输协议，IP 负责寻址与转发。把它们排成互相替代的选项，会混淆约定、封装和实现。</p>
+<p><strong>例子与时序：</strong>浏览器看到 HTTP 200，只证明某个应用响应了；响应可能来自缓存、网关或错误服务，仍须检查内容、版本和业务状态。</p>
+<p><strong>追问接答：</strong>“ping 通就能 HTTP 成功？”ICMP、TCP 端口、TLS 和应用是不同检查。“localhost 指同一台宿主机？”网络命名空间可能不同。</p>
+<p class="verify"><strong>如何验证：</strong>画出浏览器、代理、负载均衡、服务与存储节点；为每一步标出名称、地址、协议、复用条件和可观察证据。</p>
+</article>
+<article class="card pad q" id="q-26">
+<h3><span class="pill g">26</span>DNS 怎样解析？TTL 能保证切换立刻生效吗？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 本地/递归缓存 · 权威答案 · TTL · 负缓存 · 连接仍可复用</p>
+<p><strong>先这样回答：</strong>客户端常先问递归解析器，它可使用缓存或沿委派关系取得权威答案。TTL 管理记录缓存寿命，却不能保证所有应用和既有连接在某个瞬间统一切换。</p>
+<h4>机制与边界</h4><p>递归解析器承担继续查询的工作，权威服务器给出所负责区域的信息；别把每次浏览器请求都画成亲自访问根、顶级域与权威。解析结果还可能包含别名、多地址、失败或负缓存。</p>
+<p>OS、运行时、代理与连接池各自有缓存和重试行为。即使重新解析得到新地址，旧的长连接仍可能复用；更改 TTL 也不能倒退已经缓存记录的有效期。</p>
+<p><strong>例子与时序：</strong>发布后少量客户端仍访问旧节点，可能是旧 DNS 缓存，也可能只是旧连接。先区分查询结果、实际连接目标与缓存层，再决定是否排空旧节点。</p>
+<p><strong>追问接答：</strong>“DNS 只用 UDP？”也有 TCP 等路径。“低 TTL 必然解决故障切换？”会增加查询负载，应用复用与失败处理仍要设计。</p>
+<p class="verify"><strong>如何验证：</strong>在同一环境分别记录解析器、返回记录与 TTL、运行时缓存和 socket 目标；比较新建连接与复用连接，避免只在自己电脑查一次 DNS。</p>
+</article>
+<article class="card pad q" id="q-27">
+<h3><span class="pill g">27</span>同网段与跨网段通信，为什么要先找到下一跳？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 路由选择 → 下一跳 → 链路地址 → 逐跳转发；目标 IP 非每跳改写</p>
+<p><strong>先这样回答：</strong>发送端依据路由选择出口与下一跳。IPv4 常用 ARP 解析同链路下一跳的链路地址；跨网段通常先交给网关。IPv6 使用邻居发现，不能把 ARP 画成所有 IP 的共同步骤。</p>
+<h4>机制与边界</h4><p>数据经过路由器时链路层封装会按下一链路重新组织，目的 IP 通常仍是最终目标；NAT 等机制才可能改写地址或端口。远端服务器 MAC 不必被客户端提前知道。</p>
+<p>可达性还受路由、邻居状态、MTU、防火墙和策略影响。单个端点看见“已发出”，不能证明报文已经跨过每一跳，也不能证明返回路径与去程对称。</p>
+<p><strong>例子与时序：</strong>客户端访问外部服务时 ARP 查询的可能是网关，而不是远端服务的 IP。只在远端机器上找 ARP 记录，不能据此诊断客户端链路。</p>
+<p><strong>追问接答：</strong>“路由器每跳都改目标 IP？”不是普通转发语义。“大包超时、小包正常？”应考虑 MTU 与路径问题，也需实际证据。</p>
+<p class="verify"><strong>如何验证：</strong>从所在网络命名空间检查路由与邻居，再在测试链路观察收发位置和包长；受限环境里 traceroute 无响应不能独立证明该跳丢业务报文。</p>
+</article>
+<article class="card pad q" id="q-28">
+<h3><span class="pill g">28</span>NAT、负载均衡、反向代理与可信身份分别管什么？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 地址改写 · 四元组 · 转发/终止 · 信任边界 · 业务授权</p>
+<p><strong>先这样回答：</strong>NAT 改写网络端点，负载均衡选择后端，反向代理可能终止客户端连接后另建后端连接。它们改变路径和观察地址，不自动提供用户身份与资源授权。</p>
+<h4>机制与边界</h4><p>TCP 连接常以源/目的地址和端口区分；代理前后的两段连接有各自的状态、超时与缓冲，前端已经断线时后端业务可能仍在执行。NAT 与中间设备还可能回收空闲状态。</p>
+<p>Forwarded 或 X-Forwarded-For 等头只能在受控代理链规则下使用；来自客户端的任意同名头不应直接变成可信来源。业务仍须验证实际登录身份、租户、资源和动作权限。</p>
+<p><strong>例子与时序：</strong>客户端超时、网关连接已关闭，但服务仍提交订单；把网关断线当数据库回滚，会误导重试策略。代理日志中的地址也未必是原始客户端。</p>
+<p><strong>追问接答：</strong>“TCP keepalive 能保证应用活着？”它与业务健康不同。“来源 IP 合法就有权限？”身份、来源与授权需分别验证。</p>
+<p class="verify"><strong>如何验证：</strong>画出每段连接的超时、缓冲与目标；测试空闲回收、客户端断开和伪造代理头，核对真实身份及最终业务结果。</p>
+</article>
+<p class="sources"><strong>核对资料：</strong> <a href="https://www.rfc-editor.org/rfc/rfc1034.html">RFC 1034：域名系统</a><a href="https://man7.org/linux/man-pages/man7/arp.7.html">Linux：ARP</a></p></section>
+<section id="tcp"><div class="head"><h2>9. TCP：可靠传输与业务结果</h2><p>把字节可靠、有序与业务只执行一次分开，才能答对重试与未知结果。</p></div>
+<ul class="jump-list"><li><a href="#q-29">29 · 三次握手到底确认什么？TCP 可靠性怎样建立？</a></li><li><a href="#q-30">30 · 流量控制、拥塞控制、带宽和 RTT 如何联系？</a></li><li><a href="#q-31">31 · TCP 粘包拆包，为什么本质是应用分帧问题？</a></li><li><a href="#q-32">32 · 关闭连接、TIME_WAIT 和 CLOSE_WAIT 应该怎样排查？</a></li><li><a href="#q-33">33 · TCP ACK、HTTP 响应、业务提交，哪个能证明操作成功？</a></li></ul>
+<figure class="card diagram" id="fig-tcp-handshake"><svg viewBox="0 0 1040 420" role="img" aria-labelledby="tcp-handshake-title tcp-handshake-desc"><title id="tcp-handshake-title">握手与关闭的不同目的</title><desc id="tcp-handshake-desc">箭头是常见路径示意，不是所有 TCP 状态转移与报文组合的穷举。</desc><defs><marker id="ar-tcp-handshake-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="ar-tcp-handshake-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker><marker id="ar-tcp-handshake-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--red)"/></marker></defs><text class="title" x="265" y="32" text-anchor="middle">握手：常见主动连接</text><text class="title" x="775" y="32" text-anchor="middle">关闭：常见路径，报文可合并</text><text class="title" x="70" y="68" text-anchor="middle">主动方</text><path class="life" d="M70 78V293"/><text class="title" x="460" y="68" text-anchor="middle">对端</text><path class="life" d="M460 78V293"/><text class="title" x="600" y="68" text-anchor="middle">主动方</text><path class="life" d="M600 78V293"/><text class="title" x="980" y="68" text-anchor="middle">对端</text><path class="life" d="M980 78V293"/><path class="edge " d="M70 115H460" marker-end="url(#ar-tcp-handshake-blue)"/><path class="edge " d="M460 180H70" marker-end="url(#ar-tcp-handshake-blue)"/><path class="edge " d="M70 245H460" marker-end="url(#ar-tcp-handshake-blue)"/><path class="edge " d="M600 105H980" marker-end="url(#ar-tcp-handshake-blue)"/><path class="edge " d="M980 155H600" marker-end="url(#ar-tcp-handshake-blue)"/><path class="edge " d="M980 215H600" marker-end="url(#ar-tcp-handshake-blue)"/><path class="edge " d="M600 275H980" marker-end="url(#ar-tcp-handshake-blue)"/><text class="sub" x="265" y="103" text-anchor="middle">SYN：seq=x</text><text class="sub" x="265" y="168" text-anchor="middle">SYN+ACK：seq=y, ack=x+1</text><text class="sub" x="265" y="233" text-anchor="middle">ACK：ack=y+1</text><text class="sub" x="790" y="93" text-anchor="middle">FIN</text><text class="sub" x="790" y="143" text-anchor="middle">ACK</text><text class="sub" x="790" y="203" text-anchor="middle">FIN</text><text class="sub" x="790" y="263" text-anchor="middle">ACK</text><text class="sub" x="265" y="325" text-anchor="middle">同步双方序号，建立连接状态</text><text class="sub" x="790" y="325" text-anchor="middle">主动方常见 TIME_WAIT</text><text class="sub" x="790" y="351" text-anchor="middle">被动方需处理 CLOSE_WAIT 的应用关闭</text><text class="sub" x="520" y="390" text-anchor="middle">传输连接状态不证明业务可用；同时关闭等其他路径另议，计时按实际系统核对。</text></svg><figcaption>握手与关闭的不同目的。箭头是常见路径示意，不是所有 TCP 状态转移与报文组合的穷举。</figcaption></figure><figure class="card diagram" id="fig-tcp-result"><svg viewBox="0 0 1040 385" role="img" aria-labelledby="tcp-result-title tcp-result-desc"><title id="tcp-result-title">业务成功与客户端未知可以同时存在</title><desc id="tcp-result-desc">按原请求查证；传输层、受理与业务提交各有独立的承诺边界。</desc><defs><marker id="ar-tcp-result-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="ar-tcp-result-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker><marker id="ar-tcp-result-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--red)"/></marker></defs><g class="diagram-node"><rect class="node " x="45" y="75" width="250" height="76" rx="10"/><text class="title" x="170.0" y="106" text-anchor="middle">TCP 确认</text><text class="sub" x="170.0" y="130" text-anchor="middle">传输层确认字节</text></g><g class="diagram-node"><rect class="node " x="395" y="75" width="250" height="76" rx="10"/><text class="title" x="520.0" y="106" text-anchor="middle">应用受理</text><text class="sub" x="520.0" y="130" text-anchor="middle">接受任务不等于完成</text></g><g class="diagram-node"><rect class="node g" x="745" y="75" width="250" height="76" rx="10"/><text class="title" x="870.0" y="106" text-anchor="middle">业务持久提交</text><text class="sub" x="870.0" y="130" text-anchor="middle">应由业务契约与事实证明</text></g><path class="edge " d="M295 113H395" marker-end="url(#ar-tcp-result-blue)"/><path class="edge " d="M645 113H745" marker-end="url(#ar-tcp-result-blue)"/><text class="sub" x="520" y="52" text-anchor="middle">不同承诺层级；不表示 ACK 必须早于提交到达客户端</text><g class="diagram-node"><rect class="node a" x="395" y="240" width="250" height="76" rx="10"/><text class="title" x="520.0" y="271" text-anchor="middle">客户端结果未知</text><text class="sub" x="520.0" y="295" text-anchor="middle">保留请求身份，查询 / 对账</text></g><path class="edge r" d="M870 151V278H645" marker-end="url(#ar-tcp-result-red)"/><text class="sub" x="775" y="257" text-anchor="middle">成功响应可能丢失</text><text class="sub" x="520" y="350" text-anchor="middle">超时不是未执行；不能生成新请求身份盲目重做退款、起飞等副作用。</text></svg><figcaption>业务成功与客户端未知可以同时存在。按原请求查证；传输层、受理与业务提交各有独立的承诺边界。</figcaption></figure>
+<article class="card pad q" id="q-29">
+<h3><span class="pill g">29</span>三次握手到底确认什么？TCP 可靠性怎样建立？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 双方序号 · SYN/ACK · 字节确认 · 重传 · 有序交付</p>
+<p><strong>先这样回答：</strong>握手协商连接相关状态并同步双方初始序号，建立双向通信所需的序号空间。传输通过序号、确认与重传等机制恢复缺失并有序交付字节，不承诺任意故障下永久可达。</p>
+<h4>机制与边界</h4><p>在常见主动连接路径中，SYN、SYN+ACK、ACK 使双方交换并确认序号。确认号通常指期望的下一字节；累计确认、重复确认和其他协商机制帮助判断已接收范围。</p>
+<p>接收端 TCP 可去重与重排传输字节，但应用退出、连接重建和同一业务请求重发是另一层。应用确认也不同于 TCP ACK，不能因握手成功就假定业务已可用。</p>
+<p><strong>例子与时序：</strong>TCP 重传同一段数据通常不会让同一连接上的应用收到两份相同字节；客户端断线后重新发送整条“创建订单”请求，却可能产生第二次业务执行。</p>
+<p><strong>追问接答：</strong>“两次握手为什么不够？”按双方状态与旧报文影响推演，不只背“确认收发能力”。“ACK 后数据必已持久？”ACK 的承诺不是数据库提交。</p>
+<p class="verify"><strong>如何验证：</strong>在测试环境观察 SYN、ACK、重传与应用记录的时间线；协议序号、请求身份和业务结果分别记录，不用抓包中的 ACK 代替业务证据。</p>
+</article>
+<article class="card pad q" id="q-30">
+<h3><span class="pill g">30</span>流量控制、拥塞控制、带宽和 RTT 如何联系？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 接收窗口 rwnd · 拥塞窗口 cwnd · RTT · 在途容量 · 丢包非唯一信号</p>
+<p><strong>先这样回答：</strong>流量控制保护接收端容量，拥塞控制调节网络中的发送压力。发送还受到两类窗口、应用供给和路径约束；带宽大不意味着小请求延迟一定低。</p>
+<h4>机制与边界</h4><p>接收窗口表达可接收范围，拥塞窗口根据相应算法与反馈演进。对在途数据的约束不能只看其中一个窗口，零窗口也不能简单归因网络带宽不足。</p>
+<p>带宽延迟积帮助估计填满路径所需在途量，但 RTT、排队、损失、竞争与算法版本会改变行为。丢包可由拥塞或其他原因产生；应用 P99 还可能主要来自服务排队。</p>
+<p><strong>例子与时序：</strong>远距离链路带宽很高，却因往返等待和小请求交互而慢；增加带宽未必减少 DNS、握手、数据库和模型首字的等待。</p>
+<p><strong>追问接答：</strong>“TCP 有流控所以应用不会 OOM？”应用队列仍可无界。“BBR 对所有路径都更好？”版本、公平性与负载需要实测。</p>
+<p class="verify"><strong>如何验证：</strong>按同一路径记录 RTT、重传、接收窗口、发送速率与应用排队；一次只改变一项，不把所有延迟变化都叫网络拥塞。</p>
+</article>
+<article class="card pad q" id="q-31">
+<h3><span class="pill g">31</span>TCP 粘包拆包，为什么本质是应用分帧问题？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 字节流 · write/read 不对应 · 长度/分隔符 · 增量解析 · 长度护栏</p>
+<p><strong>先这样回答：</strong>TCP 不保留应用每次 write 的消息边界。所谓粘包和半包是应用把读取块误当成完整消息；解决方案是协议定义边界并增量解析，不是强行让发送间隔变大。</p>
+<h4>机制与边界</h4><p>接收一次可能得到多条消息、部分消息或零字节 EOF 等情况；长度前缀、可转义分隔符和自描述编码是不同分帧方案。应用还要处理最大长度、超时和异常断开。</p>
+<p>网络包、TLS 记录、HTTP 帧、业务消息与读取缓冲区是不同层的边界。关闭某种发送合并机制也不会让 read 次数与 write 次数建立可靠一一对应。</p>
+<p><strong>例子与时序：</strong>发送“3:abc”和“2:de”，接收可分成“3:a”“bc2:”“de”。解析器应输出 abc、de，而不是按三次读取生成三个业务事件。</p>
+<p><strong>追问接答：</strong>“sleep 一会儿就不会粘包？”不构成协议。“用 JSON 就有边界？”连续 JSON 仍需完整解析规则，换行也要定义转义。</p>
+<p class="verify"><strong>如何验证：</strong>复用第 6 章分帧练习，在所有切割位置、多消息与非法长度下验证相同结果；不要仅在 loopback 上测一次正常收发。</p>
+</article>
+<article class="card pad q" id="q-32">
+<h3><span class="pill g">32</span>关闭连接、TIME_WAIT 和 CLOSE_WAIT 应该怎样排查？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 双向半关闭 · 最后 ACK/旧报文 · TIME_WAIT · 应用未关闭的 CLOSE_WAIT</p>
+<p><strong>先这样回答：</strong>TCP 两个方向可以独立关闭，常见关闭路径中主动关闭方会经历 TIME_WAIT。CLOSE_WAIT 通常表示已收到对端关闭而本地应用尚未完成关闭，两者的责任与治理方式不同。</p>
+<h4>机制与边界</h4><p>FIN 表示该方向不再发送字节，另一方向仍可发送；常说“四次挥手”是常见图示，报文可合并且存在同时关闭。TIME_WAIT 保护终止和旧报文处理，规范的 2MSL 与实际系统计时应区分。</p>
+<p>大量 TIME_WAIT 可能只是高连接创建率；判断端口耗尽要看源 IP、目标地址/端口、临时端口范围和连接复用。CLOSE_WAIT 持续增长则应追本地 close 与异常清理责任。</p>
+<p><strong>例子与时序：</strong>每个请求新建短连接会积累 TIME_WAIT；客户端收到 EOF 却忘了关闭对象，则可能堆积 CLOSE_WAIT。二者不能用同一条“调小超时”处理。</p>
+<p><strong>追问接答：</strong>“TIME_WAIT 一定是客户端？”主动关闭角色由实际路径决定。“关 keepalive 就能修复？”可能让短连接更多，先明确参数含义。</p>
+<p class="verify"><strong>如何验证：</strong>连续记录连接状态、创建率、fd 数与实际连接错误；核对主动关闭方和连接池回收，不直接套过时内核参数。</p>
+</article>
+<article class="card pad q" id="q-33">
+<h3><span class="pill g">33</span>TCP ACK、HTTP 响应、业务提交，哪个能证明操作成功？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 字节确认 ≠ 业务提交 · 响应可丢 · 结果未知 · 原请求查证</p>
+<p><strong>先这样回答：</strong>TCP ACK 不等于业务提交，HTTP 响应的意义也由接口契约决定。服务可能已提交但响应丢失；客户端超时只说明未获得结果，不能据此认定未执行。</p>
+<h4>机制与边界</h4><p>可靠受理、执行完成和持久提交是不同阶段；202 Accepted 通常只表示受理。即便返回成功结果，客户端是否实际收到与服务端提交之间仍有故障窗口。</p>
+<p>有副作用的操作应绑定稳定请求身份、参数与结果记录；未知时按同一身份查询或受控幂等重试。若远端没有查询/幂等契约，需对账或人工处理，而不是生成新身份再执行。</p>
+<p><strong>例子与时序：</strong>退款已提交，服务在回包前断线；Agent 不应凭“工具超时”发起新退款。它应保留 actionId，查证原动作的真实结果并向用户展示未知状态。</p>
+<p><strong>追问接答：</strong>“TCP 不丢包还需要幂等？”传输可靠不覆盖应用重试与崩溃。“HTTP 200 就完成？”需看返回是否只是任务受理。</p>
+<p class="verify"><strong>如何验证：</strong>在提交前、提交后回包前和客户端接收后分别注入故障；核对结果查询、同键异参拒绝和真实副作用次数。</p>
+</article>
+<p class="sources"><strong>核对资料：</strong> <a href="https://www.rfc-editor.org/rfc/rfc9293.html">RFC 9293：TCP</a><a href="https://man7.org/linux/man-pages/man7/tcp.7.html">Linux：TCP 接口与配置</a><a href="https://github.com/google/bbr">Google：BBR 项目</a></p></section>
+<section id="http"><div class="head"><h2>10. HTTP、TLS 与实时通信</h2><p>协议解决通信问题，应用仍要负责授权、恢复与完整业务结果。</p></div>
+<ul class="jump-list"><li><a href="#q-34">34 · HTTP/1.1、HTTP/2、HTTP/3 分别改善哪种队头阻塞？</a></li><li><a href="#q-35">35 · HTTP 安全性、幂等性、缓存与业务去重是什么关系？</a></li><li><a href="#q-36">36 · TLS 握手、证书、SNI、ALPN 与 0-RTT 应该记住什么？</a></li><li><a href="#q-37">37 · SSE、WebSocket、gRPC 和轮询，如何按需求选？</a></li><li><a href="#q-38">38 · 连接池、各类超时和整体 deadline，怎样避免互相打架？</a></li></ul>
+<figure class="card diagram" id="fig-http"><svg viewBox="0 0 1040 405" role="img" aria-labelledby="http-title http-desc"><title id="http-title">队头阻塞发生在哪一层</title><desc id="http-desc">这是交付边界对比，不承诺任意 HTTP/3 请求都比 HTTP/2 快。</desc><defs><marker id="ar-http-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="ar-http-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker><marker id="ar-http-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--red)"/></marker></defs><rect class="lane" x="25" y="55" width="485" height="280" rx="14"/><rect class="lane" x="530" y="55" width="485" height="280" rx="14"/><text class="title" x="267" y="91" text-anchor="middle">HTTP/2：共享 TCP 字节流</text><text class="title" x="772" y="91" text-anchor="middle">HTTP/3：QUIC 流分别交付</text><g class="diagram-node"><rect class="node " x="45" y="115" width="210" height="76" rx="10"/><text class="title" x="150.0" y="146" text-anchor="middle">流 A</text><text class="sub" x="150.0" y="170" text-anchor="middle">与流 B 的帧可以交错</text></g><g class="diagram-node"><rect class="node " x="280" y="115" width="210" height="76" rx="10"/><text class="title" x="385.0" y="146" text-anchor="middle">流 B</text><text class="sub" x="385.0" y="170" text-anchor="middle">底层仍共享 TCP</text></g><g class="diagram-node"><rect class="node r" x="550" y="115" width="210" height="76" rx="10"/><text class="title" x="655.0" y="146" text-anchor="middle">流 A 缺失数据</text><text class="sub" x="655.0" y="170" text-anchor="middle">本流等待恢复</text></g><g class="diagram-node"><rect class="node g" x="785" y="115" width="210" height="76" rx="10"/><text class="title" x="890.0" y="146" text-anchor="middle">流 B 数据完整</text><text class="sub" x="890.0" y="170" text-anchor="middle">可独立交付</text></g><text class="title" x="267" y="244" text-anchor="middle">TCP 缺字节 → 同连接后续交付等待</text><text class="title" x="772" y="244" text-anchor="middle">不同流不必共用同一个有序字节缺口</text><text class="sub" x="267" y="292" text-anchor="middle">多路复用改善应用层排队，不消除 TCP 队头阻塞</text><text class="sub" x="772" y="292" text-anchor="middle">共享拥塞 / 流控 / QPACK 依赖仍要考虑</text><text class="sub" x="520" y="370" text-anchor="middle">协议演进改变部分等待机制；业务处理、队列、缓存和实际部署仍决定最终延迟。</text></svg><figcaption>队头阻塞发生在哪一层。这是交付边界对比，不承诺任意 HTTP/3 请求都比 HTTP/2 快。</figcaption></figure>
+<article class="card pad q" id="q-34">
+<h3><span class="pill g">34</span>HTTP/1.1、HTTP/2、HTTP/3 分别改善哪种队头阻塞？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> H1 响应顺序 · H2 多路复用/TCP 阻塞 · H3 独立流 · 共享约束仍在</p>
+<p><strong>先这样回答：</strong>HTTP/2 用帧与流多路复用改善 HTTP/1.1 的应用层排队，但同 TCP 连接丢字节仍影响交付。HTTP/3 用 QUIC 流改善跨流传输阻塞，不代表没有拥塞、排队或头部依赖。</p>
+<h4>机制与边界</h4><p>HTTP/1.1 的持久连接不等于任意交错响应；流水线仍有响应顺序约束。HTTP/2 在连接中交错多个流的数据，但底层 TCP 提供单一有序字节流，缺失字节可能挡住后续交付。</p>
+<p>QUIC 在流内保留顺序，某一流的缺失数据不必按相同方式阻塞其他流；连接仍共享拥塞控制等资源，HTTP/3 的 QPACK 头部依赖也可能造成等待。UDP 只是承载，不等于 QUIC 不可靠。</p>
+<p><strong>例子与时序：</strong>大响应与小响应共享连接时，多路复用有助于交错；丢包、服务端 CPU 和业务并发限制仍可能使小响应延迟升高。</p>
+<p><strong>追问接答：</strong>“HTTP/2 保证请求并行执行？”协议允许交错，后端可串行。“HTTP/3 必须更快？”需看路径、连接复用、版本与服务瓶颈。</p>
+<p class="verify"><strong>如何验证：</strong>同路径分别测冷建连、复用、大/小混合与损失条件；确认实际协商协议，避免把缓存命中或后端变化算成协议收益。</p>
+</article>
+<article class="card pad q" id="q-35">
+<h3><span class="pill g">35</span>HTTP 安全性、幂等性、缓存与业务去重是什么关系？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 方法语义 · 同意图效果 · ETag 验证 · no-cache/no-store · 权限维度</p>
+<p><strong>先这样回答：</strong>安全方法的预期语义不修改目标资源，幂等方法重复执行的预期效果相同；它们不是“请求绝不会产生任何记录”或“业务自动防重”。缓存新鲜度、验证与授权是另一组契约。</p>
+<h4>机制与边界</h4><p>GET 可有访问日志等附带效果，但不应把支付当作其资源操作；PUT 的幂等语义也需要服务实现遵守。POST 可通过应用幂等协议支持安全重试，不能仅凭方法名称判断实际副作用。</p>
+<p>ETag 等验证器支持条件请求与 304；不带字段参数的 no-cache 表示复用前需要验证，不等于禁止存储，no-store 才表达不应存储的要求。个性化内容还需区分共享/私有缓存及影响表示的维度。</p>
+<p><strong>例子与时序：</strong>用户权限撤销后，旧页面缓存或旧 ETag 不能替代当前授权；更新订单时可用版本条件拒绝基于旧状态的覆盖。</p>
+<p><strong>追问接答：</strong>“幂等就每次响应一样？”可不同但预期效果相同。“304 说明当前用户有权看旧内容？”服务应先正确处理授权与表示。</p>
+<p class="verify"><strong>如何验证：</strong>用重复请求、同键异参、权限切换和不同表示验证；分别记录缓存命中、重新验证、实际业务效果，避免只看 HTTP 状态码。</p>
+</article>
+<article class="card pad q" id="q-36">
+<h3><span class="pill g">36</span>TLS 握手、证书、SNI、ALPN 与 0-RTT 应该记住什么？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 协商 → 身份验证 → 密钥 → 加密记录；SNI 选站 · ALPN 选协议 · 0-RTT 可重放</p>
+<p><strong>先这样回答：</strong>TLS 协商安全参数，并按所用模式验证对端身份，再保护传输数据。常见 HTTPS 校验服务器，客户端身份由业务认证或 mTLS 等机制处理；证书验证要检查信任链、名称和有效性，SNI 与 ALPN 分别帮助选择站点和应用协议。</p>
+<h4>机制与边界</h4><p>以 TLS 1.3 常见证书握手为语境，双方协商密钥相关材料与协议参数，验证握手并建立保护；会话恢复与 QUIC 等路径有不同交互。通常用协商出的对称密钥保护数据，而不是每个业务字节都用证书公钥加密。</p>
+<p>0-RTT 降低部分恢复连接的等待，但 early data 存在重放风险，业务应明确哪些动作可接受重放。TLS 保护这段通信，不保证明文离开终止代理后的链路、日志、模型上下文与数据库都受同样保护。</p>
+<p><strong>例子与时序：</strong>直接用 IP 访问多站点服务，可能命中错误站点或名称验证失败；排查时应保持实际 hostname、SNI 与验证边界，不用跳过证书验证掩盖原因。</p>
+<p><strong>追问接答：</strong>“HTTPS 所以不会越权？”认证链路与资源授权不同。“会话恢复等于所有写请求可 0-RTT？”必须按重放风险决定。</p>
+<p class="verify"><strong>如何验证：</strong>记录证书链、名称、协商版本与 ALPN；测试过期、错误域名、恢复连接和允许的 early data，核对应用是否重复产生副作用。</p>
+</article>
+<article class="card pad q" id="q-37">
+<h3><span class="pill g">37</span>SSE、WebSocket、gRPC 和轮询，如何按需求选？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 方向 · 频率 · 格式 · 基础设施 · 恢复游标 · 权威查询</p>
+<p><strong>先这样回答：</strong>先看通信方向、延迟、吞吐、客户端与恢复需求。SSE 适合服务端事件推送，WebSocket 支持双向消息，gRPC 提供 RPC 契约与流模式，轮询可简化状态查询；没有一个协议自动替应用补齐恢复。</p>
+<h4>机制与边界</h4><p>SSE 基于文本事件流，空行标记事件边界，id 与重连机制还要配服务端历史才能补发。WebSocket 定义消息与控制帧，业务 ACK、鉴权、离线历史和重连恢复需另设计。</p>
+<p>gRPC 能提供接口与消息契约，但浏览器接入、代理、deadline 和流控应核对实际栈。低频任务状态用有界轮询可能更简单；推送只做实时提示，持久任务状态负责查询与恢复。</p>
+<p><strong>例子与时序：</strong>AI 回答需要区分 token、工具状态与最终结果，连接断线时按 run 和游标恢复；另开一个连接从头启动模型，可能重复工具副作用。</p>
+<p><strong>追问接答：</strong>“SSE 就是每次 read 一条事件？”网络块不保边界。“WebSocket 已发送说明业务完成？”需定义 ACK 所确认的阶段。</p>
+<p class="verify"><strong>如何验证：</strong>验证分块、重连、多实例、事件保留过期、客户端慢读和取消；比较用户感知延迟、结果一致与资源上限，不只测正常连接。</p>
+</article>
+<article class="card pad q" id="q-38">
+<h3><span class="pill g">38</span>连接池、各类超时和整体 deadline，怎样避免互相打架？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 池等待 → DNS/建连 → TLS → 读写；整体预算 · 重试扣账 · 未知结果</p>
+<p><strong>先这样回答：</strong>连接复用减少建连成本，但池等待也会消耗请求预算。连接、读写、空闲与整体 deadline 的语义不同，必须按实际客户端核对，并让重试与下游调用共享剩余预算。</p>
+<h4>机制与边界</h4><p>一个 read timeout 可能限制连续无数据的等待，不一定限制整个响应总时长；某些库的连接超时也不包含池获取或全部解析步骤。命名相似的配置不能跨库照抄。</p>
+<p>上游超时不必然取消底层任务或远端操作，取消还需协作与清理。超时、熔断、入口限流和下游隔离分别解决不同问题；多层重试容易放大请求量。</p>
+<p><strong>例子与时序：</strong>总预算 2 秒，先在池等 1.5 秒，再按原始 2 秒调用下游，会突破整体预算；剩余时间不足时应按契约拒绝继续，而非每层重新起计时。</p>
+<p><strong>追问接答：</strong>“持续有少量字节就永不超时？”要看是否另设整体预算。“超时就可以换节点重发退款？”先查原请求结果与幂等契约。</p>
+<p class="verify"><strong>如何验证：</strong>注入池耗尽、慢 DNS、慢握手、慢读和响应丢失，沿同请求记录预算传播；核对取消后连接、许可与未知动作是否被正确处理。</p>
+</article>
+<p class="sources"><strong>核对资料：</strong> <a href="https://www.rfc-editor.org/rfc/rfc9110.html">RFC 9110：HTTP 语义</a><a href="https://www.rfc-editor.org/rfc/rfc9111.html">RFC 9111：HTTP 缓存</a><a href="https://www.rfc-editor.org/rfc/rfc9113.html">RFC 9113：HTTP/2</a><a href="https://www.rfc-editor.org/rfc/rfc9114.html">RFC 9114：HTTP/3</a><a href="https://www.rfc-editor.org/rfc/rfc8446.html">RFC 8446：TLS 1.3</a><a href="https://html.spec.whatwg.org/multipage/server-sent-events.html">WHATWG：Server-sent events</a><a href="https://www.rfc-editor.org/rfc/rfc9000.html">RFC 9000：QUIC</a><a href="https://www.rfc-editor.org/rfc/rfc6455.html">RFC 6455：WebSocket</a></p></section>
+<section id="cases"><div class="head"><h2>11. 五个故障场景：把基础变成排查能力</h2><p>每个案例都先分清证据，再止住放大，最后验证恢复。</p></div>
+<ul class="jump-list"><li><a href="#q-39">39 · 服务 P99 暴涨，CPU 高低各有一批实例，如何组织排查？</a></li><li><a href="#q-40">40 · 容器突然退出，堆却很空，下一步查什么？</a></li><li><a href="#q-41">41 · 连接报错“Too many open files”，同时 CLOSE_WAIT 增长，怎么修？</a></li><li><a href="#q-42">42 · “网络超时”如何拆成 DNS、连接、TLS、池等待和服务处理？</a></li><li><a href="#q-43">43 · AI 流式输出断线、内存涨、页面重复，如何沿整条链路排查？</a></li></ul>
+<figure class="card diagram" id="fig-cases"><svg viewBox="0 0 1040 390" role="img" aria-labelledby="cases-title cases-desc"><title id="cases-title">从“接口慢”拆到实际等待位置</title><desc id="cases-desc">按实例、版本和请求类型分组，再沿实际 trace 解释慢在哪里。</desc><defs><marker id="ar-cases-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--blue)"/></marker><marker id="ar-cases-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--amber)"/></marker><marker id="ar-cases-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="var(--red)"/></marker></defs><g class="diagram-node"><rect class="node " x="25" y="70" width="170" height="76" rx="10"/><text class="title" x="110.0" y="101" text-anchor="middle">排队/池等待</text><text class="sub" x="110.0" y="125" text-anchor="middle">受理、并发预算</text></g><g class="diagram-node"><rect class="node " x="230" y="70" width="170" height="76" rx="10"/><text class="title" x="315.0" y="101" text-anchor="middle">解析/建连</text><text class="sub" x="315.0" y="125" text-anchor="middle">DNS、目标地址</text></g><g class="diagram-node"><rect class="node " x="435" y="70" width="170" height="76" rx="10"/><text class="title" x="520.0" y="101" text-anchor="middle">协议/代理</text><text class="sub" x="520.0" y="125" text-anchor="middle">TLS、缓冲、重试</text></g><g class="diagram-node"><rect class="node " x="640" y="70" width="170" height="76" rx="10"/><text class="title" x="725.0" y="101" text-anchor="middle">业务/下游</text><text class="sub" x="725.0" y="125" text-anchor="middle">CPU、锁、I/O</text></g><g class="diagram-node"><rect class="node " x="845" y="70" width="170" height="76" rx="10"/><text class="title" x="930.0" y="101" text-anchor="middle">结果/展示</text><text class="sub" x="930.0" y="125" text-anchor="middle">读取、解码、渲染</text></g><path class="edge " d="M195 108H230" marker-end="url(#ar-cases-blue)"/><path class="edge " d="M400 108H435" marker-end="url(#ar-cases-blue)"/><path class="edge " d="M605 108H640" marker-end="url(#ar-cases-blue)"/><path class="edge " d="M810 108H845" marker-end="url(#ar-cases-blue)"/><text class="sub" x="520" y="207" text-anchor="middle">同请求关键路径与资源证据一起看；连接复用时部分阶段可以被跳过。</text><g class="diagram-node"><rect class="node g" x="355" y="240" width="330" height="76" rx="10"/><text class="title" x="520.0" y="271" text-anchor="middle">止血 → 根因 → 验证恢复</text><text class="sub" x="520.0" y="295" text-anchor="middle">限制放大，而不是统一调大所有池</text></g><text class="sub" x="520" y="357" text-anchor="middle">各段 P95/P99 不可直接相加；示例路径也不是所有客户端 API 的固定超时边界。</text></svg><figcaption>从“接口慢”拆到实际等待位置。按实例、版本和请求类型分组，再沿实际 trace 解释慢在哪里。</figcaption></figure>
+<article class="card pad q" id="q-39">
+<h3><span class="pill g">39</span>服务 P99 暴涨，CPU 高低各有一批实例，如何组织排查？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 分实例/版本 → 分链路 → 热点/等待 → 止放大 → 灰度验证</p>
+<p><strong>先这样回答：</strong>先按实例、版本、租户与请求类型分组，区分计算忙、调度受限和资源等待。用指标定位阶段，再用多次栈、采样与 trace 解释原因，不先统一调大线程池。</p>
+<h4>机制与边界</h4><p>CPU 高的一组看热点、输入复杂度、GC 与配额；CPU 低而慢的一组看连接池、锁、I/O 与下游。共享重试和流量路由也可能让两组互相影响。</p>
+<p>止血优先控制重试、队列与受影响能力的并发，保留健康路径。性能修改要配同负载验证；总 P99 不能用各段 P99 直接相加。</p>
+<p><strong>例子与时序：</strong>某版本对长文本做高复杂度正则，同时下游慢使另一组等待连接；只扩大线程池会使数据库与内存压力更大。</p>
+<p><strong>追问接答：</strong>“RUNNABLE 就是 CPU 热点？”还需线程 CPU 证据。“把慢实例摘除即可？”要确认剩余容量能接流量，避免二次过载。</p>
+<p class="verify"><strong>如何验证：</strong>保留变更前后同类请求的分段耗时、错误与资源指标；验证 P99、吞吐、质量和受影响范围一起改善。</p>
+</article>
+<article class="card pad q" id="q-40">
+<h3><span class="pill g">40</span>容器突然退出，堆却很空，下一步查什么？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 退出证据 → cgroup 峰值 → 内存分类 → 生命周期 → 有界修复</p>
+<p><strong>先这样回答：</strong>先确认退出原因，再定位容器计费内存来自哪里。堆曲线平稳只排除了部分问题，不能排除线程、直接内存、文件页、原生分配或其他进程。</p>
+<h4>机制与边界</h4><p>对齐容器/节点事件、memory.events 与退出前峰值，区分 OOM、外部强杀和正常退出。再结合 memory.stat、进程映射、线程与运行时指标，避免把不同计量口径硬相加。</p>
+<p>检查对象和缓冲的生命期：慢客户端、无界队列、未关闭连接或 native 库都可能留住资源。修复要限制来源和归还路径，调大限制只是一种容量取舍。</p>
+<p><strong>例子与时序：</strong>图片处理把原始字节、解码图和待发送结果同时留在队列，堆统计只看到其中部分路径；峰值发生在处理重叠时，空闲截图容易漏掉。</p>
+<p><strong>追问接答：</strong>“重启一次没复现就好了？”生命周期与负载可能尚未触发。“137 就一定 OOM？”还需平台和内核证据。</p>
+<p class="verify"><strong>如何验证：</strong>在隔离环境复现峰值负载与慢消费者；检查峰值可控、完成后资源回落，以及强杀后的已受理任务能查询或补偿。</p>
+</article>
+<article class="card pad q" id="q-41">
+<h3><span class="pill g">41</span>连接报错“Too many open files”，同时 CLOSE_WAIT 增长，怎么修？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> fd 类型 → 创建/关闭责任 → EOF/异常 → 池回收 → 容量与泄漏分开</p>
+<p><strong>先这样回答：</strong>先确认哪个进程触及哪类描述符限制，再按 fd 类型和连接状态追创建与关闭路径。CLOSE_WAIT 提示本地关闭责任，但大量正常长连接也会消耗 fd，不能把所有占用都叫泄漏。</p>
+<h4>机制与边界</h4><p>重复统计 fd、连接池 active/idle/pending、CLOSE_WAIT 和连接年龄。定位 EOF、异常、取消和正常返回是否都关闭或归还资源，特别检查响应体未消费/未关闭的路径。</p>
+<p>提高限制只增加余量，持续泄漏仍会耗尽。若连接确实需要长期存在，还要预算端口、内存、心跳和代理空闲状态，并设明确清理协议。</p>
+<p><strong>例子与时序：</strong>HTTP 客户端异常分支直接返回而未关闭响应体，连接未归还；池等待变长后又启动重试，导致 fd 与在途请求一起增长。</p>
+<p><strong>追问接答：</strong>“看到 TIME_WAIT 就是 fd 没关？”不能等同。“kill 掉全部连接？”会破坏在途业务，应先明确影响与恢复方式。</p>
+<p class="verify"><strong>如何验证：</strong>对正常、EOF、错误、取消四条路径重复调用并观察资源趋势；修复后在相同负载下 fd 和池占用应稳定。</p>
+</article>
+<article class="card pad q" id="q-42">
+<h3><span class="pill g">42</span>“网络超时”如何拆成 DNS、连接、TLS、池等待和服务处理？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> 确定边界 → 记录目标 → 拆阶段 → 同环境复现 → 单因素验证</p>
+<p><strong>先这样回答：</strong>先知道是哪个 API 的哪类超时。实际请求可能在池等待、解析、建连、握手、发送、服务处理或接收；仅凭异常中有 timeout 无法定位网络层。</p>
+<h4>机制与边界</h4><p>将同请求的各阶段时间、目标地址、代理路径、重用连接与重试次数关联起来。服务端未见请求可能发生在应用前，也可能是日志采样或入口不同；要逐跳寻找证据。</p>
+<p>在同网络命名空间与相同身份条件下比较解析与实际连接；测试固定解析时仍保留正确 hostname、SNI 与证书验证。网关与服务端日志还需考虑时钟误差。</p>
+<p><strong>例子与时序：</strong>只有复用连接失败，新建连接正常，可能涉及代理回收空闲状态；直接在笔记本 ping 成功，不能解释容器内的解析或连接行为。</p>
+<p><strong>追问接答：</strong>“curl 快说明服务没问题？”请求、认证、协议与复用可能不同。“抓不到包就是没发？”还需确认接口、命名空间和捕获范围。</p>
+<p class="verify"><strong>如何验证：</strong>分别注入每阶段延迟，看对应指标和错误是否正确归属；确认修复改变了目标阶段，而不是通过绕过 TLS 验证使错误消失。</p>
+</article>
+<article class="card pad q" id="q-43">
+<h3><span class="pill g">43</span>AI 流式输出断线、内存涨、页面重复，如何沿整条链路排查？</h3>
+<p class="memory-cue"><strong>记忆关键词：</strong> run/seq → 解析边界 → 慢消费背压 → 断线恢复 → 副作用查证</p>
+<p><strong>先这样回答：</strong>把业务任务、生成过程、事件流和网络连接分开。连接断线不等于任务取消，网络块不等于事件，输出快于消费会积压；恢复必须保留原任务身份与结果证据。</p>
+<h4>机制与边界</h4><p>核对 UTF-8 解码、SSE 空行边界、run/message/seq、服务端保留与前端已应用游标。重复传输可以通过事件身份去重，遗漏则需补发或明确转为最终状态查询。</p>
+<p>检查模型生成、工具调用、网关缓冲和浏览器渲染各自的队列预算。取消要贯穿执行器与资源清理；工具已产生的副作用仍要按动作身份查证，不能因为重新连接就盲目重放。</p>
+<p><strong>例子与时序：</strong>客户端慢读使网关缓冲增长，超时后重建 run 又重复执行工具；提高超时可能掩盖排队，却让峰值内存与副作用风险更大。</p>
+<p><strong>追问接答：</strong>“每个 token 都立即 setState？”渲染可批处理，协议仍按事件解析。“连接收到 done 就绝对成功？”done 的任务语义须由业务契约定义。</p>
+<p class="verify"><strong>如何验证：</strong>测试分块、慢读、重复/缺口、保留过期、换实例和工具成功后断线；同时验证最终正文、真实副作用与内存上限。</p>
+</article>
+<p class="sources"><strong>核对资料：</strong> <a href="https://docs.kernel.org/admin-guide/cgroup-v2.html">Linux 内核：cgroup v2</a><a href="https://man7.org/linux/man-pages/man5/proc_loadavg.5.html">Linux：load average</a></p></section>
+<section id="recall"><div class="head"><h2>12. 自测：把关键词连成完整回答</h2><p>遮住正文，先给结论，再解释机制，最后说反例与如何验证。</p></div>
+<div class="card pad table"><table><thead><tr><th>专题</th><th>记忆骨架</th><th>必须保留的边界</th></tr></thead><tbody>
+<tr><td>CPU 与缓存</td><td>局部性、工作集、缓存行、发布关系</td><td>缓存一致性不是跨变量事务；字段独立仍可能伪共享</td></tr>
+<tr><td>进程与调度</td><td>资源、执行流、可运行、等待、配额</td><td>系统调用不必换任务；load 与 CPU% 不同</td></tr>
+<tr><td>并发</td><td>不变量、原子边界、谓词、进展、预算</td><td>唤醒不等于条件满足；单状态 CAS 不覆盖多个资源</td></tr>
+<tr><td>内存</td><td>地址、翻译、驻留、持有、容器计费</td><td>TLB miss 非缺页；堆空不证明总内存充裕</td></tr>
+<tr><td>I/O</td><td>就绪、读写、分帧、缓冲、背压</td><td>读取块不是消息；ET 与公平处理需一起设计</td></tr>
+<tr><td>文件</td><td>fd、对象寿命、页缓存、同步、目录</td><td>write 非持久；rename 原子可见不等于断电恢复</td></tr>
+<tr><td>DNS 与路由</td><td>名称、缓存、下一跳、目标、身份</td><td>新 DNS 不自动替换旧连接；IP 来源不等于授权</td></tr>
+<tr><td>TCP</td><td>序号、ACK、窗口、重传、关闭</td><td>字节可靠不保证业务只一次；超时只表示结果未获知</td></tr>
+<tr><td>HTTP 与 TLS</td><td>语义、多路复用、验证、协商、恢复</td><td>HTTP/3 非无阻塞；TLS 非业务授权；0-RTT 可重放</td></tr>
+<tr><td>故障排查</td><td>分组、分段、证据、止血、验证</td><td>单截图不证明因果；分位数不直接相加</td></tr>
+</tbody></table></div>
+<div class="grid2" style="margin-top:18px"><div class="card pad"><h3>能否讲清这四个反例？</h3><ul class="clean"><li>两个线程只修改不同字段，却因同缓存行争用而慢。</li><li>申请了大地址区间，虚拟大小增大，但 RSS 尚未等量增长。</li><li>epoll 已通知可读，应用仍没拿到一条完整消息。</li><li>服务已完成退款，客户端却因回包丢失显示超时。</li></ul></div><div class="card pad"><h3>能否设计这四个验证？</h3><ul class="clean"><li>拆出容器节流、热点 CPU 与下游等待的证据。</li><li>在每个字节边界切割同一条报文，输出仍一致。</li><li>检查文件替换各步骤中断后的可见版本与持久结果。</li><li>模拟断线、重复事件与慢客户端，正文、副作用与内存均可核对。</li></ul></div></div>
+<div class="callout" style="margin-top:18px"><p><strong>面试回答顺序：</strong>“结论与范围 → 机制与时序 → 具体反例 → 工程处理 → 验证证据”。关键词帮助找回链路，不能代替条件与边界。</p></div>
+<div class="grid3 read-map" style="margin-top:18px"><div class="mini"><a href="java-agent-ai-interview-illustrated.html#chapter-deep">Java / AI 图解手册</a><p>继续下钻 JVM、AQS、数据库、消息与通信实现。</p></div><div class="mini"><a href="agent-ai-interview-questions.html#s-cs">Agent / AI 面试题全集</a><p>把系统与网络基础应用到手撕和全栈场景题。</p></div><div class="mini"><a href="uav-backend-review-handbook.html">六周项目复习手册</a><p>把等待、状态、不变量和未知结果带回真实项目链路。</p></div></div>
+<p class="verify">本页已提供分帧自检；Linux 调度、epoll、抓包、断电和容器故障实验需在相应隔离环境执行。核对资料按章节附在正文之后。</p>
+</section></main>
+<footer><div class="shell">基础能力专栏 · 操作系统、网络与故障推演 · 核对资料与适用边界见各章</div></footer>
+<nav class="dock" aria-label="页面快捷导航"><a href="../index.html">首页</a><a href="#">↑ 顶部</a></nav>
+<script>(()=>{const root=document.documentElement,key="html-docs-theme";let saved;try{saved=localStorage.getItem(key)}catch{}if(saved)root.dataset.theme=saved==="dark"?"dark":"paper";document.getElementById("theme").addEventListener("click",()=>{const next=root.dataset.theme==="dark"?"paper":"dark";root.dataset.theme=next;try{localStorage.setItem(key,next)}catch{}})})();</script>
+</body></html>
