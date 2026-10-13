@@ -1,5 +1,17 @@
 [
   {
+    "title": "无人机巡检平台后端 · 六周直读复习手册",
+    "description": "无人机巡检平台后端六周直读复习手册：自动建模调度、分布式一致性、状态机与断点续飞、AI 工程化、智能体集成与违章停车多轮复核，百余道面试追问与代码级事实。",
+    "date": "2026-10-13",
+    "url": "documents/uav-backend-review-handbook.html"
+  },
+  {
+    "title": "无人机巡检平台后端 · 六周直读复习手册（md 版）",
+    "description": "围绕一个真实无人机巡检平台的自动建模、多机库调度、分布式一致性、AI 工程化、智能体集成与违章停车多轮复核的六周面试复习手册，百余道追问结合项目实现、故障时序和能力边界。",
+    "date": "2026-10-13",
+    "url": "viewer.html?src=documents/uav-backend-review-handbook.md"
+  },
+  {
     "title": "Java 后端与 Agent / AI 应用 · 面试图解手册",
     "description": "Java 后端与 Agent / AI 应用面试图解手册：190 道深度题、54 幅原理图，覆盖 JVM、并发、Spring、MySQL、RAG、Agent、前端与通信协议。",
     "date": "2026-10-13",
@@ -10,18 +22,6 @@
     "description": "基于 modelcontextprotocol.io 官方文档的中文全解：覆盖 MCP 2026-07-28 版核心架构、无状态协议设计、三大服务器原语、Elicitation 与 MRTR 多轮往返、stdio 与 Streamable HTTP 传输、OAuth 2.1 授权、安全攻防与开发者生态。",
     "date": "2026-10-13",
     "url": "documents/mcp-official-docs-guide.html"
-  },
-  {
-    "title": "无人机巡检平台后端 · 六周直读复习手册",
-    "description": "无人机巡检平台后端六周直读复习手册：自动建模调度、分布式一致性、状态机与断点续飞、AI 工程化、智能体集成与违章停车多轮复核，百余道面试追问与代码级事实。",
-    "date": "2026-10-12",
-    "url": "documents/uav-backend-review-handbook.html"
-  },
-  {
-    "title": "无人机巡检平台后端 · 六周直读复习手册（md 版）",
-    "description": "围绕一个真实无人机巡检平台的自动建模、多机库调度、分布式一致性、AI 工程化、智能体集成与违章停车多轮复核的六周面试复习手册，115+ 道追问全部有代码级事实支撑。",
-    "date": "2026-10-12",
-    "url": "viewer.html?src=documents/uav-backend-review-handbook.md"
   },
   {
     "title": "Agent / AI 应用面试题全集：手撕代码与场景题精讲",
