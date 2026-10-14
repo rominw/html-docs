@@ -1,5 +1,17 @@
 [
   {
+    "title": "产品面试与实践速成手册（30 题 · 理解与实践）",
+    "description": "产品面试与实践速成手册：30 题分基础必会、项目常用与进阶追问，按具体问题、原理、例子、边界和自测组织，连接常用实践与完整任务。",
+    "date": "2026-10-14",
+    "url": "documents/product-interview-prep.html"
+  },
+  {
+    "title": "前端八股速成手册（40 题 · 理解与实践）",
+    "description": "前端八股速成手册：40 题分基础必会、项目常用与进阶追问，按具体问题、原理、例子、边界和自测组织，连接常用实践与完整任务。",
+    "date": "2026-10-14",
+    "url": "documents/frontend-interview-prep.html"
+  },
+  {
     "title": "无人机巡检平台后端 · 六周直读复习手册",
     "description": "自动建模面试精读：机库分配手算、真实源码、派飞时序与并发异常；对照v2.5工作树和v3，扩展Java/MySQL/Redis/AI/Agent原理追问。",
     "date": "2026-10-14",
@@ -16,6 +28,18 @@
     "description": "面向 1–3 年 Java 后端的 67 题理解手册：分基础必会、项目常用、进阶追问，补齐集合、并发、Spring Boot、MySQL 日志、Redis、Redisson 与线上排障，每题含原理、例子、边界和自测。",
     "date": "2026-10-14",
     "url": "documents/java-backend-interview-prep.html"
+  },
+  {
+    "title": "Node.js / TypeScript 后端八股速成手册（34 题 · 理解与实践）",
+    "description": "Node.js / TypeScript 后端八股速成手册：34 题分基础必会、项目常用与进阶追问，按具体问题、原理、例子、边界和自测组织，连接常用实践与完整任务。",
+    "date": "2026-10-14",
+    "url": "documents/node-typescript-interview-prep.html"
+  },
+  {
+    "title": "Python 后端八股速成手册（35 题 · 理解与实践）",
+    "description": "Python 后端八股速成手册：35 题分基础必会、项目常用与进阶追问，按具体问题、原理、例子、边界和自测组织，连接常用实践与完整任务。",
+    "date": "2026-10-14",
+    "url": "documents/python-backend-interview-prep.html"
   },
   {
     "title": "基础能力专栏 · 操作系统、网络与故障推演",
