@@ -12,8 +12,8 @@
     "url": "viewer.html?src=documents/uav-backend-review-handbook.md"
   },
   {
-    "title": "Java 后端八股速成手册（理解版 · 32 题原理与自测）",
-    "description": "Java 后端 32 题理解手册：从具体问题推导 MySQL、Redis、并发、JVM、Spring 与消息队列原理，逐题配例子、反例、自测解析和简短表达，标明版本与项目边界。",
+    "title": "Java 后端八股速成手册（67 题 · 原理、Redisson 与排障）",
+    "description": "面向 1–3 年 Java 后端的 67 题理解手册：分基础必会、项目常用、进阶追问，补齐集合、并发、Spring Boot、MySQL 日志、Redis、Redisson 与线上排障，每题含原理、例子、边界和自测。",
     "date": "2026-10-14",
     "url": "documents/java-backend-interview-prep.html"
   },
