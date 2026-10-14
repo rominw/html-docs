@@ -1,6 +1,6 @@
 ---
 title: 无人机巡检平台后端 · 六周直读复习手册（md 版）
-description: 围绕一个真实无人机巡检平台的自动建模、多机库调度、分布式一致性、AI 工程化、智能体集成与违章停车多轮复核的六周面试复习手册，对照两个自动建模分支，重点解释共享资源、锁范围、CAS、GC与恢复窗口，并扩展简历技术的原理追问。
+description: 围绕一个真实无人机巡检平台的自动建模、多机库调度、分布式一致性、AI 工程化、智能体集成与违章停车多轮复核的六周面试复习手册，对照两个自动建模分支，含机库分配手算、真实源码精读和调度时序图，解释共享资源、锁范围、CAS、GC与恢复窗口，并扩展技术原理追问。
 date: 2026-10-14
 tags: 面试·分布式·AI 工程
 ---
@@ -71,7 +71,7 @@ tags: 面试·分布式·AI 工程
 
 六周并不是要求你完成额外作业，而是帮你控制复习顺序：
 
-- 第 1 周：先把自动建模端到端链路、机库分配和航线动态准入读懂。
+- 第 1 周：先读1.1–1.9建立主线，再精读1.10–1.15的机库分配手算、代码与调度图；这部分优先复述。
 - 第 2 周：理解并发控制、任务预占和分布式一致性。
 - 第 3 周：理解状态机、事件补偿、暂停继续取消和断点续飞。
 - 第 4 周：结合项目复习 Java、MySQL、Redis、Spring。
@@ -192,9 +192,9 @@ v3 EXTERNAL：远端分配 → 本地规划/Mission准备 → submitTaskGroup �
 
 系统先为每个子区域查询候选机库，考虑机库是否在线、距离范围、规划数据是否完整、绑定飞机和吊舱能力是否满足要求。
 
-分配时优先处理候选机库较少的区域，避免先把稀缺机库分给选择很多的区域，导致后面的区域无机库可用。
+分配时优先处理候选机库较少的区域，让选择较多的区域根据前面确定的分配调整负载与空间关系；当前没有一库只分一个区域的容量限制。
 
-当前二维分配评分顺序是：
+完整图解、手算和源码精读见1.10–1.15。当前二维分配评分顺序是：
 
 1. 机库最终负载差值更小。
 2. 机库到区域的连接线交叉数量更少。
@@ -231,7 +231,7 @@ v3 EXTERNAL：远端分配 → 本地规划/Mission准备 → submitTaskGroup �
 > // 交点为(18/13,18/13)；区域x跨度4大于y跨度2，主轴仍可选x。
 > ```
 >
-> 这只是局部平面教学反例。分配评分的二维连接线也只是代理指标，本地模式最终仍要检查机库、Mission与电池；航迹可飞性由已启用的JTS约束筛选。
+> 这只是局部平面教学反例。分配评分的二维连接线也只是代理指标，当前v2.5最终仍要检查机库、Mission与电池，并经过统一碰撞准入；JTS筛选仅指旧提交/v3 SELF。
 
 ### 面试官问：为什么不直接选择最近机库
 
@@ -243,13 +243,13 @@ v3 EXTERNAL：远端分配 → 本地规划/Mission准备 → submitTaskGroup �
 
 ### 面试官问：分不到机库的区域怎么处理
 
-> 初次分配没拿到机库的区域不会立即失败，而是进入延迟重试链：间隔 6 秒、最多重试 2 次，重试同样复用 modelingRouteExecutor（delayedExecutor）。每次重试前先重查数据库，只处理仍为 PENDING 且未分配机库的区域，状态已被其他流程改变的区域自动跳过；重试中分配成功的照常进入航线规划批次，2 次耗尽仍未分配的标记 FAILED，原因写“机库状态重试2次后仍未找到可用机库”。整条重试链与首批规划一起被 allOf 收口，批次准备完成时不会有漏网区域。用延迟而不是立即重试，是因为机库不满足通常是外部瞬时状态（正在充电、占用未释放），立即重试只会看到同样结果。
+> 初次分配没拿到机库的区域不会立即失败，而是进入延迟重试链：间隔 6 秒、最多重试 2 次，重试同样复用 modelingRouteExecutor（delayedExecutor）。每次重试前先重查数据库，只处理仍为 PENDING 且未分配机库的区域，状态已被其他流程改变的区域自动跳过；重试中分配成功的照常进入航线规划批次，2 次耗尽仍未分配的标记 FAILED，原因写“机库状态重试2次后仍未找到可用机库”。整条重试链与首批规划一起被 allOf 收口，批次准备完成时不会有漏网区域。用延迟而不是立即重试，是为了给设备/能力状态恢复留时间；自动规划候选没有统一要求达到派飞电量阈值，不能将无候选都归因于充电。
 
 ### 面试官问：评分和局部优化的代码具体怎么实现的
 
 > **记忆关键词：** 字典序评分 → 稀缺优先 → 贪心初解 → 移动/交换 → 有界停止
 
-> 三个层次。① 打分函数一次算四个维度：把每个“机库→区域”连成线段两两判交数交叉数（同一机库的多条线不互判）；距离用 haversine 球面距离求和（米）；忙碌惩罚是所选机库的 penalty 之和；负载差 = 全部机库“存量负载＋本批已分配”的最大值减最小值。四个数按字典序比较：负载差最小优先，其次交叉更少、惩罚更低、总距离更短。② 初始解是“试放-打分”贪心：区域按候选机库数升序（稀缺优先），每个区域把每个候选放进当前方案全量打一次分，取最优——不是只看距离的就近贪心。③ 局部优化每轮搜索两个邻域：单区域换机库的移动，和两区域互换机库的交换（要求互换后各自仍在对方候选集内），取全邻域最优改进，无改进即停，轮次上限 max(4, 区域数×2)——所以叫“有界”局部优化，最坏时间可控。经纬度先做偏移还原再参与计算；区域或机库缺坐标时整个二维分配放弃，回退负载均衡兜底。
+> 三个层次。① 打分函数一次算四个维度：把每个“机库→区域”连成线段两两判交数交叉数（同一机库的多条线不互判）；距离用 haversine 球面距离求和（米）；忙碌惩罚是所选机库的 penalty 之和；负载差 = 全部机库“存量负载＋本批已分配”的最大值减最小值。四个数按字典序比较：负载差最小优先，其次交叉更少、惩罚更低、总距离更短。② 初始解是“试放-打分”贪心：区域按候选机库数升序（稀缺优先），每个区域把每个候选放进当前方案全量打一次分，取最优——不是只看距离的就近贪心。③ 局部优化每轮搜索两个邻域：单区域换机库的移动，和两区域互换机库的交换（要求互换后各自仍在对方候选集内），取全邻域最优改进，无改进即停，轮次上限 max(4, 区域数×2)——所以叫“有界”局部优化，最坏时间可控。区域中心先做偏移还原；区域缺坐标时二维返回空方案，机库缺坐标时先排除该机库，未分配区域再走负载均衡兜底。
 
 **代码定位：** ModelingDockResolver.buildTwoDimensionalAssignment、scoreAssignment、findBestAssignmentImprovement。** 八股扩展：** 字典序评分与加权和不同；稀缺优先是启发式，不保证全局最优；局部优化的邻域与停止预算决定质量/成本。分配只是规划绑定，不是实际领取机库，两个批次的存量负载快照也可能并发变化。
 
@@ -471,6 +471,649 @@ flowchart TD
 两个模式不重复处理同一批次，但仍可能使用同一样板间的机库与空域。需要核对两个调度器共同的资源准入协议；仅有 excludeExternal 条件不足以证明物理资源互斥。远端调度器实现不在这两个分支的证据范围内。
 
 **八股扩展：** 灰度切换的关键是持久化归属、存量兼容、回滚范围和远端受理语义。先远端后本地仍可能发生“远端成功、本地失败”，需要命令身份和对账，不能靠 HTTP 成功先后顺序构成分布式事务。
+
+
+## 1.10 机库分配精读：先分清“规划绑定”和“执行占用”
+
+这一节至1.15是面试重点精读。先读图和例子，再对着摘录复述，最后做追问。**主线始终是v2.5当前工作树**；v3 SELF沿用本地分配核心，EXTERNAL在入口改走外部机库分配。以下区域、机库名字和算例坐标都是教学数据，不是线上运行记录。
+
+**记忆关键词：候选资格 → 规划绑定 → 航线/Mission准备 → 最新状态复检 → 空域准入 → 实际派飞。**
+
+```mermaid
+flowchart LR
+  A[区域与候选资格] --> B[选择机库并保存 dockSn]
+  B --> C[按机库起止点规划航线]
+  C --> D[创建 Mission 静态检查]
+  D --> E[等机库 电池 批次可执行]
+  E --> F[区域 CAS 动态检测与登记]
+  F --> G[IoT 下发 飞行与续飞]
+```
+
+### 三种对象，三种不同的承诺
+
+| 对象/动作 | 它承诺什么 | 它没有承诺什么 |
+| --- | --- | --- |
+| `task` | 一次建模批次，包含多个子区域 | 不独占样板间，也不归创建它的服务节点独占 |
+| `taskArea.dockSn` | 这个区域计划使用哪个机库；据此确定规划起止点 | 不表示机库已经被领取、已经派飞、或现在只有这一个区域绑定它 |
+| `missionId` | 已准备好的设备飞行任务 | 不表示设备已经接收或已完成飞行 |
+| `dispatchStatus=DISPATCHING` | 当前区域行被一次条件更新领取，进入下发过程 | 不自动给其他区域行施加同机库唯一约束 |
+| 活跃航线登记 | 统一碰撞服务能识别这条设备航线的占用 | 不等于命令幂等、尝试代际或旧执行者隔离 |
+
+假设两个批次T1、T2都把区域绑定给D1，这是合法的规划结果：先准备两条从D1出发的航线，执行时再排队。同一机库能绑定多条待执行航线，不能把分配描述成“一机库只分一个区域”。真正需要避免的是**两条互不兼容的任务同时进入执行**。
+
+绑定影响航线本身：`resolvePlanningDock`读取已分配机库，`buildPlanningPoint`用机库经纬度加建模精度对应的相对高度构造规划起止点。因此执行时临时换成另一个机库，不能只改dockSn就认为原航线仍有效；还需重新确认起止点、飞机、吊舱、航线和Mission的一致性。当前基础调度扫描主要等待既定机库恢复，没有自动做一次完整的跨库重规划。
+
+### 候选机库到底怎样筛出来
+
+调用链是`listPlanningDockCandidates → listPlanningDocksForCenter → listCandidateDocksForCenter → ShowroomService.getWaitingDock(..., false)`，然后由`ModelingDockAvailabilityServiceImpl`判断状态与吊舱。最后`hasRequiredPlanningDockData`检查SN、绑定飞机、经纬度。
+
+| 检查层 | 实际代码行为 | 面试时怎样解释 |
+| --- | --- | --- |
+| 样板间与权限 | getWaitingDock按用户角色、机库范围、样板间查询 | 不是拿全公司所有机库直接按距离排序 |
+| 搜索半径 | 使用区域中心点和配置的dockSearchRadius；DAO做范围过滤 | 是中心点附近候选，不能据此证明区域全部航点都在设备续航范围内 |
+| 普通机库 | ONLINE且nestStatus为6或900，匹配机库吊舱配置 | 规划候选要有可用状态与合适能力 |
+| 应急机库 | EMERGENCY且nestStatus为82，匹配配对飞机的吊舱 | 不能笼统说只有ONLINE才进入候选 |
+| 吊舱编码 | 应急飞机等价码命中后返回机库侧规范码 | “能匹配”与“传给设备的编码正确”是两件事 |
+| 基础数据 | SN、pairedDevice、经纬度非空 | 能规划之前必须知道起止位置和飞机绑定 |
+| 下发就绪 | isDockReadyForDispatch还检查最大可用电池容量阈值 | 规划可用与现在可以派飞的条件并不完全一样 |
+
+**指定机库是单独分支。** 当requestedDockSn不为空，`searchPlanningDock`检查存在、所属样板间、未删除、绑定飞机和坐标，并返回单元素候选；它没有重走自动候选的全部实时状态/半径/吊舱过滤。后续规划仍会解析吊舱，派飞前也会重新检查就绪与电池。答题不要把自动选择规则原封不动套到指定路径。
+
+### 负载和忙碌惩罚并不是同一个数
+
+`computePlanningDockLoad`统计PLANNING、READY、EXECUTING且未删除批次中的已绑定区域，排除航线、Mission创建或下发状态为FAILED的区域，按dockSn计数。查询没有额外按当前样板间过滤，靠各区域的dockSn聚合。**它统计任务记录数量，不是CPU负载、剩余飞行分钟、电量消耗或实时在飞机数。** 活跃批次中已飞完的区域也不在这里逐项扣除；因此这是一个粗略的规划负载代理。
+
+`dockBusyExtra`则调用`isDockReadyForDispatch`：就绪为0，否则为1。在二维评分中，它按每个新分配区域累加。例如D3惩罚1且新分到两块区域，busyScore贡献2。自动候选可能满足规划状态，但电池不足导致这个惩罚为1。
+
+两个并发批次可能读到同一份负载快照，再分别写入绑定；这会影响均衡质量。后面保存分配的本地事务只原子提交本批绑定，不会把“读负载—计算—写绑定”自动变成跨批次资源领取协议。**规划均衡的近似性与执行互斥的正确性要分开说明。**
+
+### 面试官问：为什么先分配机库，再调度时还要重新判断
+
+> **记忆关键词：位置依赖 · 时间变化 · 两类承诺。**
+>
+> 规划必须先知道从哪座机库出发、使用哪架飞机和吊舱，才能生成航线。但规划完成后可能排队、暂停或者等待充电，之前的状态会变化。所以规划绑定回答“计划由谁执行”，最终调度回答“现在是否能执行”。机库分配允许同库多个区域排队；执行时必须重新检查同库未结束链、设备与电池，并做空域准入。
+
+### 面试官问：候选稀缺优先是不是先抢唯一名额
+
+> **记忆关键词：无硬容量 · 决策顺序 · 保留灵活度。**
+>
+> 当前分配没有每机库只能分一个区域的容量限制，D1被分一次不会从后面候选中移除。候选少的先确定，让选择多的区域根据前面形成的负载与空间关系作调整；这是启发式顺序，不是抢名额。如果一个区域候选为空，先后顺序也不能凭空创造机库，只能等待重试或失败。
+
+## 1.11 机库分配手算：三个机库、五个区域、四级评分
+
+**先把目标写成四元组：S=(负载极差, 连接线严格交叉数, 忙碌惩罚, 总球面距离)。越小越好，按字典序逐级比较。** 它不是把四个指标乘权重加在一起。构造器虽然先接crossingCount，但真正优先级由compareTo决定。
+
+**源码摘录 · `ModelingDockResolver.java` 第 423–438 行（v2.5当前工作树）：**
+
+```java
+@Override
+public int compareTo(AssignmentScore other) {
+    int compared = Long.compare(loadSpread, other.loadSpread);
+    if (compared != 0) {
+        return compared;
+    }
+    compared = Integer.compare(crossingCount, other.crossingCount);
+    if (compared != 0) {
+        return compared;
+    }
+    compared = Long.compare(busyScore, other.busyScore);
+    if (compared != 0) {
+        return compared;
+    }
+    return Double.compare(totalDistanceMeters, other.totalDistanceMeters);
+}
+```
+
+例如S1=(1,3,2,8000)，S2=(2,0,0,2000)，代码选S1：第一项已经胜出，后面的交叉、惩罚、距离都不再比较。这意味着“先均衡”是严格优先级，不是“总体上大致比较重视均衡”。连接线交叉是分配阶段的软目标，不能用这种取舍直接裁决真实飞行安全。
+
+```mermaid
+flowchart LR
+  A[先比较负载极差] --> B[相同才比连接线交叉]
+  B --> C[相同才比忙碌惩罚]
+  C --> D[最后比总距离]
+```
+
+### 把输入明确列出来
+
+以下是便于画图的局部平面坐标，单位米。演算时映射到纬度约30°的经纬度，用源码同样的haversine公式算距离；图上距离仅表示空间关系。
+
+| 机库 | 平面位置 | 已有规划负载 | busyExtra | 教学设定 |
+| --- | --- | --- | --- | --- |
+| D1 | (0,0) | 2 | 0 | 有两条存量记录，当前可派飞 |
+| D2 | (1000,0) | 0 | 0 | 当前可派飞 |
+| D3 | (2000,0) | 0 | 1 | 可参与规划，但当前电池未就绪 |
+
+| 区域 | 平面中心 | 候选集 | 初始排序 |
+| --- | --- | --- | --- |
+| R1 | (200,600) | D1 | 1个候选，第一处理 |
+| R2 | (400,1000) | D1、D2 | 2个候选，与R3按sort/id排序 |
+| R3 | (1700,700) | D2、D3 | 2个候选 |
+| R4 | (900,1400) | D1、D2、D3 | 3个候选 |
+| R5 | (1600,1500) | D1、D2、D3 | 3个候选 |
+
+```mermaid
+flowchart LR
+  D1[D1 存量2] --> R1[R1 仅D1]
+  D1 --> R2[R2 D1或D2]
+  D2[D2 存量0] --> R2
+  D2 --> R3[R3 D2或D3]
+  D3[D3 存量0 惩罚1] --> R3
+  D1 --> R4[R4 三库可选]
+  D2 --> R4
+  D3 --> R4
+  D1 --> R5[R5 三库可选]
+  D2 --> R5
+  D3 --> R5
+```
+
+### 贪心不是“看当前区域最近的机库”
+
+每轮把当前区域试放到一个候选，把**当前已分配的整个方案**重打分，保留最小方案。负载极差在本次候选机库并集上算，包含还没分到新区域的机库；不是只在本轮选中的机库之间比较。
+
+| 轮次 | 各选择的有效负载(D1,D2,D3) | 决定本轮胜负的指标 | 选择 |
+| --- | --- | --- | --- |
+| R1 | D1→(3,0,0) | 唯一合法候选；极差3 | D1 |
+| R2 | D1→(4,0,0)；D2→(3,1,0) | 极差4与3 | D2 |
+| R3 | D2→(3,2,0)；D3→(3,1,1) | 极差3与2；即使D3惩罚1也先胜出 | D3 |
+| R4 | D1→(4,1,1)；D2→(3,2,1)；D3→(3,1,2) | D1极差3被淘汰；D2/D3极差2、交叉0均相同，惩罚1与2 | D2 |
+| R5 | D1→(4,2,1)；D2→(3,3,1)；D3→(3,2,2) | 极差3、2、1 | D3 |
+
+最终新分配数量=(1,2,2)，加存量后=(3,2,2)，极差1，严格交叉数0，busyScore=2，haversine总距离约5516米。存量记录只进入负载，没有把它们的旧连接线与距离并入当前方案评分。R3、R5绑定D3可以先规划，**并不意味着低电量时立即起飞**；真正派飞仍会等电池。
+
+这里还有一个很有价值的追问：如果实际要减小总工期，为什么用“条数极差”而不是“分钟数极差”？因为当前没有把每条航线预计耗时、面积、速度、换电和充电都建模成服务时间；两块区域条数相同不代表工作量相同。以预计剩余时长、设备能力与等待成本优化是可讨论的改进，不能说代码已经实现。
+
+### 为什么还要搜索“移动”和“交换”
+
+贪心每次只决定一个区域，后来的选择可能让先前决定变得不合适。局部优化反复考察：① 单个区域换到其候选机库；② 两个区域互换机库，且两边新机库都必须属于自己的候选集。**每轮取全邻域里最好的一次严格改进**，不是遇到第一个改善就立刻返回。
+
+用两个机库、两个区域看交换的价值：D1=(0,0)、D2=(1000,0)，R1=(1000,1000)、R2=(0,1000)，无存量、无忙碌惩罚，两区域都允许两机库。初解D1→R1、D2→R2的负载=(1,1)，连接线交叉1。单独移动任何一个区域会变成(2,0)或(0,2)，极差从0变2，按第一目标被拒绝。**互换之后负载仍是(1,1)，交叉从1变0，因此接受交换**；图中平面总距离也由约2828米降为2000米。
+
+```mermaid
+flowchart LR
+  A[原方案 两库各1条 交叉1] --> B[单区域移动 极差变2 拒绝]
+  A --> C[两区域交换 极差仍0 交叉0 接受]
+```
+
+上限`max(4, 区域数×2)`限制优化轮数，无严格改善就提前停。本例五区域初解已没有更好的合法移动/交换，提前结束；并不是一定跑满10轮。有轮次上限不等于每轮便宜，更不等于达到全局最优。
+
+### 面试官问：如何现场证明你的算法不是最近距离贪心
+
+> **记忆关键词：四元组 · 全方案打分 · 严格优先级。**
+>
+> 我会先写compareTo，再举R3：已有负载(3,1,0)，分给D2变(3,2,0)、极差3；分给D3变(3,1,1)、极差2，因此选D3，即使它有忙碌惩罚。每次试放都对整个部分方案打分，而非只计算当前区域距离。这个优先级保证按当前启发式目标选择，不保证总工期最短。
+
+### 面试官问：连接线没有交叉，为什么还可能发生碰撞
+
+> **记忆关键词：代理指标 · 严格相交 · 完整航迹 · 动态占用。**
+>
+> 连接线只是机库到区域中心的线段，不包括区域内覆盖航迹、返航、时间、高度或偏航；scoreAssignment也只比较本批连接线。segmentsIntersect用两组叉积乘积严格小于0，只统计线段内部穿越，端点接触与共线重叠不计数，同机库两条线也跳过。因此交叉为0只能说明这个代理指标为0，飞行可行性还需最终统一碰撞准入。
+
+## 1.12 机库分配源码逐步读：输入、试放、优化和事务
+
+源码目录：`hushi-web/src/main/java/.../web/service/modeling/impl/`。摘录保留实际表达式；省略段落在正文说明。以下不是重新实现算法的伪代码。
+
+### 第一步：调用者把“已分到”和“没分到”分开推进
+
+**源码摘录 · `ModelingTaskServiceImpl.java` 第 217–229 行（v2.5当前工作树）：**
+
+```java
+ModelingDockResolver.PlanningDockAssignmentResult assignment = dockResolver.assignPlanningDocks(
+        context.getTaskAreas(), context.getDockSn(), taskId);
+log.info("建模首次机库分配结果 taskId={}, assignedCount={}, unassignedCount={}, assignedTaskAreaIds={}, unassignedTaskAreaIds={}",
+        taskId, assignment.getAssignedAreas().size(), assignment.getUnassignedAreas().size(),
+        assignment.getAssignedAreas().stream().map(ModelingTaskAreaEntity::getId).collect(Collectors.toList()),
+        assignment.getUnassignedAreas().stream().map(ModelingTaskAreaEntity::getId).collect(Collectors.toList()));
+CompletableFuture<Void> initialPlanning = submitAsyncRoutePlanningBatch(
+        context, assignment.getAssignedAreas(), loginUser, "INITIAL");
+CompletableFuture<Void> retryPlanning = scheduleDockAssignmentRetry(
+        context, assignment.getUnassignedAreas(), loginUser, 1);
+CompletableFuture.allOf(initialPlanning, retryPlanning)
+        .whenComplete((ignored, throwable) -> completeAsyncRoutePlanning(
+                context, loginUser, throwable));
+```
+
+已分配区域马上进入异步航线规划批次；未分配区域进入6秒间隔、最多2次的分配重试链。allOf等待两条链完成后统一收口。这是**一次初次分配加最多两次补尝试**，不要说总共只尝试两次。每次重试查数据库，只处理仍PENDING且没有dockSn的区域，避免重复处理已经推进的记录。
+
+### 第二步：候选稀缺优先，逐个试放后评分
+
+**源码摘录 · `ModelingDockResolver.java` 第 169–196 行（v2.5当前工作树）：**
+
+```java
+Map<Long, WaitingDockResp> assignment = new LinkedHashMap<>();
+List<ModelingTaskAreaEntity> orderedAreas = new ArrayList<>(taskAreas);
+orderedAreas.sort(Comparator
+        .comparingInt((ModelingTaskAreaEntity area) ->
+                candidatesByArea.getOrDefault(area.getId(), Collections.emptyList()).size())
+        .thenComparing(ModelingTaskAreaEntity::getSort, Comparator.nullsLast(Integer::compareTo))
+        .thenComparing(ModelingTaskAreaEntity::getId));
+for (ModelingTaskAreaEntity area : orderedAreas) {
+    WaitingDockResp bestDock = null;
+    AssignmentScore bestScore = null;
+    for (WaitingDockResp dock : candidatesByArea.getOrDefault(area.getId(), Collections.emptyList())) {
+        if (dock == null || !docksBySn.containsKey(dock.getDeviceSn())) {
+            continue;
+        }
+        assignment.put(area.getId(), dock);
+        AssignmentScore score = scoreAssignment(
+                assignment, areaPoints, docksBySn, dockLoad, dockPenalty);
+        if (bestScore == null || score.compareTo(bestScore) < 0) {
+            bestScore = score;
+            bestDock = dock;
+        }
+    }
+    if (bestDock == null) {
+        assignment.remove(area.getId());
+    } else {
+        assignment.put(area.getId(), bestDock);
+    }
+}
+```
+
+`assignment.put`会覆盖当前区域上一次试放的机库，不会多留一份。每个候选评分都含前面已确定的区域，但不含后面尚未分配的区域。循环结束后把bestDock写回；无合法候选就移除当前区域。比较使用`<0`而不是`<=0`，完全相同分数保留先遇到的候选；区域排序有sort/id兜底，候选迭代顺序仍可能影响完全平分时的结果。
+
+### 第三步：负载第一目标到底怎么计算
+
+**源码摘录 · `ModelingDockResolver.java` 第 321–330 行（v2.5当前工作树）：**
+
+```java
+long minLoad = Long.MAX_VALUE;
+long maxLoad = Long.MIN_VALUE;
+for (String dockSn : docksBySn.keySet()) {
+    long effectiveLoad = dockLoad.getOrDefault(dockSn, 0L)
+            + assignedCount.getOrDefault(dockSn, 0);
+    minLoad = Math.min(minLoad, effectiveLoad);
+    maxLoad = Math.max(maxLoad, effectiveLoad);
+}
+long loadSpread = minLoad == Long.MAX_VALUE ? 0L : maxLoad - minLoad;
+return new AssignmentScore(crossingCount, loadSpread, busyScore, totalDistance);
+```
+
+例如候选并集D1、D2、D3，已有负载(2,0,0)，只试放R1到D1，得到(3,0,0)，极差3。即使D2、D3当前没拿到新区域，它们仍进入min/max。距离与忙碌是本批assignment贡献，负载额外叠加数据库统计的存量。
+
+同一方法先累加haversine距离、assignedCount和busyScore，再两两检查连接线交叉。`segmentsIntersect`是平面经纬度叉积方向判断，haversine则是球面两点距离，别把二者说成同一种距离公式。
+
+**源码摘录 · `ModelingDockResolver.java` 第 336–347 行（v2.5当前工作树）：**
+
+```java
+
+private boolean segmentsIntersect(SpatialPoint firstStart, SpatialPoint firstEnd,
+                                  SpatialPoint secondStart, SpatialPoint secondEnd) {
+    if (firstStart == null || firstEnd == null || secondStart == null || secondEnd == null) {
+        return false;
+    }
+    double firstDirection = direction(firstStart, firstEnd, secondStart);
+    double secondDirection = direction(firstStart, firstEnd, secondEnd);
+    double thirdDirection = direction(secondStart, secondEnd, firstStart);
+    double fourthDirection = direction(secondStart, secondEnd, firstEnd);
+    return firstDirection * secondDirection < 0D && thirdDirection * fourthDirection < 0D;
+}
+```
+
+### 第四步：有界局部优化只接受严格改善
+
+**源码摘录 · `ModelingDockResolver.java` 第 198–211 行（v2.5当前工作树）：**
+
+```java
+AssignmentScore bestScore = scoreAssignment(
+        assignment, areaPoints, docksBySn, dockLoad, dockPenalty);
+int maxRounds = Math.max(4, taskAreas.size() * 2);
+for (int round = 0; round < maxRounds; round++) {
+    AssignmentImprovement improvement = findBestAssignmentImprovement(
+            orderedAreas, assignment, bestScore, candidatesByArea,
+            areaPoints, docksBySn, dockLoad, dockPenalty);
+    if (improvement == null) {
+        break;
+    }
+    assignment.clear();
+    assignment.putAll(improvement.assignment);
+    bestScore = improvement.score;
+}
+```
+
+findBestAssignmentImprovement里移动复制一份current，再替换一个区域的机库；交换复制一份，再替换两个区域。交换需要下面这些条件，既不能同机库交换，也不能把区域换到它不支持的机库。
+
+**源码摘录 · `ModelingDockResolver.java` 第 253–277 行（v2.5当前工作树）：**
+
+```java
+for (int first = 0; first < areas.size(); first++) {
+    Long firstAreaId = areas.get(first).getId();
+    WaitingDockResp firstDock = current.get(firstAreaId);
+    if (firstDock == null) {
+        continue;
+    }
+    for (int second = first + 1; second < areas.size(); second++) {
+        Long secondAreaId = areas.get(second).getId();
+        WaitingDockResp secondDock = current.get(secondAreaId);
+        if (secondDock == null || Objects.equals(firstDock.getDeviceSn(), secondDock.getDeviceSn())
+                || !containsDock(candidatesByArea.get(firstAreaId), secondDock.getDeviceSn())
+                || !containsDock(candidatesByArea.get(secondAreaId), firstDock.getDeviceSn())) {
+            continue;
+        }
+        Map<Long, WaitingDockResp> trial = new LinkedHashMap<>(current);
+        trial.put(firstAreaId, secondDock);
+        trial.put(secondAreaId, firstDock);
+        AssignmentScore score = scoreAssignment(
+                trial, areaPoints, docksBySn, dockLoad, dockPenalty);
+        if (score.compareTo(bestScore) < 0) {
+            bestScore = score;
+            bestAssignment = trial;
+        }
+    }
+}
+```
+
+`score.compareTo(bestScore)<0`才替换当前最佳邻居，不接受平分方案，所以不会为同分来回晃动。不过存在同时移动三块区域才能改善的情况，而当前邻域只看单移动/双交换，这就是可能停在局部最优的原因。
+
+### 第五步：二维兜底与保存绑定
+
+区域坐标缺失时二维函数返回空方案；机库坐标缺失时先从二维候选并集中排除，无有效二维机库则返回空方案。外层只为未分配区域走buildLoadBalancedAssignment。**不是任意一座机库缺坐标就强制把整批二维方案都丢掉。** 正常自动候选此前已检查基础数据，缺数据兜底是防御性路径。
+
+兜底也按候选数排序，但选机库的比较规则变成`存量负载+busyPenalty`，然后SN排序；每分一个区域就把内存负载加1。它没有二维交叉和距离目标，忙碌惩罚与负载在这一兜底里是相加，不能把二维字典序规则套过来。
+
+**源码摘录 · `ModelingDockResolver.java` 第 105–110 行（v2.5当前工作树）：**
+
+```java
+TransactionTemplate tx = new TransactionTemplate(transactionManager);
+tx.executeWithoutResult(status -> assignment.forEach((taskAreaId, dock) -> modelingTaskAreaDao.update(null,
+        new LambdaUpdateWrapper<ModelingTaskAreaEntity>()
+                .eq(ModelingTaskAreaEntity::getId, taskAreaId)
+                .set(ModelingTaskAreaEntity::getDockSn, dock.getDeviceSn())
+                .set(ModelingTaskAreaEntity::getUpdateTime, new Date()))));
+```
+
+事务保存后还会更新内存taskArea.dockSn，再返回assignedAreas和unassignedAreas。事务保证这批写库的提交/回滚边界，不校验机库排他占用、不冻结候选状态，也不把后续远端规划/碰撞/IoT纳入本地事务。
+
+### 面试官问：这个算法复杂度是多少，为什么不能只说有界所以快
+
+> **记忆关键词：候选数 · 全量评分 · 邻域枚举 · 实测。**
+>
+> 设n个区域、平均k个候选、m个有效机库。一轮评分有区域两两判交，约O(n²+m)。贪心约nk次评分；局部优化一轮有nk级别移动和n²级别交换，还带候选集校验与Map复制，最多max(4,2n)轮。粗略主项是O(nk(n²+m)+n(nk+n²)(n²+m))，候选成员检查若线性扫描还要额外计入成本。k固定且m同阶时最坏主项可到O(n⁵)。因此有界只是限制搜索，不代表大量区域时没有成本；应按候选数、评分次数、耗时和方案质量做测量，再决定是否增量评分或更换算法。
+
+### 面试官问：为什么不是二分图最大匹配或匈牙利算法
+
+> **记忆关键词：一对多 · 方案耦合 · 目标不独立。**
+>
+> 这里一个机库可以分到多块区域，负载极差依赖整个方案，连接线交叉又依赖两条分配边，不能直接当一对一、每条边固定代价的标准指派。可以通过容量展开、整数规划等重新建模，但不能只报一个算法名字就说已经解决。当前选择贪心加有限邻域搜索，是对实际目标和实现成本的折中。
+
+## 1.13 调度源码精读：从触发入口走到真实派飞
+
+**记忆关键词：多入口 → 全样板间扫描 → 两段锁 → 最新复检 → 区域CAS → 动态准入/登记 → IoT → 结果分类。**
+
+### 调度由什么触发，队列存在哪里
+
+| 入口 | 代码位置（v2.5工作树） | 为什么需要 |
+| --- | --- | --- |
+| onTaskPrepared | ModelingQueueManager第93行 | 航线与Mission准备完成，首轮调度 |
+| reconcileActiveShowrooms | 第110行；@Scheduled在109行 | 漏事件、服务重启和遗留任务；默认fixedDelay120秒，各启用实例都可能执行 |
+| onMissionFinished | 第131行 | 一条执行链结束后尝试补位 |
+| onDockReady | 第155行 | 机库恢复、电池就绪后重新尝试 |
+| 继续执行入口 | 恢复后调用scheduleShowroom | 批次从暂停恢复，重新参与扫描 |
+
+这里的“队列”主要是数据库task/taskArea的状态和排序，候选列表是本次查询结果，**不是JVM里某个BlockingQueue持有全部飞行任务**。节点A创建T1，节点B补偿查询同一样板间的T1很正常；taskId用来定位批次，showroomId用来定位共享调度范围。
+
+onTaskPrepared最后调用`scheduleShowroom(task.getShowroomId(), "PLAN_READY", null)`，而定时补偿也调用同一方法。它按样板间查READY/EXECUTING、未删除、未暂停的批次，批次按createTime/id排序；再查Mission创建成功、dispatch=PENDING、dockSn/missionId/routeCode完整且非终态的区域，按批次顺序、区域createTime、sort、id排序。因此一次触发可能推进其他批次，并不只调度传入taskId的区域。
+
+### 第一段锁：先恢复遗留状态，再收集基础候选
+
+**源码摘录 · `ModelingQueueManager.java` 第 618–627 行（v2.5当前工作树）：**
+
+```java
+List<ModelingTaskAreaEntity> reserved = executeWithShowroomScheduleLock(
+        showroomId, roundSource, () -> {
+    reconcileCancelledResumeChains(showroomId);
+    reconcileStaleCancelledOccupancies(showroomId);
+    if (roundReadyDockSn != null) {
+        requeueUnstartedAreaAfterDockReady(roundReadyDockSn);
+    }
+    requeueStaleDispatching(showroomId);
+    return reserveDispatchCandidates(showroomId, roundSource);
+});
+```
+
+处理取消续飞链、取消占用、机库恢复、超时遗留，再reserveDispatchCandidates筛候选。**名字里有reserve，但当前方法没有把整个列表预写成DISPATCHING，也没有真正占住每个机库。** 第一段锁释放后，列表只是快照，其他节点可能先推进某条区域。
+
+基础筛选先查同库未结束执行链，同库起飞超时重试候选优先于普通待发区域，再检查Mission和实时机库电池。碰撞检测留到真正下发前。没有阻塞的同一机库可能有两条PENDING同时进入列表；它们不会因为进入列表就一起发出。
+
+### 第二段锁：逐条重读，不相信候选快照
+
+dispatchTaskAreaRoute重新获取同一个showroom锁，调用doDispatchTaskAreaRoute。按顺序：重查最新taskArea → 已SUCCESS或非PENDING则跳过 → 检查批次未暂停/取消 → 检查其他区域的同库未结束链 → 检查Mission是否存在和仍可下发 → 检查设备/电池 → CAS领取。
+
+检查同库执行链时会考虑续飞：原Mission返航不代表整条区域执行链结束；还要结合可执行子任务、活跃子任务与最新续飞腿。样板间范围会纳入取消批次残留占用的恢复处理。这里实现依赖持久状态与生命周期判断，不能简化成只看设备表的一个busy位。
+
+**源码摘录 · `ModelingQueueManager.java` 第 1279–1284 行（v2.5当前工作树）：**
+
+```java
+int reserved = modelingTaskAreaDao.update(null, new LambdaUpdateWrapper<ModelingTaskAreaEntity>()
+        .eq(ModelingTaskAreaEntity::getId, taskArea.getId())
+        .eq(ModelingTaskAreaEntity::getDispatchStatus, ModelingDispatchStatusEnum.PENDING.getCode())
+        .set(ModelingTaskAreaEntity::getDispatchStatus, ModelingDispatchStatusEnum.DISPATCHING.getCode())
+        .set(ModelingTaskAreaEntity::getWaitReason, null)
+        .set(ModelingTaskAreaEntity::getUpdateTime, new Date()));
+```
+
+这次UPDATE要恰好影响1行，才能继续。它把“这个区域当前仍是PENDING”变成数据库裁决，挡住同一状态下同一行被重复领取。**它的WHERE没有dockSn唯一约束，也没有attempt/version；不同区域同库竞争靠样板间锁与占用复检协调，旧调用恢复靠这一条CAS不能彻底解决。**
+
+### 第三步：CAS之后仍要做空域动态准入
+
+```mermaid
+sequenceDiagram
+  participant Q as 调度器 最终持锁
+  participant DB as taskArea 数据库
+  participant S as 统一碰撞服务
+  participant I as IoT执行接口
+  Q->>DB: 重读状态 同库链 条件更新
+  DB-->>Q: PENDING变DISPATCHING 影响1行
+  Q->>S: 查询sourceEnv droneSn routeCode登记
+  alt 未登记
+    Q->>S: taskDispatch=true 安全检测并登记
+    Q->>S: 再查询确认登记
+  end
+  Q->>I: 确认准入后execMission
+  I-->>Q: 明确成功 明确拒绝 或结果未知
+  Q->>DB: 按真实结果写回
+```
+
+源码紧接CAS调用`checkAndRegisterBeforeDispatch(missionId, STANDARD_CHECK)`。该方法先验证任务/航线/飞机、样板间开关、sourceEnv与设备检测开关，然后按sourceEnv/droneSn/routeCode查活跃登记。已有登记直接复用；没有才进入检测和登记流程。
+
+**源码摘录 · `MissionRouteSafetyServiceImpl.java` 第 140–163 行（v2.5当前工作树）：**
+
+```java
+CollisionCheckRequestParam checkParam = new CollisionCheckRequestParam();
+checkParam.setDroneSn(drone.getDeviceSn());
+checkParam.setRouteCode(route.getRouteCode());
+checkParam.setTaskDispatch(true);
+checkParam.setCheckHeight(true);
+checkParam.setOverHeight(resolveShowroomHeightLimit(mission.getShowroomId()));
+checkParam.setActiveRouteTtlType(activeRouteTtlType == null
+        ? ActiveRouteTtlType.STANDARD_CHECK.getCode() : activeRouteTtlType);
+com.ikingtec.hushi.common.utils.Result checkResult = checkRouteSafety(checkParam);
+if (checkResult == null || !Objects.equals(
+        checkResult.getFlag(), com.ikingtec.hushi.common.utils.Result.FLAG_SUCCESS)) {
+    return checkResult == null
+            ? com.ikingtec.hushi.common.utils.Result.error("航线安全检测响应为空")
+            : checkResult;
+}
+
+Result<Boolean> registeredResult = collisionWarningGateway.activeRouteExists(queryParam);
+if (registeredResult == null || !Objects.equals(registeredResult.getFlag(), 0)
+        || !Boolean.TRUE.equals(registeredResult.getData())) {
+    log.error("建模任务下发前活跃航线登记未确认，missionId={}, droneSn={}, routeCode={}",
+            missionId, drone.getDeviceSn(), route.getRouteCode());
+    return com.ikingtec.hushi.common.utils.Result.error("活跃航线登记未确认");
+}
+return checkResult;
+```
+
+taskDispatch=true让统一服务把当前派飞占用纳入检测/登记。创建Mission时则taskDispatch=false，只做静态模型/障碍与限高，不因排队提前占空域。检测接口技术降级可能返回允许，派飞专用方法又查一次登记，查不到或查询失败就不继续IoT。
+
+正常错误返回中：永久模型/障碍碰撞或超高→FAILED；临时活跃冲突、服务不可用或登记未确认→释放区域DISPATCHING到PENDING并记录waitReason，等待后续事件/补偿。显式disableSafetyDetection样板间存在直接放行路径，已有登记复用也不会重新跑整套检测；因此“每次派飞一定完整检测所有项”不符合代码。
+
+客户端发出“检测并登记”请求不等于已经证明远端原子性。若碰撞服务内部先查占用再单独写入，两个其他业务调度器仍可能一起通过；需要远端在共享资源边界原子裁决。这是服务端契约要求，当前仓库只能证实客户端调用与确认。
+
+### 第四步：先设置图片上传模式，再尝试IoT，再分类写回
+
+准入成功后setDockImageUploadMode同时处理设备和Mission快照，让建模使用落库后上传。真正进入execMission前设置dispatchAttempted=true，用它区分“还没尝试下发”和“可能已经产生远端副作用”。
+
+```mermaid
+stateDiagram-v2
+  PENDING --> DISPATCHING: 最终复检通过 CAS=1
+  DISPATCHING --> PENDING: 临时冲突 服务不可用 登记未确认
+  DISPATCHING --> FAILED: 永久阻飞 或明确拒绝
+  DISPATCHING --> SUCCESS: IoT明确成功
+  DISPATCHING --> DISPATCHING: 超时 异常 空响应 结果未知
+```
+
+成功写SUCCESS，表示下发成功，**不是飞行完成**。明确拒绝清理活跃登记并写FAILED；IoT异常或空响应保留DISPATCHING和活跃登记，不在HTTP异常时贸然释放。外层catch也区分dispatchAttempted：未尝试时清理并FAILED，已经尝试则保留未知。所以“所有接口错误都回PENDING”“所有失败都删登记”都不正确。
+
+### 第五步：本轮补位不是无限重试
+
+候选for循环会继续尝试后面的区域；检查出某条明确FAILED后，scheduleShowroom再做基础扫描，给此前被同库优先关系挡住的候选补位，最多同步32轮。临时等待与结果未知不驱动无限同步重扫；其后由完成、机库就绪、继续和定时补偿推进。32是同步失败补位预算，不是机库分配2次重试，也不是起飞超时2次重发预算。
+
+### 面试官问：为什么两段都要锁，候选阶段加一次锁不够吗
+
+> **记忆关键词：快照会旧 · 最终副作用 · 同库跨行。**
+>
+> 第一次锁保护恢复和候选收集，释放后不保证名单仍可下发。每条真正派飞前再拿同一把样板间锁，重读区域、批次、同库执行链、Mission和电池；条件更新领取后做最新空域准入再调用IoT。第二段把多入口对同库、跨区域资源的正常竞争串起来，CAS再挡同一行重复领取。锁失效和旧执行者仍是另外一层问题。
+
+### 面试官问：只按机库加锁，碰撞检测交给统一服务，能否缩小锁粒度
+
+> **记忆关键词：设备资源 · 空域资源 · 原子裁决 · 接口时延。**
+>
+> 可以作为重构方向，但先验证统一碰撞服务是否原子完成检测与登记、是否覆盖所有参与者。同库还需要明确的资源归属和尝试代际；锁外IoT要有执行端fencing/幂等。只把showroom锁替换成dock锁，跨机库空域和超时恢复的竞态不会自动消失。当前先用较粗范围协调，代价是同一样板间一次网络调用慢会挡住其他派飞判断。
+
+## 1.14 用一轮调度讲透：同库串行、跨库并飞、等待与补偿
+
+### 四条区域的真实顺序怎么走
+
+教学场景：同一样板间，较早批次T1有R1→D1、R2→D2，较晚批次T2有R3→D1、R4→D3。所有区域已准备Mission、PENDING，机库电池就绪。假设实际routeCode对应的R1/R2航迹互不兼容，R4与R1兼容。这里的冲突来自完整航迹准入结果，不由区域是否重叠推断。
+
+| 步骤 | 代码读取或动作 | 区域结果 | 为什么后续还能走 |
+| --- | --- | --- | --- |
+| 首轮扫描 | 尚无DISPATCHING/SUCCESS未结束链，得到R1、R2、R3、R4 | 都只是候选 | 没有在名单生成时整体领取 |
+| 尝试R1 | 最终锁、复检、CAS、登记成功、IoT成功 | R1=SUCCESS，D1链未结束，航线活跃 | 派飞临界区完成就解锁，飞机继续飞 |
+| 尝试R2 | D2可用，CAS成功；统一服务发现与R1活跃航迹冲突 | R2回PENDING，记录空域等待 | 本轮循环continue，不会让它阻塞全部候选 |
+| 尝试R3 | 最终复检看到R1占D1，即使首轮名单没看见 | R3保持PENDING，同库等待 | 没抢区域CAS，也没有发送第二条D1命令 |
+| 尝试R4 | D3可用且与R1兼容，登记并下发成功 | R4=SUCCESS | D1与D3两架飞机此后可以同时飞 |
+
+```mermaid
+sequenceDiagram
+  participant Q as 派飞临界区
+  participant D1 as D1设备
+  participant D2 as D2设备
+  participant D3 as D3设备
+  Q->>D1: R1受理
+  Note over D1: R1飞行中
+  Note over Q,D2: R2空域冲突 等待
+  Note over Q,D1: R3同库链未完 等待
+  Q->>D3: R4受理
+  Note over D1,D3: 两机并飞 临界区已经结束
+  D1-->>Q: R1链结束 后续重新扫描
+```
+
+**锁串行的是“检查和发送过程”，不是让所有飞行串行。** 若R1的execMission耗时2秒，其他进入同showroom最终锁的派飞判断要等这2秒；一旦解锁，R1实际飞10分钟，也不要求D3等10分钟才能飞。飞行期间的排他与兼容性靠持久执行链、活跃登记和状态，不靠把Redis锁一直持有到降落。
+
+### R1结束之后，是不是一定立刻发R2和R3
+
+完成监听先尝试清理R1活跃登记，再调度全样板间。若R1没有未完成续飞腿且设备电池恢复，D1可释放给R3；R2要重新与**当前全部有效活跃登记**比较，R4可能仍在飞，也可能形成新冲突。完成事件不保证“后面所有任务现在都安全”，所以每次准入要重算最新条件。清理失败、状态滞后、电池不足都会继续等待。
+
+批次公平性也要说准确：查询优先早批次及区域顺序，同库起飞超时任务有优先权，但不满足资格的候选可以跳过，较晚批次的兼容任务仍可执行。因此它不是“整个T1彻底完成才允许T2开始”，也不是保证每条任务固定时间内得到服务的严格公平调度。
+
+### 按等待原因定位，不要看到PENDING就说调度没跑
+
+| 观测组合 | 优先追查的证据 | 正确处理方向 |
+| --- | --- | --- |
+| PENDING + 同库链等待 | blockingTaskAreaId、父Mission、可执行续飞子Mission及当前状态 | 判断整链是否真正结束；别只改区域为成功 |
+| PENDING + 电量不足 | nestStatus、dockStatus、maxBatteryCapacity和阈值 | 等机库就绪；候选绑定还在 |
+| PENDING + 活跃冲突 | sourceEnv、droneSn、routeCode、blockType和登记TTL | 区分真实占用与清理滞后；不能无证据删正在飞的登记 |
+| PENDING + 登记未确认 | routeSafeCheck响应、两次activeRouteExists结果 | 查询/服务故障不当安全，恢复后再准入 |
+| DISPATCHING + IoT结果未知 | 同一次调用的trace/返回、Mission/设备接收事实 | 查询或可靠撤销后对账；未知不当明确失败 |
+| SUCCESS + 没起飞 | Mission是否ALREADY_RECEIVED、起飞超时、机库状态 | 下发与起飞分层处理，不把SUCCESS当飞完 |
+
+最有用的关联字段是taskId、taskAreaId、showroomId、dockSn、missionId、routeCode、source与waitReason。将“候选数→最终复检阻塞数→CAS成功数→准入阻塞类型→IoT明确/未知结果”分层统计，才能区分算法分配问题、锁等待、设备等待和碰撞服务等待。
+
+### GC和恢复为什么仍是面试重点
+
+正常流程中，B看到A已经DISPATCHING，会跳过同一行；看到同库执行链，也会等待。要产生重复发送，不能只说“锁到期了，所以B一定重复执行”，还要说清恢复如何把旧状态重新开放。
+
+具体推演：A已CAS并确认登记，在execMission前长暂停；看门狗无法及时续期，锁到期。B的补偿进入，达到下发超时阈值且Mission仍WAITING，当前requeueStaleAreaToPending把区域回PENDING，B再CAS、可能复用同一三元组活跃登记并下发。A恢复后原栈继续，也下发。锁到期、状态回退、远端登记复用、旧栈续执行共同形成窗口；**默认两分钟回退阈值与实际Redis锁TTL不是同一个值，补偿执行时间还受fixedDelay和持锁时长影响**。
+
+现有代码对普通超时保留未知占用是一种防护，但后续超时恢复仍可能重新开放，不能说系统已彻底避免重复。对应改进分三层：数据库attempt/epoch阻旧回写；机库和空域的原子资源归属阻跨行双领；副作用入口执行端fencing阻旧主人，稳定commandId幂等阻同一命令重复。处于UNKNOWN时先查询或确认撤销，再释放。详细代码与时序见第2周2.7、2.8。
+
+### 面试官问：两个批次区域不重叠、机库不同，为什么还要等
+
+> **记忆关键词：锁等待 · 资源等待 · 航迹不等于区域。**
+>
+> 两次调度进入同样板间临界区会短暂互斥；拿到锁以后，如果完整航迹兼容、设备就绪，就可以分别下发并行飞，不需要等别的批次飞完。区域不重叠只描述作业范围，去程、返航仍可能穿越同一空域。先区分拿不到锁、设备不可用、空域冲突，再判断这种等待是否合理。
+
+### 面试官问：能不能直接把超时任务改FAILED，然后发下一条
+
+> **记忆关键词：超时非失败 · 副作用未知 · 释放需证据。**
+>
+> IoT可能已经受理，只是响应丢失。把状态改FAILED并释放登记，会让下一条同库或冲突航迹获得机会，而旧命令仍可能执行。应查询设备/IoT受理状态，或通过可靠撤销确认旧命令不能再执行，再更新资源归属。当前代码保留结果未知，但基于本地状态的自动回退仍是需要加强的边界。
+
+## 1.15 面试复述与八股扩展：能讲机制，也能指出边界
+
+### 被问“机库怎么分配”时的90秒回答
+
+> **记忆关键词：资格 · 存量 · 字典序 · 试放 · 移动交换 · 规划绑定。**
+>
+> 先按样板间权限、区域中心搜索半径、设备状态、吊舱和基础数据建立每区域候选集，指定机库单独校验。然后统计活跃批次各机库已绑定区域数量作为存量负载，获取派飞就绪0/1惩罚。区域按候选数、sort、id排序，逐个试放候选机库，对当前整体方案算四元组：负载极差、二维连接线交叉、忙碌惩罚、总haversine距离，按字典序选择。先得到贪心初解，再枚举单区域移动和合法双区域交换，每轮取最好严格改进，最多max(4,2n)轮；没有二维有效结果的区域走负载均衡兜底。最后事务保存dockSn，已分配开始规划，无候选的做有限延迟重试。
+>
+> 这是规划绑定，一座机库可以绑定多块区域；连接线交叉也只是代理目标。算法不保证全局最优或最短总工期，真正派飞仍要重新判断同库执行链、机库电池和最新空域安全。
+
+### 被问“多机库怎么调度”时的2分钟回答
+
+> **记忆关键词：多入口 · 数据库队列 · 两段锁 · CAS · 登记 · 结果未知 · 补位。**
+>
+> 规划完成、任务完成、机库就绪、继续及定时补偿都汇入样板间调度。数据库保存队列状态，扫描整个样板间可执行批次，按批次和区域顺序拿已创建Mission的PENDING区域。第一段样板间锁做遗留恢复和基础筛选，释放后候选只是快照。每条派飞前再次加同一把锁，重查区域状态、批次暂停取消、同库未结束链、Mission和电池，UPDATE WHERE PENDING把该区域领取成DISPATCHING，影响1行才继续。
+>
+> 当前v2.5接着走统一碰撞服务，已有登记复用，未登记时检测并登记，再查询确认，只有放行后才调用IoT。永久静态阻飞标失败，临时活跃冲突回PENDING等待；IoT明确成功记SUCCESS，明确拒绝清理登记并失败，异常/空响应保留未知占用。逐条循环还能尝试后面的兼容机库，明确失败会有限轮次重新扫描补位；事件和定时补偿共同恢复。
+>
+> 临界区串行不等于飞行串行，同库链没结束要等，不同库且航迹兼容可以同时飞。Redisson协调跨区域共享资源，CAS只领取同一行；长GC、状态回退和旧调用仍有重复发送窗口，需要代际、资源归属、执行端fencing与幂等分别完善。v3 SELF的本地JTS组合筛选、EXTERNAL的外部派飞是另外两条实现，不能混入当前v2.5回答。
+
+### 把项目问题转成原理问题
+
+| 面试官继续追问 | 项目切入口 | 需要说清的原理和边界 |
+| --- | --- | --- |
+| 贪心和动态规划的区别 | 机库试放与历史主轴单调方案 | 贪心只选当前方案最优；DP要定义状态/转移并证明子结构，历史DP也是在简化目标内求解 |
+| 字典序和加权和怎么选 | 负载极差严格先于交叉 | 字典序表达不可交换优先级；加权和要处理单位/尺度，低优先级累计可能反压高优先级 |
+| 为什么局部最优不等于全局最优 | 单移动/双交换邻域 | 三块联动或先变差再改善的路径不在当前严格改进搜索里；上限还可能提前截断 |
+| CAS和ABA | PENDING→DISPATCHING→PENDING | CAS只知道现在又是PENDING，不知道代际；UPDATE加attempt/version才能区分旧尝试 |
+| 数据库隔离级别、MVCC | 候选快照与最终条件更新 | 一致性快照用于读；设备状态仍在变化，远端副作用也不随MySQL事务回滚 |
+| 分布式锁与AQS | showroom的Redisson锁 | JVM等待队列与跨进程Redis锁作用域不同；watchdog是租约续期，不能阻止旧栈恢复 |
+| 幂等与fencing | 设备重复命令与旧主人 | 幂等按动作键去重复；fencing按资源代际拒绝旧主人；检查必须由实际副作用边界执行 |
+| 事件为什么还需要补偿 | 完成/就绪事件及Scheduled | 事件降低响应延迟，补偿处理漏信号/重启；二者会并发，需要共享裁决和持久事实 |
+| 死锁与锁粒度 | 当前一个样板间键，未来多个资源键 | 多资源固定顺序/原子领取防循环等待；粗锁易推理但持有网络调用影响吞吐 |
+| 安全性与活性 | 不乱派飞与最终能推进 | 保留UNKNOWN提高安全，查询/对账提高活性；盲目超时释放会用活性换取错误并发 |
+| 图论组合优化 | v3 SELF旧冲突矩阵/安全集合 | 冲突图可表达兼容性，按机库分组保证每库一条；当前v2.5顺序动态准入没有全局搜索 |
+
+### 面试官问：如果让你改进，优先做算法还是并发安全
+
+> **记忆关键词：事实先行 · 正确性边界 · 瓶颈数据。**
+>
+> 先查真实瓶颈与故障：记录分配耗时、候选数、下发临界区RTT、同库/空域等待及结果未知比例。存在重复执行风险时，先补执行幂等、资源归属/代际和未知对账，避免拿效率换错误执行。若主要慢在每轮全量几何评分，考虑增量计算；若主要慢在设备充电或远端RTT，换更复杂分配算法未必有收益。没有线上统计就不承诺提升倍数。
+
+### 面试官问：不同版本具体区别，能不能画一条线说明
+
+> **记忆关键词：当前工作树 · SELF历史筛选 · EXTERNAL派飞权。**
+>
+> v2.5当前工作树：本地负载/空间启发式分配→并行规划→静态创建检查→顺序逐条动态碰撞登记确认→IoT。v3当前提交SELF：本地分配核心相同，但保留JTS对占用和候选两两冲突筛选、按机库分组搜索；最终派飞未接新增checkAndRegisterBeforeDispatch。v3 EXTERNAL：分配入口转Swarm assignDocks，准备后submitTaskGroup，派飞权归外部，本地队列通过模式守卫排除。模式隔离本批控制权，不代表两个模式的实际设备/空域天然隔离。
+
+### 三道现场推演，答案必须沿着代码讲
+
+### 面试官问：首轮名单里同机库出现两条区域，是不是一定同时下发
+
+> 不会仅因进入名单就同时下发。当前reserveDispatchCandidates没有整体CAS占库。第一条最终锁内下发后形成DISPATCHING/SUCCESS未结束链，第二条拿最终锁复检时会看到同库阻塞，保持PENDING。如果第一条明确失败并释放后，第二条则可能继续；这就是必须做最终复检的原因。这个结论依赖正常锁协调，不能外推为锁失效后的无条件保证。
+
+### 面试官问：D3电量不足但分配评分选了它，是算法错误吗
+
+> 要先看是否符合规划资格。busyExtra只是第三目标，前面负载极差或交叉更好就可能选电量未就绪的规划候选。它可以准备航线并等待设备恢复；最终派飞检查电池会挡住。所以不是低电量照样起飞，但这种策略是否拖慢总工期需要数据评估，条数均衡也不等于时间均衡。
+
+### 面试官问：临时碰撞失败后，是重新给它分一个机库吗
+
+> 当前正常错误分支releaseDispatchReservation回PENDING并记录等待，没有自动重新分配dockSn、重做航线和Mission。下一次再按既定任务与最新空域准入。如果要支持跨库改派，需要完整重规划与任务一致性流程，不能只改一个字段。明确永久阻飞则FAILED，和等待资源释放分开。
+
+---
 
 ## 第 1 周速记
 
