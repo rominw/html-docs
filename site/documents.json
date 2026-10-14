@@ -1,7 +1,7 @@
 [
   {
     "title": "无人机巡检平台后端 · 六周直读复习手册",
-    "description": "对照两个自动建模分支的六周复习手册：共享资源、两段锁、CAS、GC与ABA、设备幂等及Java/MySQL/Redis/AI/Agent八股扩展。",
+    "description": "对照自动建模工作树与提交的六周手册：统一碰撞准入、活跃登记、共享资源、CAS、GC/ABA及Java/MySQL/Redis/AI/Agent原理追问。",
     "date": "2026-10-14",
     "url": "documents/uav-backend-review-handbook.html"
   },
