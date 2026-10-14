@@ -1,13 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <meta name="description" content="面向 1-3 年经验 Java 后端的小厂面试八股速查手册：32 道高频题全部带口述版答案，按 P0 必背 / P1 高频 / P2 速览分级，附项目挂靠话术与两周复习计划。">
-  <meta name="date" content="2026-10-13">
-  <title>Java 后端八股速成手册（32 题 · P0/P1/P2 分级）</title>
-  <style>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark"><meta name="description" content="Java 后端 32 题理解手册：从具体问题推导 MySQL、Redis、并发、JVM、Spring 与消息队列原理，逐题配例子、反例、自测解析和简短表达，标明版本与项目边界。">
+<meta name="date" content="2026-10-14"><title>Java 后端八股速成手册（理解版 · 32 题原理与自测）</title>
+<style>
     :root {
       --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
       --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
@@ -22,8 +18,8 @@
     }
     *{box-sizing:border-box} html{scroll-behavior:smooth}
     body{margin:0;color:var(--ink);background:
-      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
-      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      radial-gradient(circle at 8% 0,color-mix(in srgb,var(--blue) 13%,transparent),transparent 31rem),
+      radial-gradient(circle at 96% 8%,color-mix(in srgb,var(--violet) 10%,transparent),transparent 28rem),var(--bg);
       font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
     a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
       color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
@@ -70,481 +66,459 @@
     .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
     .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
     ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    .dock{position:fixed;right:18px;bottom:18px;z-index:99;display:flex;gap:4px;padding:6px;border-radius:999px;background:rgba(15,23,42,.82);backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(15,23,42,.28)}
+    .dock a{padding:7px 13px;border-radius:999px;color:#fff;text-decoration:none;font:600 13px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+    .dock a:hover{background:rgba(255,255,255,.16)}
     footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
-    .qa{margin-bottom:15px}.qa h3{margin:0 0 10px;font-size:17px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
     @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
-    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
-  </style>
-</head>
-<body>
-  <header>
-    <div class="shell">
-      <div class="kicker">JAVA BACKEND INTERVIEW · 32 QUESTIONS</div>
-      <h1>Java 后端八股速成手册</h1>
-      <p class="lead">面向 1-3 年经验、目标中小厂的 Java 后端面试速查：按 P0 必背 / P1 高频 / P2 速览分级，每题给口述版答案，能挂项目的题附「挂靠话术」。</p>
-      <div class="doc-meta">
-        <time datetime="2026-10-13">2026年10月13日</time>
-        <span>面试准备 / Java 后端</span>
-      </div>
-      <div class="actions">
-        <a class="btn" href="../index.html">返回首页</a>
-        <a class="btn" href="#guide">开始阅读</a>
-        <button class="btn" id="theme" type="button">切换主题</button>
-        <button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button>
-      </div>
-      <div class="stats">
-        <div class="stat"><b>32</b><span>道高频题 · 全部带口述答案</span></div>
-        <div class="stat"><b>17</b><span>道 P0 必背（MySQL / Redis / 并发 / JVM）</span></div>
-        <div class="stat"><b>10</b><span>道 P1 高频（Spring / 基础 / MQ）</span></div>
-        <div class="stat"><b>14 天</b><span>推荐复习周期 · 配合每日投递</span></div>
-      </div>
-    </div>
-  </header>
-  <nav>
-    <div class="shell">
-      <a href="#guide">使用指南</a><a href="#mysql">MySQL</a><a href="#redis">Redis</a><a href="#concurrent">并发</a><a href="#jvm">JVM</a><a href="#spring">Spring</a><a href="#javabase">Java 基础</a><a href="#mq">消息队列</a><a href="#p2">P2 速览</a><a href="#proj">项目挂靠</a>
-    </div>
-  </nav>
-  <main class="shell">
+    @media print{body{background:var(--panel)}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
 
-    <section id="guide">
-      <div class="head"><h2>1. 使用指南</h2><p>怎么用这份手册，以及配套的两周复习计划。</p></div>
-      <div class="grid3">
-        <div class="mini"><h3>答案 = 口述 1-2 分钟</h3><p>每题答案是面试时说出来的版本：先给结论，再给要点。先理解逻辑链，再背关键词，不要逐字背。</p></div>
-        <div class="mini"><h3>P0 背到脱口而出</h3><p>P0 是小厂提问率最高的部分；P1 要能说出主干；P2 过一遍有印象即可，答不上不丢人。</p></div>
-        <div class="mini"><h3>间隔重复</h3><p>每天开始新章节前，花 30 分钟把前一天的题目自测一遍。答不上的标记出来，第二天再来。</p></div>
-      </div>
-      <div class="card pad table" style="margin-top:15px">
-        <table>
-          <thead><tr><th>时间</th><th>模块</th><th>对应章节</th><th>目标</th></tr></thead>
-          <tbody>
-            <tr><td>第 1-2 天</td><td>MySQL</td><td>第 2 章</td><td>P0 六题全部能口述</td></tr>
-            <tr><td>第 3-4 天</td><td>Redis</td><td>第 3 章</td><td>P0 五题 + 挂靠话术</td></tr>
-            <tr><td>第 5-6 天</td><td>并发</td><td>第 4 章</td><td>线程池流程画得出</td></tr>
-            <tr><td>第 7 天</td><td>JVM</td><td>第 5 章</td><td>内存区域 + G1/CMS</td></tr>
-            <tr><td>第 8-9 天</td><td>Spring + Java 基础</td><td>第 6-7 章</td><td>事务失效背全</td></tr>
-            <tr><td>第 10 天</td><td>消息队列</td><td>第 8 章</td><td>选型 + 幂等话术</td></tr>
-            <tr><td>第 11-12 天</td><td>P2 速览 + K8S</td><td>第 9 章</td><td>每题说出两句</td></tr>
-            <tr><td>第 13-14 天</td><td>模拟自测</td><td>第 10 章</td><td>八股全部挂到项目上自问自答</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="callout warn" style="margin-top:14px"><p><strong>提醒：</strong>别等「准备好了」再投简历。投递到约面有 3-7 天延迟，前两三个面试本来就是练手。简历上写的每一个技术词（分布式锁、幂等、JVM、K8S、Kafka、RabbitMQ）都是自埋考点，全部在这份手册覆盖范围内。</p></div>
-    </section>
-
-    <section id="mysql">
-      <div class="head"><h2>2. MySQL（P0）</h2><p>索引、事务、锁、慢 SQL——小厂必问，往深挖三层的部分。</p></div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 1. 为什么用 B+ 树做索引，而不是 B 树、哈希或二叉树？</h3>
-        <ul class="clean">
-          <li><strong>对比二叉 / 红黑树：</strong>数据量大时树太高，而树高就等于磁盘 IO 次数，B+ 树矮胖（3 层可撑约 2000 万行）。</li>
-          <li><strong>对比哈希：</strong>哈希等值查询 O(1) 很快，但不支持范围查询、排序和最左前缀匹配。</li>
-          <li><strong>对比 B 树：</strong>B 树的非叶子节点也要存整行数据，InnoDB 一页 16KB 能放的键就少、扇出小、树更高；且范围查询需要中序遍历回溯。</li>
-          <li><strong>B+ 树两个关键设计：</strong>非叶子节点只存键不存数据，单页能放约 1170 个键（bigint 8B + 页指针 6B），树更矮；叶子节点存全部数据且用双向链表串联，范围查询和排序只需顺序扫描。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 2. 联合索引的最左匹配原则？</h3>
-        <ul class="clean">
-          <li>索引 <code>(a,b,c)</code> 的排序规则：先按 a 排，a 相同按 b，b 相同按 c——像字典先按首字母再按次字母。</li>
-          <li><strong>能走索引：</strong><code>where a=?</code>、<code>a=? and b=?</code>、<code>a=? and b=? and c=?</code>（条件顺序无所谓，优化器会重排）。</li>
-          <li><strong>不能走：</strong><code>where b=?</code> 或 <code>b=? and c=?</code>——缺了 a，b 在整个索引里是无序的，无法定位。</li>
-          <li><strong>范围之后失效：</strong><code>where a&gt;? and b=?</code> 只有 a 列走索引，因为 a 是范围匹配后，结果集里 b 不再有序（MySQL 5.6+ 的索引条件下推 ICP 能部分缓解）。</li>
-          <li><code>order by</code> 同样遵循最左连续：<code>where a=? order by b,c</code> 可以免掉 filesort。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 3. 什么是回表、覆盖索引？</h3>
-        <ul class="clean">
-          <li><strong>聚簇 vs 二级索引：</strong>主键索引（聚簇）叶子节点存整行数据；二级索引叶子节点只存索引列 + 主键值。</li>
-          <li><strong>回表：</strong><code>select * where name=?</code> 走 name 索引拿到主键后，还要回聚簇索引再查一次整行——多一次树查找。</li>
-          <li><strong>覆盖索引：</strong>查询的列和条件列全部包含在二级索引里，不需要回表；<code>explain</code> 的 Extra 显示 <code>Using index</code>。</li>
-          <li><strong>实践：</strong>高频查询建联合索引做覆盖；少写 <code>select *</code>，只取需要的列。</li>
-        </ul>
-        <div class="callout" style="margin-top:12px"><p><strong>挂靠项目：</strong>「调度任务列表查询（机库 + 任务状态 + 时间）就是这么建联合索引的，状态和时间放在机库 ID 后面，列表页不回表。」</p></div>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 4. 事务隔离级别和 MVCC？</h3>
-        <ul class="clean">
-          <li><strong>三个并发问题：</strong>脏读（读到未提交数据）、不可重复读（同事务两次读同一行结果不同，针对 update）、幻读（两次读行数不同，针对 insert/delete）。</li>
-          <li><strong>四个级别：</strong>读未提交 → 读已提交 RC（解决脏读）→ 可重复读 RR（InnoDB 默认，解决不可重复读）→ 串行化。</li>
-          <li><strong>MVCC 三要素：</strong>行记录隐藏字段（<code>trx_id</code> 最近修改事务、<code>roll_pointer</code> 指向旧版本）；undo log 版本链；ReadView（活跃事务列表）。</li>
-          <li><strong>可见性判断：</strong>版本的事务 id 小于 ReadView 里最小活跃事务 id → 可见；大于最大已分配 id 或仍在活跃列表里 → 不可见，沿版本链往回找。</li>
-          <li><strong>RC 与 RR 的区别就在 ReadView 的生成时机：</strong>RC 每次 select 都新建（所以能看到别人新提交的，造成不可重复读）；RR 只在事务第一次 select 时生成并复用 → 可重复读。RR 下的幻读靠 next-key lock（当前读）基本解决。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 5. 行锁、间隙锁、临键锁？</h3>
-        <ul class="clean">
-          <li><strong>Record Lock（记录锁）：</strong>锁住单条索引记录。</li>
-          <li><strong>Gap Lock（间隙锁）：</strong>锁住两条记录之间的开区间，阻止其他事务在区间内插入——RR 级别解决幻读的手段，RC 级别没有。</li>
-          <li><strong>Next-Key Lock（临键锁）：</strong>记录锁 + 间隙锁，左开右闭区间，是 RR 下当前读的默认加锁单位；唯一索引等值命中已存在记录时可退化为纯记录锁。</li>
-          <li><strong>重点（生产事故来源）：</strong>InnoDB 的行锁加在索引上。<code>update</code> 没走索引会全表扫描，把所有记录都锁上，近似锁全表——所以更新条件必须命中索引。</li>
-          <li>意向锁（IS/IX）是表级锁，只用来快速判断表内是否存在行锁，不和行锁冲突。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 6. 一条慢 SQL 怎么优化？</h3>
-        <ul class="clean">
-          <li><strong>定位：</strong>慢查询日志（<code>slow_query_log</code>、<code>long_query_time</code>）找到嫌疑 SQL。</li>
-          <li><strong>分析：</strong><code>explain</code> 四看——type（至少到 range，ALL 全表扫要处理）、key（是否命中索引）、rows（扫描行数）、Extra（出现 <code>Using filesort</code> / <code>Using temporary</code> 要警惕，<code>Using index</code> 是覆盖索引，好）。</li>
-          <li><strong>索引层：</strong>按查询建联合索引并遵循最左匹配；覆盖索引免回表；索引列上避免函数、运算、隐式类型转换（字符串列传了数字）。</li>
-          <li><strong>SQL 层：</strong>深分页改游标 <code>where id&gt;? limit n</code> 或延迟关联（先查 id 再回表）；只查需要的列；小表驱动大表。</li>
-          <li><strong>架构层：</strong>读写分离、冷热分离、加缓存、异构到 ES、大事务拆小。</li>
-        </ul>
-        <div class="callout" style="margin-top:12px"><p><strong>挂靠项目：</strong>按「先说定位手段，再说一个自己优化过的例子」的结构答，任何一条列表查询加索引的经历都可以展开讲。</p></div>
-      </div>
-    </section>
-
-    <section id="redis">
-      <div class="head"><h2>3. Redis（P0）</h2><p>缓存三件套、一致性、分布式锁——每题都能挂到项目上。</p></div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 7. 缓存穿透、击穿、雪崩？</h3>
-        <ul class="clean">
-          <li><strong>穿透（查不存在的数据）：</strong>请求的 key 在缓存和数据库都不存在，每次都打到 DB（典型是恶意伪造 id）。对策：缓存空值（短 TTL）、布隆过滤器前置拦截、接口层参数校验和限流。</li>
-          <li><strong>击穿（单个热点过期）：</strong>某个热 key 过期瞬间，大量并发同时回源。对策：互斥锁重建（setnx 保证一个线程查库、其他等待或返回旧值）；逻辑过期（不设物理 TTL，值里存过期时间，过期后异步重建）；核心热点直接不设过期 + 后台更新。</li>
-          <li><strong>雪崩（大面积失效）：</strong>大量 key 同时过期，或 Redis 整体宕机。对策：TTL 加随机值打散；哨兵 / 集群保证高可用；多级缓存；限流降级兜底。</li>
-          <li><strong>记忆口诀：</strong>穿透是「不存在」，击穿是「单个热点」，雪崩是「大面积」。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 8. 缓存一致性：先更新数据库还是先删缓存？</h3>
-        <ul class="clean">
-          <li><strong>主流方案 Cache Aside：</strong>读——先读缓存，miss 则查库并回填；写——<strong>先更新数据库，再删除缓存</strong>。</li>
-          <li><strong>为什么是删不是更新：</strong>并发双写时更新缓存容易乱序覆盖产生脏数据；删除是幂等的，下次读自动回源。</li>
-          <li><strong>为什么先库后缓存：</strong>先删缓存的话，「删除后-更新前」窗口期有读请求会把旧值回填。可以延迟双删缓解：先删、更新库、延迟几百毫秒再删一次。</li>
-          <li><strong>极小概率的不一致仍有：</strong>读请求恰好在更新前查库、在删除后回填。要求强一致就上分布式锁串行化，或 canal 订阅 binlog 异步删缓存，日常用 TTL 兜底即可。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 9. 分布式锁：SETNX 和 Redisson 的区别？</h3>
-        <ul class="clean">
-          <li><strong>裸 SETNX 的坑：</strong><code>setnx</code> 和 <code>expire</code> 两条命令不原子（setnx 后宕机 → 永久死锁），要用 <code>set key value nx ex</code> 一条命令解决。</li>
-          <li><strong>剩下的坑：</strong>业务执行超过锁过期时间，锁失效后被别的线程拿到，自己释放时删掉了别人的锁 → 锁的 value 存线程唯一标识，释放前用 Lua 脚本校验再删。</li>
-          <li><strong>Redisson 帮你做好了：</strong>加锁用 Lua（hash 结构，天然可重入）；<strong>看门狗机制</strong>——默认锁 30 秒，后台每 10 秒检查业务没执行完就自动续期；主从切换丢锁问题对应的 RedLock 方案争议大，多数场景不用。</li>
-        </ul>
-        <div class="callout" style="margin-top:12px"><p><strong>挂靠项目（重点题，背熟）：</strong>「机库调度里我用 Redisson 做调度锁，但没有只依赖它——Redis 锁挡住大部分并发，真正保证不重复分配的是数据库条件更新（<code>update ... where status='待分配'</code>，影响行数为 0 就说明被别人抢了）。Redis 是性能优化，DB 约束才是正确性兜底，锁粒度收到单个机库避免互相阻塞。」</p></div>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 10. RDB 和 AOF？</h3>
-        <ul class="clean">
-          <li><strong>RDB：</strong>某时刻的全量快照。<code>bgsave</code> fork 子进程基于写时复制生成；文件小、恢复快；丢两次快照之间的数据（分钟级）。</li>
-          <li><strong>AOF：</strong>追加记录每条写命令。<code>appendfsync</code> 三档：always 最安全最慢、<strong>everysec 默认（最多丢 1 秒）</strong>、no 交给系统。文件大、恢复慢；AOF 重写用当前状态生成最小命令集来压缩体积。</li>
-          <li><strong>4.0+ 混合持久化：</strong>重写时 RDB 全量做头 + 后续 AOF 增量，恢复快、丢失少，推荐开启。</li>
-          <li><strong>选型：</strong>纯缓存场景可以只 RDB 甚至不持久化；不允许丢数据的用 everysec 或混合。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 11. Redis 为什么快？</h3>
-        <ul class="clean">
-          <li><strong>纯内存操作：</strong>内存访问是纳秒-微秒级，磁盘是毫秒级，差几个数量级。</li>
-          <li><strong>高效数据结构：</strong>SDS（O(1) 取长度、二进制安全、空间预分配）、跳表（zset，O(logN) 且范围查询友好）、listpack、小整数集合 intset。</li>
-          <li><strong>单线程执行命令：</strong>无锁竞争、无线程上下文切换，实现还简单。</li>
-          <li><strong>IO 多路复用（epoll）：</strong>单线程也能监听海量连接（Reactor 模型）。</li>
-          <li><strong>6.0 的 IO 多线程：</strong>只是读写 socket 和协议解析用了多线程，命令执行仍是单线程——不改线程模型，保持兼容。</li>
-        </ul>
-      </div>
-    </section>
-
-    <section id="concurrent">
-      <div class="head"><h2>4. 并发（P0）</h2><p>线程池是必考之王，流程要能画出来。</p></div>
-
-      <div class="card diagram qa">
-        <svg viewBox="0 0 1040 360" role="img" aria-labelledby="dTitle dDesc">
-          <title id="dTitle">线程池执行流程</title><desc id="dDesc">任务提交后依次判断：核心线程未满则创建核心线程；否则入缓冲队列；队列满则创建非核心线程；达到最大线程数则执行拒绝策略。</desc>
-          <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker></defs>
-          <rect class="lane" x="10" y="16" width="1020" height="330" rx="16"/>
-          <rect class="node" x="30" y="42" width="120" height="52" rx="10"/><text class="title" x="90" y="64" text-anchor="middle">提交任务</text><text class="sub" x="90" y="82" text-anchor="middle">execute()</text>
-          <path class="edge" d="M150 68H200" marker-end="url(#ar)"/>
-          <polygon class="decision" points="270,38 335,68 270,98 205,68"/><text class="title" x="270" y="73" text-anchor="middle">核心线程未满?</text>
-          <text class="sub" x="368" y="58" text-anchor="middle">是</text>
-          <path class="edge" d="M335 68H395" marker-end="url(#ar)"/>
-          <rect class="node g" x="395" y="42" width="140" height="52" rx="10"/><text class="title" x="465" y="64" text-anchor="middle">创建核心线程</text><text class="sub" x="465" y="82" text-anchor="middle">corePoolSize</text>
-          <text class="sub" x="285" y="122" text-anchor="start">否</text>
-          <path class="edge" d="M270 98V135" marker-end="url(#ar)"/>
-          <polygon class="decision" points="270,135 335,165 270,195 205,165"/><text class="title" x="270" y="170" text-anchor="middle">队列未满?</text>
-          <text class="sub" x="368" y="155" text-anchor="middle">是</text>
-          <path class="edge" d="M335 165H395" marker-end="url(#ar)"/>
-          <rect class="node a" x="395" y="139" width="140" height="52" rx="10"/><text class="title" x="465" y="161" text-anchor="middle">入缓冲队列</text><text class="sub" x="465" y="179" text-anchor="middle">workQueue</text>
-          <text class="sub" x="285" y="222" text-anchor="start">否</text>
-          <path class="edge" d="M270 195V232" marker-end="url(#ar)"/>
-          <polygon class="decision" points="270,228 345,262 270,296 195,262"/><text class="title" x="270" y="267" text-anchor="middle">达到最大线程数?</text>
-          <text class="sub" x="370" y="252" text-anchor="middle">是</text>
-          <path class="edge r" d="M345 262H400" marker-end="url(#ar)"/>
-          <rect class="node r" x="400" y="236" width="130" height="52" rx="10"/><text class="title" x="465" y="258" text-anchor="middle">拒绝策略</text><text class="sub" x="465" y="276" text-anchor="middle">handler</text>
-          <text class="sub" x="560" y="252" text-anchor="middle">否</text>
-          <path class="edge" d="M530 262H570" marker-end="url(#ar)"/>
-          <rect class="node v" x="570" y="236" width="160" height="52" rx="10"/><text class="title" x="650" y="258" text-anchor="middle">创建非核心线程</text><text class="sub" x="650" y="276" text-anchor="middle">maximumPoolSize</text>
-        </svg>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 12. 线程池七大参数和执行流程？</h3>
-        <ul class="clean">
-          <li><strong>七参数：</strong><code>corePoolSize</code> 核心线程数、<code>maximumPoolSize</code> 最大线程数、<code>keepAliveTime + unit</code> 非核心线程空闲回收时间、<code>workQueue</code> 任务队列、<code>threadFactory</code> 线程工厂、<code>handler</code> 拒绝策略。</li>
-          <li><strong>执行流程（对照上图）：</strong>核心线程未满 → 创建核心线程；满了 → 入队；队列满 → 创建非核心线程（直到 max）；达到 max → 执行拒绝策略。注意「先入队再开非核心」，很多人答反。</li>
-          <li><strong>四种拒绝策略：</strong>AbortPolicy（默认，抛异常）；CallerRunsPolicy（提交线程自己执行，天然反压限流）；DiscardPolicy（静默丢弃）；DiscardOldestPolicy（丢队头最老的）。</li>
-          <li><strong>参数怎么配：</strong>CPU 密集型 N+1；IO 密集型 2N，或按 QPS × 平均耗时（秒）估算；队列必须有界，防 OOM。</li>
-          <li><strong>为什么不用 Executors 快捷方法：</strong>FixedThreadPool / SingleThreadExecutor 用无界队列会堆积 OOM；CachedThreadPool 最大线程数是 Integer.MAX_VALUE。手动 <code>new ThreadPoolExecutor</code>。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 13. synchronized 和 volatile 的区别？</h3>
-        <ul class="clean">
-          <li><strong>从三性看：</strong>原子性、可见性、有序性。</li>
-          <li><strong>synchronized：</strong>三者都保证（互斥 → 原子；解锁前刷回主内存 → 可见；监视器锁 happens-before → 有序）。JDK 1.6 后有锁升级：无锁 → 偏向锁 → 轻量级锁（CAS 自旋）→ 重量级锁，只能升不能降。</li>
-          <li><strong>volatile：</strong>只保证可见性（写后立即刷主内存，其他 CPU 缓存行失效）和有序性（内存屏障禁止指令重排），<strong>不保证原子性</strong>——<code>i++</code> 是读-改-写三步，volatile 挡不住并发覆盖。</li>
-          <li><strong>volatile 典型场景：</strong>状态标志位（<code>while(!stop)</code>）；双检锁单例的实例字段（防止对象初始化指令重排，别的线程拿到半初始化对象）。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 14. ConcurrentHashMap 怎么保证线程安全？</h3>
-        <ul class="clean">
-          <li><strong>1.8 的方案：</strong>Node 数组 + 链表 + 红黑树；空桶用 CAS 插入，非空桶 <code>synchronized</code> 只锁该桶的头节点——锁粒度细到一个桶。</li>
-          <li><strong>树化条件：</strong>链表长度 ≥ 8 且数组长度 ≥ 64（否则先扩容）；退化阈值 6。</li>
-          <li><strong>扩容：</strong>支持多线程协助迁移，每个线程认领一段桶（stride）。</li>
-          <li><strong>size()：</strong>baseCount + CounterCell 分散计数（LongAdder 思想），结果是近似值。</li>
-          <li><strong>对比：</strong>1.7 是 Segment 分段锁（并发度 = 段数）；HashTable 是全表一把锁。key 和 value 都不许 null——并发下 get 返回 null 有「不存在」和「值就是 null」的二义性。</li>
-        </ul>
-      </div>
-    </section>
-
-    <section id="jvm">
-      <div class="head"><h2>5. JVM（P0）</h2><p>内存区域、GC、类加载——答不出排查思路就说工具链。</p></div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 15. JVM 运行时内存区域？</h3>
-        <ul class="clean">
-          <li><strong>线程私有：</strong>程序计数器（记录字节码行号，唯一不会 OOM 的区域）；虚拟机栈（每个方法一个栈帧：局部变量表 / 操作数栈 / 动态链接 / 返回地址；递归过深 StackOverflowError，<code>-Xss</code> 调整）；本地方法栈（native 方法用）。</li>
-          <li><strong>线程共享：</strong>堆（新生代 Eden : S0 : S1 = 8:1:1 + 老年代）；方法区（类元信息、运行时常量池、静态变量；1.8 起由永久代改为元空间 Metaspace，使用本地内存，不容易再 OOM）。</li>
-          <li><strong>对象分配路径：</strong>优先在 Eden 的 TLAB（线程私有分配缓冲，避免并发竞争指针）分配；大对象直接进老年代；Minor GC 后年龄默认到 15 晋升老年代（还有动态年龄判定）。</li>
-          <li><strong>加分项——排查工具链：</strong>CPU 高 / 内存涨 / 卡顿三类问题，用 <code>jstat -gcutil</code> 看 GC 频率、<code>jmap</code> dump 堆、<code>jstack</code> 看线程栈，线上用 arthas。没实操过就说「我知道的排查路径是……」。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 16. GC 算法和垃圾收集器？</h3>
-        <ul class="clean">
-          <li><strong>对象判定：</strong>可达性分析——从 GC Roots（栈上引用、静态变量、常量、JNI 引用、活跃线程）出发不可达即垃圾。引用计数法有循环引用问题，JVM 不用。</li>
-          <li><strong>三大算法：</strong>标记-清除（简单但有碎片）；标记-复制（新生代用它，Eden + 两块 Survivor 轮流倒腾，空间换时间）；标记-整理（老年代用，移动对象消灭碎片，停顿更久）。</li>
-          <li><strong>CMS：</strong>并发标记清除。初始标记（STW 短）→ 并发标记 → 重新标记（STW）→ 并发清除。低停顿但有浮动垃圾、内存碎片，并发失败会退化为 Serial Old 单线程整理。</li>
-          <li><strong>G1（JDK 9 起默认）：</strong>堆切成等大的 Region，Eden / Survivor / Old 不再物理连续；整体上是标记-整理、Region 之间是复制，无碎片；可以设 <code>-XX:MaxGCPauseMillis</code> 停顿目标，按收益优先回收垃圾最多的 Region；大对象用专门的 Humongous Region。</li>
-          <li><strong>ZGC：</strong>着色指针 + 读屏障，停顿亚毫秒级——说得出名字和特点就够了。</li>
-        </ul>
-        <div class="callout" style="margin-top:12px"><p><strong>加分答法：</strong>「我们服务跑的是 G1，日常关注 Full GC 频率和单次停顿，频繁 Full GC 就先查大对象分配和内存泄漏。」</p></div>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill g">P0</span> 17. 类加载过程和双亲委派？</h3>
-        <ul class="clean">
-          <li><strong>五个阶段：</strong>加载（字节流 → 内存中的 Class 对象）→ 验证 → 准备（静态变量分配内存并设零值，final 常量例外）→ 解析（符号引用转直接引用）→ 初始化（执行 <code>&lt;clinit&gt;</code>：静态变量赋值 + static 块，JVM 保证线程安全，所以静态内部类单例成立）。</li>
-          <li><strong>双亲委派：</strong>收到类加载请求先委托父加载器，父加载器找不到才自己加载。层级：Bootstrap（核心类库）→ Platform → Application → 自定义。</li>
-          <li><strong>两个作用：</strong>防止核心类被篡改（自己写的 <code>java.lang.String</code> 永远加载不到）；保证同一个类只被加载一次（类的唯一性由「类加载器 + 全限定名」决定）。</li>
-          <li><strong>打破它的场景：</strong>JDBC 的 SPI（线程上下文类加载器）、Tomcat 的 webapp 隔离（先自己加载）、热部署。</li>
-        </ul>
-      </div>
-    </section>
-
-    <section id="spring">
-      <div class="head"><h2>6. Spring（P1）</h2><p>生命周期、循环依赖、事务失效——事务失效是小厂最爱。</p></div>
-
-      <div class="card pad qa">
-        <h3><span class="pill a">P1</span> 18. Bean 的生命周期？</h3>
-        <ul class="clean">
-          <li><strong>主线：</strong>实例化（构造方法）→ 属性填充（@Autowired 注入）→ Aware 回调（BeanNameAware / ApplicationContextAware）→ BeanPostProcessor 前置处理 → 初始化（@PostConstruct → InitializingBean.afterPropertiesSet → init-method）→ BeanPostProcessor 后置处理 → 单例入池使用 → 销毁（@PreDestroy → DisposableBean → destroy-method）。</li>
-          <li><strong>关键一句：</strong>AOP 代理对象就是在「后置处理」阶段由 AnnotationAwareAspectJAutoProxyCreator 生成的——面试说到这一句就超出预期了。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill a">P1</span> 19. 循环依赖和三级缓存？</h3>
-        <ul class="clean">
-          <li><strong>三级缓存：</strong>一级 singletonObjects（成品单例）；二级 earlySingletonObjects（提前曝光的早期对象）；三级 singletonFactories（对象工厂）。</li>
-          <li><strong>流程：</strong>A 实例化后先把自己的工厂放进三级缓存 → 填充属性时发现要 B → 创建 B → B 注入 A 时从三级缓存的工厂里拿到 A 的早期引用（若 A 需要代理，工厂生成的就是代理对象）→ B 完成 → A 拿到 B 继续走完生命周期。</li>
-          <li><strong>为什么要工厂不直接放对象：</strong>把「要不要提前生成代理」这个决定延迟到真正发生循环依赖那一刻，不破坏正常生命周期里代理该在后置处理生成的顺序。</li>
-          <li><strong>解决不了的：</strong>构造器注入的循环依赖（对象都还没建出来）、prototype 作用域、@Async 代理对象的循环依赖。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill a">P1</span> 20. Spring 事务失效的场景？（小厂最爱，背全）</h3>
-        <ul class="clean">
-          <li>本质：声明式事务底层是<strong>动态代理</strong>，一切绕过代理或配置错误的场景都失效。</li>
-          <li>方法不是 <code>public</code>；</li>
-          <li><strong>自调用</strong>：同类里 <code>this.methodB()</code> 没走代理对象 → 拆到另一个 Bean，或用 <code>AopContext.currentProxy()</code>；</li>
-          <li>异常被 try-catch 吞掉了，事务管理器感知不到；</li>
-          <li>抛的是受检异常——默认只回滚 RuntimeException 和 Error，要加 <code>rollbackFor = Exception.class</code>；</li>
-          <li>对象不是 Spring 管理的（自己 new 出来的）；</li>
-          <li>多线程里调用——事务绑定在 ThreadLocal 的数据库连接上，新线程不在同一事务；</li>
-          <li>传播行为配置错误（如 NOT_SUPPORTED 会挂起事务）。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill a">P1</span> 21. IOC 和 AOP？</h3>
-        <ul class="clean">
-          <li><strong>IOC 控制反转：</strong>对象的创建和依赖装配从代码里的 new 交给容器，依赖注入 DI 是实现方式。价值：解耦、便于测试（注入 mock）、统一管理生命周期。</li>
-          <li><strong>AOP 面向切面：</strong>把横切关注点（事务、日志、权限、审计）抽成切面织入。核心概念：切点 Pointcut（在哪切）+ 通知 Advice（前置 / 环绕 / 后置 / 异常 / 返回）+ 切面 Aspect。</li>
-          <li><strong>实现：</strong>有接口用 JDK 动态代理，没接口用 CGLIB 子类代理；Spring Boot 默认 CGLIB。</li>
-        </ul>
-        <div class="callout" style="margin-top:12px"><p><strong>挂靠项目：</strong>「Action 指令的审计日志就是用 AOP 环绕通知统一记录的，业务代码零侵入。」</p></div>
-      </div>
-    </section>
-
-    <section id="javabase">
-      <div class="head"><h2>7. Java 基础（P1）</h2><p>HashMap 和 String 不可变，出现率极高但答好的人不多。</p></div>
-
-      <div class="card pad qa">
-        <h3><span class="pill a">P1</span> 22. HashMap 底层原理？1.7 和 1.8 的区别？</h3>
-        <ul class="clean">
-          <li><strong>1.8 结构：</strong>数组 + 链表 + 红黑树。链表长度 ≥ 8 且数组长度 ≥ 64 才树化（否则先扩容），节点数 ≤ 6 退化回链表。</li>
-          <li><strong>定位桶：</strong>hash 值高 16 位与低 16 位异或（扰动，减少碰撞），再 <code>(n-1) &amp; hash</code>——这就是容量必须取 2 的幂的原因：等价取模但更快，且扩容迁移只有两个去处。</li>
-          <li><strong>扩容：</strong>负载因子 0.75，超过阈值容量翻倍。1.8 迁移时判断 <code>hash &amp; oldCap</code>：等于 0 留原位置，等于 1 挪到「原位置 + oldCap」，不用重算 hash。</li>
-          <li><strong>1.7 的经典问题：</strong>头插法在并发扩容时会让链表成环，造成死循环；1.8 改成尾插解决。但 HashMap 依然线程不安全，并发场景用 ConcurrentHashMap。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill a">P1</span> 23. String 为什么设计成不可变？</h3>
-        <ul class="clean">
-          <li><strong>怎么实现的：</strong>final 类 + private final 的字符数组 + 不提供任何修改方法。</li>
-          <li><strong>字符串常量池：</strong>不可变才能放心共享同一份字面量，节省内存。</li>
-          <li><strong>hashCode 缓存：</strong>第一次算完缓存起来，作 HashMap 的 key 时高效。</li>
-          <li><strong>安全性：</strong>路径、类名、URL 参数如果是可变的，中途被改会造成安全漏洞。</li>
-          <li><strong>线程安全：</strong>天然线程安全。顺带说清三者：String 不可变；StringBuilder 可变非线程安全（单线程拼接用）；StringBuffer 可变且方法加 synchronized（老 API）。</li>
-        </ul>
-      </div>
-    </section>
-
-    <section id="mq">
-      <div class="head"><h2>8. 消息队列（P1）</h2><p>简历上 Kafka 和 RabbitMQ 都写了，选型题必来。</p></div>
-
-      <div class="card pad qa">
-        <h3><span class="pill a">P1</span> 24. Kafka 和 RabbitMQ 怎么选型？</h3>
-        <ul class="clean">
-          <li><strong>共同解决的问题：</strong>解耦、异步、削峰。</li>
-          <li><strong>Kafka：</strong>分布式顺序日志，分区水平扩展，顺序写 + 零拷贝，吞吐百万级；支持消息回溯重放，流处理生态（Kafka Streams / Flink）。适合日志采集、埋点、大数据管道。</li>
-          <li><strong>RabbitMQ：</strong>AMQP 协议，exchange（direct / topic / fanout）路由灵活，单机万级吞吐、延迟低；支持优先级、TTL + 死信队列做延迟队列。适合业务解耦、异步通知、复杂路由场景。</li>
-        </ul>
-        <div class="callout" style="margin-top:12px"><p><strong>挂靠项目（必被问）：</strong>「告警外发在亚信时走 Kafka 中转 Topic——消息量大、日志性质、要高吞吐；无人机平台的业务异步补偿用 RabbitMQ——业务消息，需要灵活路由和重试。按消息量和路由复杂度选型。」</p></div>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill a">P1</span> 25. 消息怎么保证不丢？</h3>
-        <ul class="clean">
-          <li><strong>生产端：</strong>开 confirm 确认 + 失败重试；更可靠的是本地消息表——业务数据和消息记录写同一个事务，定时任务扫表补偿。</li>
-          <li><strong>Broker：</strong>Kafka 设 <code>acks=all</code> + <code>min.insync.replicas&gt;=2</code>、副本因子 3；RabbitMQ 交换机 / 队列 / 消息都设持久化。</li>
-          <li><strong>消费端：</strong>关自动 ack，业务处理完再手动 ack；失败 nack 重回队列或进死信 + 告警人工介入。</li>
-          <li><strong>本质：</strong>三段都保证后得到的是「至少一次」投递，代价是可能重复——所以必须配下一题的幂等。</li>
-        </ul>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill a">P1</span> 26. 重复消费怎么办？</h3>
-        <ul class="clean">
-          <li><strong>前提认知（答出这句就赢一半）：</strong>只要保证不丢就必然可能重复（网络超时重发），重复无法在投递层消灭，只能做<strong>消费端幂等</strong>。</li>
-          <li><strong>手段一：数据库唯一约束</strong>——业务唯一键建唯一索引，重复插入报错捕获即可。</li>
-          <li><strong>手段二：Redis 去重</strong>——setnx 记录 messageId / 业务键，处理前先判断。</li>
-          <li><strong>手段三：状态机条件更新</strong>——<code>update ... set status='已处理' where status='待处理'</code>，影响行数为 0 说明已处理过。</li>
-        </ul>
-        <div class="callout" style="margin-top:12px"><p><strong>挂靠项目（重点题，背熟）：</strong>「我们 Action 协议的回调就是幂等的——messageId 贯穿指令接收、执行、结果查询全链路，Redis + Lua 做原子状态流转，终态保护：已经是终态的指令再来回调，Lua 那一步直接拒绝，不会重复执行。」</p></div>
-      </div>
-
-      <div class="card pad qa">
-        <h3><span class="pill a">P1</span> 27. Kafka 为什么快？</h3>
-        <ul class="clean">
-          <li><strong>顺序写磁盘：</strong>消息只追加到分区日志末尾，磁盘顺序写接近内存随机写的速度，且先落 page cache。</li>
-          <li><strong>零拷贝（sendfile）：</strong>消费者拉取时数据从页缓存直接送到网卡，不经过用户态两次拷贝。</li>
-          <li><strong>批量 + 压缩：</strong>生产端攒批发送（linger.ms + batch.size），配 lz4 / zstd 压缩，摊薄网络和 IO 开销。</li>
-          <li><strong>分区并行：</strong>分区是最小并行单位，消费者组内消费者各自认领分区。</li>
-          <li><strong>稀疏索引：</strong>.log 分段 + .index 稀疏索引，按 offset 快速定位。</li>
-        </ul>
-      </div>
-    </section>
-
-    <section id="p2">
-      <div class="head"><h2>9. P2 速览</h2><p>过一遍留印象即可，每题能说出两句就达标。</p></div>
-      <div class="grid2">
-        <div class="card pad qa">
-          <h3>28. Spring Cloud 组件？</h3>
-          <ul class="clean">
-            <li><strong>Nacos：</strong>注册中心 + 配置中心二合一；临时实例走 AP（心跳），持久实例走 CP（Raft）；配置变更实时推送。</li>
-            <li><strong>Gateway：</strong>基于 WebFlux + Netty 的网关，路由（predicate 谓词匹配）+ 过滤器链，替代阻塞模型的 Zuul1。</li>
-            <li><strong>熔断限流（Sentinel）：</strong>熔断是错误率 / 慢调用比例超阈值后快速失败，防止雪崩，半开状态试探恢复；限流是按 QPS / 线程数控制入口。</li>
-          </ul>
-          <div class="callout" style="margin-top:12px"><p><strong>挂靠项目：</strong>「平台本身就是 Spring Cloud 微服务，Nacos 做注册和配置。」</p></div>
-        </div>
-        <div class="card pad qa">
-          <h3>29. MyBatis：#{} 和 ${}、缓存？</h3>
-          <ul class="clean">
-            <li><strong>#{}：</strong>预编译参数占位（?），值按参数传，天然防 SQL 注入，默认用它。</li>
-            <li><strong>${}：</strong>字符串直接拼进 SQL，只能用于表名、列名、order by 字段这些没法参数化的位置，必须白名单校验。</li>
-            <li><strong>缓存：</strong>一级缓存 SqlSession 级默认开启；二级缓存是 namespace 级，多表关联时容易脏读，分布式下还有节点间不一致问题，一般不用，要缓存上 Redis。</li>
-          </ul>
-        </div>
-        <div class="card pad qa">
-          <h3>30. K8S：Pod / Deployment / Service？</h3>
-          <ul class="clean">
-            <li><strong>Pod：</strong>最小调度单元，一到多个容器共享同一 Pod IP 和存储卷；多容器是为 sidecar（日志收集、代理）和主容器同生共死。</li>
-            <li><strong>Deployment：</strong>管理 ReplicaSet 控制副本数，负责滚动更新（maxSurge / maxUnavailable）和回滚；Pod 挂了自动重建（自愈）。</li>
-            <li><strong>Service：</strong>给一组 Pod（按标签选中）提供稳定的虚拟 IP 和 DNS 名做负载均衡——Pod IP 随时会变，Service 解决「找谁」的问题。类型：ClusterIP 集群内 / NodePort 端口映射 / LoadBalancer。</li>
-            <li>实操：<code>kubectl get pods / logs -f / describe</code>；readiness 探针没过就把 Pod 摘出流量。</li>
-          </ul>
-          <div class="callout" style="margin-top:12px"><p><strong>挂靠项目：</strong>简历写了 K8S，说得出自己服务怎么发布、怎么看日志就及格。</p></div>
-        </div>
-        <div class="card pad qa">
-          <h3>31. 三次握手四次挥手 + 32. HTTPS？</h3>
-          <ul class="clean">
-            <li><strong>三次握手：</strong>SYN → SYN+ACK → ACK。<strong>为什么三次：</strong>双方都要确认「我能发、你能收」；两次的话旧的失效 SYN 到达服务端会建出僵尸连接。</li>
-            <li><strong>四次挥手：</strong>FIN → ACK → FIN → ACK；主动关闭方最后等 2MSL 的 TIME_WAIT：保证最后的 ACK 丢了能重发，也让旧连接的报文自然消亡。排查衍生题：大量 TIME_WAIT 是短连接频繁（正常现象）；大量 CLOSE_WAIT 是自己代码没关连接。</li>
-            <li><strong>HTTPS：</strong>TCP 之后走 TLS——客户端发随机数 + 加密套件 → 服务端发随机数 + 证书 → 客户端验证证书链（CA 签名、域名、有效期），生成预主密钥用证书公钥加密发过去 → 双方用两个随机数 + 预主密钥导出对称会话密钥，之后对称加密通信。<strong>为什么混合：</strong>非对称安全但慢，只用来协商密钥；对称快，用来传数据。</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <section id="proj">
-      <div class="head"><h2>10. 项目挂靠速查表</h2><p>八股不裸背，全部绑到项目上答——这是和同年限候选人拉开差距的打法。</p></div>
-      <div class="card pad table">
-        <table>
-          <thead><tr><th>八股考点</th><th>项目素材</th><th>一句话挂靠答法</th></tr></thead>
-          <tbody>
-            <tr><td>分布式锁（Q9）</td><td>多机库协同调度</td><td>Redisson 调度锁 + 数据库条件更新双保险，Redis 管性能、DB 约束管正确性，锁粒度到单机库。</td></tr>
-            <tr><td>幂等 / 重复消费（Q26）</td><td>Action 协议回调</td><td>messageId 贯穿全链路，Redis + Lua 原子状态流转，终态保护挡掉重复回调。</td></tr>
-            <tr><td>MQ 选型（Q24）</td><td>告警外发（实习）+ 业务异步</td><td>Kafka 管高吞吐日志流，RabbitMQ 管业务路由和重试，按消息量与路由复杂度选。</td></tr>
-            <tr><td>缓存一致性（Q8）</td><td>设备 / 配置类缓存</td><td>Cache Aside + TTL 兜底，最终一致够用，不强一致不加锁。</td></tr>
-            <tr><td>AOP（Q21）</td><td>Action 指令审计</td><td>环绕通知统一记指令日志，业务代码零侵入。</td></tr>
-            <tr><td>慢 SQL（Q6 / Q3）</td><td>任务列表查询</td><td>联合索引设计（维度 + 状态 + 时间），列表页覆盖索引不回表。</td></tr>
-            <tr><td>线程池（Q12）</td><td>AI 识别任务异步处理</td><td>IO 密集配置 + 有界队列 + CallerRuns 反压（若项目中有线程池使用，按真实参数讲）。</td></tr>
-            <tr><td>JVM 排查（Q15）</td><td>通用</td><td>没实操过就讲排查路径：jstat 看 GC、jmap dump、jstack 看栈、arthas 线上诊断。</td></tr>
-            <tr><td>K8S（Q30）</td><td>平台部署</td><td>说得出服务怎么发布（Deployment 滚动更新）、怎么看日志、探针摘流量。</td></tr>
-            <tr><td>TCP（Q31）</td><td>SSE 长连接</td><td>智能体 SSE 推送就是一条 HTTP 长连接，可顺势聊连接管理和断线重连。</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="callout" style="margin-top:14px"><p><strong>核心技巧：</strong>「八股你懂 + 生产上真用过 + 想过取舍」三件事用一句话同时证明。面试官问原理，你先给原理结论，再补一句「我在项目里是这么用的」——这一句就是 1 年经验候选人里最能打的答法。</p></div>
-      <div class="callout warn" style="margin-top:14px"><p><strong>诚实边界：</strong>挂靠话术必须基于真实做过的部分。没做过的（比如 JVM 调优）就说排查思路而不是编故事——被追三层就穿帮的答案，不如一开始就划清边界。</p></div>
-    </section>
-  </main>
-  <footer><div class="shell">Java 后端八股速成手册</div></footer>
-  <script>
-    (()=>{const root=document.documentElement,key="java-interview-prep-theme";
+    .qa{margin:18px 0;scroll-margin-top:80px}.qa h3{margin:0 0 14px;font-size:23px;line-height:1.45}
+    .qa h4{margin:22px 0 6px;color:var(--blue);font-size:16px}.qa p{margin:10px 0}
+    .qa .problem{padding:14px 16px;border-radius:10px;background:var(--panel2)}
+    .qa .callout{margin-top:18px}.qa .callout p{margin:0}
+    .qa .recap{border-top:1px solid var(--line);padding-top:14px}.qa .source{font-size:13px;color:var(--muted)}
+    .qa .quiz{margin-top:20px;font-weight:500}details{padding:12px 16px;border:1px solid var(--line);border-radius:10px}
+    summary{cursor:pointer;color:var(--blue);font-weight:600}summary:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid var(--blue);outline-offset:4px}
+    pre{max-width:100%;overflow:auto;padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);line-height:1.65}
+    pre code{padding:0;border:0;font-size:14px;color:var(--ink)}.qa p,.mini p{overflow-wrap:anywhere}
+    .question-links{display:flex;flex-wrap:wrap;gap:8px}.question-links a{padding:4px 9px;border:1px solid var(--line);border-radius:8px;text-decoration:none}
+    .reading-map{margin:18px 0}.reading-map h3{margin-top:0}.diagram p{color:var(--muted);margin:10px 0 0;font-size:14px}
+    .dock{top:auto;border:0}
+    @media(max-width:820px){.pad{padding:18px}.qa h3{font-size:21px}}
+    @media print{html{scroll-behavior:auto}*{print-color-adjust:exact}details::details-content{display:block;content-visibility:visible}details>p{display:block}.qa h3,.qa h4{break-after:avoid}.diagram svg,.table table{min-width:0}.diagram,.table{overflow:visible}pre{white-space:pre-wrap;overflow-wrap:anywhere}}
+</style></head><body>
+<header><div class="shell"><div class="kicker">JAVA BACKEND · UNDERSTAND BEFORE RECALL</div>
+<h1>Java 后端八股速成手册</h1><p class="lead">理解版：先看一个具体问题，沿原理走一遍，再用例子和反例检验。32 题都可以自己推结果，面试表达放在每题最后。</p>
+<div class="doc-meta"><time datetime="2026-10-14">2026年10月14日</time><span>面试准备 / 原理理解 / 自测练习</span></div>
+<div class="actions"><a class="btn" href="#guide">开始阅读</a><button class="btn" id="theme" type="button">切换主题</button><button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button></div>
+<div class="stats"><div class="stat"><b>32 题</b><span>每题都有问题、推演、例子和边界</span></div><div class="stat"><b>17 / 10 / 5</b><span>P0 / P1 / P2 · 学习优先级</span></div><div class="stat"><b>32 次自测</b><span>先判断，再展开解析</span></div><div class="stat"><b>14 天</b><span>按掌握标准推进，不按背诵次数</span></div></div>
+</div></header><nav aria-label="章节导航"><div class="shell"><a href="#guide">怎么学</a><a href="#mysql">MySQL</a><a href="#redis">Redis</a><a href="#concurrent">并发</a><a href="#jvm">JVM</a><a href="#spring">Spring</a><a href="#javabase">Java 基础</a><a href="#mq">消息队列</a><a href="#p2">工程边界</a><a href="#proj">项目复盘</a></div></nav>
+<main class="shell"><section id="guide">
+<div class="head"><h2>1. 先理解，再压缩成自己的话</h2><p>这份手册的目标是让你能推演一个新场景。优先级安排学习顺序，不代表要求逐字背答案。</p></div>
+<div class="grid3">
+<div class="mini"><h3>先问为什么需要它</h3><p>先看题里的具体故障：扫页太多、读到旧值、重复扣款。说清不用这个机制会发生什么，再认识术语。</p></div>
+<div class="mini"><h3>亲手走一次过程</h3><p>按条目、线程或时间顺序画过程。两个人同时做、一个进程崩溃、参数变化时，结果能不能自己算出来？</p></div>
+<div class="mini"><h3>最后练简短表达</h3><p>正文后的简述用于组织语言；自测先不看解析。能讲原因、推一个例子并指出边界，才算掌握。</p></div>
+</div>
+<div class="callout reading-map"><p><strong>阅读前提：</strong>示例以 MySQL InnoDB 8.0/8.4、JDK 8 的经典集合实现与 Java 21 的语言/API 契约为主要参照；Spring 代理模式按题内说明区分版本。SQL、伪代码与容量数字用于推演，不是已验证的生产配置。关键版本差异附官方原文。</p></div>
+<div class="card pad reading-map"><h3>32 题按问题找，不用从头硬背</h3><p><strong>MySQL</strong></p><div class="question-links"><a href="#q1">Q1</a><a href="#q2">Q2</a><a href="#q3">Q3</a><a href="#q4">Q4</a><a href="#q5">Q5</a><a href="#q6">Q6</a></div><p><strong>Redis</strong></p><div class="question-links"><a href="#q7">Q7</a><a href="#q8">Q8</a><a href="#q9">Q9</a><a href="#q10">Q10</a><a href="#q11">Q11</a></div><p><strong>并发</strong></p><div class="question-links"><a href="#q12">Q12</a><a href="#q13">Q13</a><a href="#q14">Q14</a></div><p><strong>JVM</strong></p><div class="question-links"><a href="#q15">Q15</a><a href="#q16">Q16</a><a href="#q17">Q17</a></div><p><strong>Spring</strong></p><div class="question-links"><a href="#q18">Q18</a><a href="#q19">Q19</a><a href="#q20">Q20</a><a href="#q21">Q21</a></div><p><strong>Java 基础</strong></p><div class="question-links"><a href="#q22">Q22</a><a href="#q23">Q23</a></div><p><strong>消息队列</strong></p><div class="question-links"><a href="#q24">Q24</a><a href="#q25">Q25</a><a href="#q26">Q26</a><a href="#q27">Q27</a></div><p><strong>工程边界</strong></p><div class="question-links"><a href="#q28">Q28</a><a href="#q29">Q29</a><a href="#q30">Q30</a><a href="#q31">Q31</a><a href="#q32">Q32</a></div></div>
+<div class="card pad table"><table><thead><tr><th>两周安排（可按基础调整）</th><th>学习内容</th><th>完成标准</th></tr></thead><tbody>
+<tr><td>第 1–2 天</td><td>MySQL，Q1–6</td><td>画索引顺序；推 RC/RR 时间线；解释一个查询为什么少扫描。</td></tr>
+<tr><td>第 3–4 天</td><td>Redis，Q7–11</td><td>画缓存回填竞态与锁过期场景，指出自己的方案允许什么失败。</td></tr>
+<tr><td>第 5–6 天</td><td>并发，Q12–14</td><td>算线程池接纳结果；解释丢失更新与复合操作竞态。</td></tr>
+<tr><td>第 7 天</td><td>JVM，Q15–17</td><td>把错误对应到内存区域；区分存活引用与垃圾；解释同名类型冲突。</td></tr>
+<tr><td>第 8–9 天</td><td>Spring、基础，Q18–23</td><td>画代理入口；分清事务没开启与没回滚；手算一次 hash 扩容。</td></tr>
+<tr><td>第 10 天</td><td>MQ，Q24–27</td><td>沿提交、发送、确认画崩溃点；说明重复为何出现及怎样幂等。</td></tr>
+<tr><td>第 11–12 天</td><td>工程边界，Q28–32</td><td>辨认超时、注入、探针、连接与证书验证分别保护什么。</td></tr>
+<tr><td>第 13–14 天</td><td>真实项目复盘</td><td>挑两个实际案例，讲问题、选择、失败边界与验证证据。</td></tr>
+</tbody></table></div>
+<div class="callout warn reading-map"><p><strong>卡住时怎么学：</strong>遇到术语先看本题第一次解释，再画最小例子；自测答错就回到因果步骤，而不是再读一遍结论。这里没有实测面试频率，P0/P1/P2 只是这份手册的学习优先级。</p></div>
+</section><section id="mysql"><div class="head"><h2>2. MySQL：从数据排列到并发观察</h2><p>先看数据如何排序，再看一次读写会访问哪些页、哪些版本。</p></div><div class="card diagram"><svg viewBox="0 0 1040 200" role="img" aria-labelledby="index-title index-desc"><title id="index-title">二级索引回表路径</title><desc id="index-desc">先查二级索引取得主键，再查主键树取得额外字段；若所需列已在二级索引中，就可省掉后半段取列路径。</desc><defs><marker id="index-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker></defs><rect class="node " x="25" y="72" width="210" height="70" rx="12"/><text class="title" x="130" y="101" text-anchor="middle">查 dock_id=7</text><text class="sub" x="130" y="124" text-anchor="middle">沿二级索引定位</text><path class="edge" d="M235 107H275" marker-end="url(#index-arrow)"/><rect class="node g" x="285" y="72" width="210" height="70" rx="12"/><text class="title" x="390" y="101" text-anchor="middle">索引叶子条目</text><text class="sub" x="390" y="124" text-anchor="middle">dock_id / status / time / id</text><path class="edge" d="M495 107H535" marker-end="url(#index-arrow)"/><rect class="node a" x="545" y="72" width="210" height="70" rx="12"/><text class="title" x="650" y="101" text-anchor="middle">用 id 查主键树</text><text class="sub" x="650" y="124" text-anchor="middle">需要 payload 时才取整行</text><path class="edge" d="M755 107H795" marker-end="url(#index-arrow)"/><rect class="node " x="805" y="72" width="210" height="70" rx="12"/><text class="title" x="910" y="101" text-anchor="middle">取得整行</text><text class="sub" x="910" y="124" text-anchor="middle">读取 payload 等额外字段</text></svg><p>看 Q3：如果查询所需字段在第二步就齐了，覆盖查询可省掉后半段取列路径。</p></div><article class="card pad qa" id="q1">
+      <h3><span class="pill g">P0</span> 1. 为什么索引常用 B+ 树？</h3>
+      <p class="problem"><strong>先看问题：</strong>一千万行订单里找一行，数据库最怕的不是多做几次整数比较，而是为了找它读取大量数据页。索引要先减少需要访问的页。</p>
+      <h4>原理怎样推出来</h4><p>树上的一个节点可以对应一个页。二叉树每次只把候选范围分成两份，层数容易变多；B+ 树一个内部页保存很多分隔键和子页指针，一次把范围分成很多份，所以树更矮。若页不在 Buffer Pool 中，访问它才需要实际磁盘 I/O：树高表示查找路径上的页数，不等于每次都发生那么多物理 I/O。</p><p>B+ 树把数据项集中在叶子页，内部页专门做导航。与内部节点也保存数据项的 B 树相比，在相同页容量和键大小下，导航页通常能容纳更多分支。叶子页按键有序并相连，找到范围起点后就能向后扫描，不必每取一条都从根重新找。</p>
+      <h4>把它放进一个例子</h4><p>查 <code>id BETWEEN 100 AND 200</code>：先沿导航页找到 100 所在的叶子页，再顺着叶子页读到 200。哈希擅长按完整键找一个值，但没有自然的有序邻接关系，不能靠同一结构高效完成这种范围扫描。</p><p>InnoDB 的主键树叶子保存整行，二级索引叶子保存索引列和主键。两者都是 B+ 树，却不能统称为“叶子都存整行”。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>“三层容纳两千万行”只是特定页大小、键长度、行宽和填充率下的估算。键越宽，分支越少；索引还会增加写入、分裂和存储成本。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>把 bigint 主键换成很长的字符串，为什么其他二级索引也可能变大？</p>
+      <details><summary>展开自测解析</summary><p>二级索引叶子也携带主键。主键变宽会使每个二级索引条目变宽，同一页能装的条目变少；主键本身的导航键也变宽，可能降低扇出。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>B+ 树通过多分支减少页访问，并利用有序叶子支持范围扫描；InnoDB 主键索引存行，二级索引存键与主键。</p><p class="source">核对原文：<a href="https://dev.mysql.com/doc/refman/8.4/en/innodb-index-types.html">MySQL：聚簇与二级索引</a>。</p>
+    </article>
+<article class="card pad qa" id="q2">
+      <h3><span class="pill g">P0</span> 2. 联合索引为什么有最左匹配？</h3>
+      <p class="problem"><strong>先看问题：</strong>你给任务表建了 <code>(dock_id, status, created_at)</code>，为什么按机库查很顺，单独按状态查却可能扫描很多条目？</p>
+      <h4>原理怎样推出来</h4><p>联合索引按整个元组排序：先比机库，机库相同再比状态，前两项相同才比时间。它不是三棵各自独立排序的树。确定前导列相当于先找到一本词典里的某个分区，后面的排序才能用于继续缩小连续范围。</p><p>前导列做等值匹配后，后续列通常还能确定查找范围；前导列用了 <code>&gt;</code> 之类的范围条件后，后面的列在跨分组的结果中通常不再连续有序，不能同样缩小整段扫描。但它仍可能用于索引条件下推（ICP）过滤，或作为返回列实现覆盖。</p>
+      <h4>把它放进一个例子</h4><pre><code>(A, DONE, 10:00)
+(A, NEW,  09:00)
+(A, NEW,  11:00)
+(B, DONE, 08:00)
+(B, NEW,  07:00)</code></pre><p><code>dock_id='A' AND status='NEW'</code> 对应中间连续两条；只查 <code>status='NEW'</code>，匹配条目却分散在 A、B 各组里。SQL 里把 status 写在 dock_id 前面不会改变索引的物理排序。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>缺少最左列不等于绝对不使用索引：可能全索引扫描，MySQL 8.0+ 在满足条件时还可能做 skip scan。判断的是“怎样访问、扫了多少”，不能只看 key 非空。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong><code>WHERE dock_id='A' ORDER BY created_at</code> 能直接利用这个索引的顺序吗？</p>
+      <details><summary>展开自测解析</summary><p>通常不能：同一机库内部先按 status 分组，各状态组里的时间才有序。若再固定 status，created_at 才在选定分组内有序。最终看执行计划和排序方向等条件。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>最左匹配来自元组的字典序；区分用于定位、用于过滤和用于覆盖这三种索引用途。</p><p class="source">核对原文：<a href="https://dev.mysql.com/doc/refman/8.4/en/range-optimization.html">MySQL：范围优化与 skip scan</a>。</p>
+    </article>
+<article class="card pad qa" id="q3">
+      <h3><span class="pill g">P0</span> 3. 回表和覆盖索引到底多做了什么？</h3>
+      <p class="problem"><strong>先看问题：</strong>同样按设备编号找任务，为什么只取 id 很快，改成取完整任务详情就可能更慢？</p>
+      <h4>原理怎样推出来</h4><p>在二级索引里找到条目，只拿到了该索引携带的列和主键；如果还要别的列，就拿主键去聚簇索引再找一次。这次额外访问叫回表。匹配很多行时，可能发生很多次这样的查找。</p><p>若查询所需的筛选与返回信息在这个索引里就能取得，就可以用覆盖索引避免为取缺失列而回表。“建了联合索引”与“这个查询被覆盖”是两回事，后者取决于查询实际使用的列。</p>
+      <h4>把它放进一个例子</h4><pre><code>-- 假设主键为 id，二级索引为 (dock_id, status, created_at)
+SELECT id, status, created_at FROM task WHERE dock_id = 7;
+SELECT id, status, payload    FROM task WHERE dock_id = 7;</code></pre><p>第一条所需字段都在索引条目里；第二条的 payload 不在，要回表。<code>EXPLAIN</code> 中 <code>Using index</code> 是覆盖查询的常见信号，<code>Using index condition</code> 则指索引条件下推，含义不同。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>别为覆盖把所有字段都塞进索引：宽索引占空间、降低缓存命中并增加写入成本。MVCC 可见性等内部检查也可能带来聚簇索引访问，“覆盖”描述的是取列的访问路径。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>查询只返回 id，但 WHERE 还判断一个不在索引里的 payload，仍是覆盖查询吗？</p>
+      <details><summary>展开自测解析</summary><p>不是。返回列够用不代表判断条件够用；数据库仍需取得 payload 才能判断，通常还要访问整行。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>回表是从二级索引拿主键后再访问聚簇索引；覆盖要求查询所需信息可由索引提供。</p><p class="source">核对原文：<a href="https://dev.mysql.com/doc/refman/8.4/en/innodb-index-types.html">MySQL：二级索引记录</a>。</p>
+    </article>
+<article class="card pad qa" id="q4">
+      <h3><span class="pill g">P0</span> 4. 事务隔离与 MVCC：读的是哪一版？</h3>
+      <p class="problem"><strong>先看问题：</strong>A 正在统计库存，B 同时把库存从 10 改成 8。A 第二次查询该看到 10 还是 8？隔离级别是在规定这种并发观察。</p>
+      <h4>原理怎样推出来</h4><p>脏读是看见别人尚未提交的数据；不可重复读是同一事务重复读到不同已提交版本；幻读关注同一条件下匹配记录集合的变化。读未提交、读已提交（RC）、可重复读（RR）、串行化逐步加强隔离，但实现与代价需要结合数据库看。</p><p>InnoDB 的普通一致性 SELECT 使用 MVCC（多版本并发控制）：记录带有最近修改事务信息，undo 链保留可重建的旧版本，ReadView 判断哪些版本对本次快照可见。它不是把整张表复制一份，而是读到不可见的新版本时向历史版本回溯。</p><p>RC 每次一致性读建立新快照；RR 通常复用第一次一致性读建立的快照。自己的修改仍可见。ReadView 判断还要考虑创建者自身、事务编号边界和创建时的活跃事务集合，不能简化为“事务号小就都可见”。</p>
+      <h4>把它放进一个例子</h4><div class="table"><table><thead><tr><th>顺序</th><th>A</th><th>B</th><th>A 的观察</th></tr></thead><tbody><tr><td>1</td><td>BEGIN；普通 SELECT stock</td><td>尚未修改</td><td>读到 10，RR 此时建立快照</td></tr><tr><td>2</td><td>事务继续</td><td>UPDATE stock=8；COMMIT</td><td>B 的新版本已提交</td></tr><tr><td>3</td><td>再次普通 SELECT</td><td>已结束</td><td>RC 读到 8；RR 仍读到 10</td></tr></tbody></table></div><p><code>SELECT ... FOR UPDATE</code> 等锁定读不走上述旧快照观察，而是读取并锁定当前记录。需要更新库存时，别把普通查询的旧值当成并发决策依据。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>RR 对一致性读靠快照保持观察，对范围锁定读靠 next-key 等锁抑制并发插入。混用快照读、当前读和自身修改时，不能承诺“事务里的所有查询永远相同”。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>A 先 BEGIN，B 提交库存 8，A 才第一次普通 SELECT。在通常 RR 事务里，A 读到什么？</p>
+      <details><summary>展开自测解析</summary><p>通常读到 8。仅 BEGIN 不必然建立一致性读快照；第一次一致性读时才建立。显式 WITH CONSISTENT SNAPSHOT 等用法要单独分析。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>MVCC 让读写可以并发，关键是版本可见性与快照创建时机；快照读和锁定读要分开分析。</p><p class="source">核对原文：<a href="https://dev.mysql.com/doc/refman/8.4/en/innodb-consistent-read.html">MySQL：一致性非锁定读</a>。</p>
+    </article>
+<article class="card pad qa" id="q5">
+      <h3><span class="pill g">P0</span> 5. 为什么锁住已有行，还需要间隙锁？</h3>
+      <p class="problem"><strong>先看问题：</strong>你锁住价格 10 和 20 的商品，但别人仍能插入价格 15 的商品。已有记录被锁，并没有阻止“还不存在的记录”。</p>
+      <h4>原理怎样推出来</h4><p>Record Lock 锁的是索引记录；Gap Lock 限制向两条索引记录之间的间隙插入；Next-Key Lock 把记录和它前面的间隙一起锁住，通常用左开右闭区间表示。锁范围是在索引扫描过程中确定的，所以索引路径影响并发度。</p><p>RR 的范围锁定读通常需要保护扫描范围，防止同条件下冒出新记录。唯一索引等值命中已存在记录时，常只需记录锁，因为不存在第二个相同唯一键。无合适索引导致扫描大量记录时，锁范围可能很大；这不是自动升级成一把表锁。</p>
+      <h4>把它放进一个例子</h4><pre><code>-- 在 RR、显式事务中，price 有非唯一索引，已有 10、20
+SELECT * FROM product WHERE price &gt; 10 AND price &lt;= 20 FOR UPDATE;</code></pre><p>理解时先画出 <code>(10,20]</code>：20 的记录与前面的间隙都在保护范围内，其他事务插入 15 就可能等待。真实扫描还可能锁到边界外的记录或间隙，需要结合实际索引和执行路径检查，不能只把 WHERE 区间照抄为完整锁范围。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>RC 通常不为普通搜索保留间隙锁，但外键检查与重复键检查仍可能用到它；唯一键未命中与命中也不同。锁分析先交代隔离级别、索引、是否命中及事务边界。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>两个事务都先锁 A 再锁 B，与一个锁 A→B、另一个锁 B→A，哪个更容易死锁？</p>
+      <details><summary>展开自测解析</summary><p>后者容易形成互相等待。统一加锁顺序和缩短事务可以降低风险，仍需处理数据库检测到死锁后的事务回滚与重试。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>记录锁保护已有行，间隙锁限制新插入；索引决定扫描范围，也影响锁范围和死锁风险。</p><p class="source">核对原文：<a href="https://dev.mysql.com/doc/refman/8.4/en/innodb-locking.html">MySQL：记录、间隙与 next-key 锁</a>。</p>
+    </article>
+<article class="card pad qa" id="q6">
+      <h3><span class="pill g">P0</span> 6. 慢 SQL：怎样找到真正花时间的步骤？</h3>
+      <p class="problem"><strong>先看问题：</strong>接口用了 2 秒，可能是 SQL 扫描太多，也可能是等待行锁、连接池排队或传回太多数据。先确认时间花在哪，才谈索引。</p>
+      <h4>原理怎样推出来</h4><p>先从链路耗时、慢查询记录和具体参数找出问题查询，再看计划：走哪个索引、估计扫多少行、怎样连接与排序。<code>EXPLAIN</code> 的 rows 通常是估计，不是现场实际扫描计数；能在测试环境使用 <code>EXPLAIN ANALYZE</code> 时，再对照实际行数、循环次数与耗时。</p><p>假设要取某机库最新 20 个待执行任务，<code>(dock_id,status,created_at,id)</code> 可以先固定前两列，再按时间和 id 找结果。收益来自少扫描、少排序、少回表，而不是“Extra 看起来漂亮”。每多一个索引，都让写入多维护一份结构。</p>
+      <h4>把它放进一个例子</h4><pre><code>SELECT id, created_at FROM task
+WHERE dock_id = 7 AND status = 'NEW'
+ORDER BY created_at DESC, id DESC LIMIT 20;</code></pre><p>深分页 <code>OFFSET 100000</code> 即使返回 20 条，也通常要跳过大量条目。连续翻页可用上一页最后的 <code>(created_at,id)</code> 做游标；带 id 是为解决同时间记录的稳定排序。业务要求随机跳页时，要承认游标分页不直接满足它。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>小表全扫、少量结果排序可能很便宜，ALL 或 filesort 不是一律错误。EXPLAIN ANALYZE 会实际执行语句，只在受控环境分析合适的查询。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>“加索引后从 2 秒降到 100ms”能单独证明索引有效吗？</p>
+      <details><summary>展开自测解析</summary><p>还不够。要尽量控制数据、查询参数、缓存冷热和负载，再对比扫描行数、计划和多次耗时；锁等待消失或缓存变热也能使同一查询变快。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>按定位、执行计划、实际工作量、改动和验证这条线排查；性能收益要能解释为少做了什么。</p>
+    </article></section>
+<section id="redis"><div class="head"><h2>3. Redis：从缓存加速到失败窗口</h2><p>把读写画在同一时间线上，才能看出缓存与锁的边界。</p></div><article class="card pad qa" id="q7">
+      <h3><span class="pill g">P0</span> 7. 穿透、击穿、雪崩：数据库为什么被打满？</h3>
+      <p class="problem"><strong>先看问题：</strong>这些名词描述的是缓存没有挡住请求时，数据库承受了哪种回源压力。先画请求去向，名称自然就能分清。</p>
+      <h4>原理怎样推出来</h4><p>不存在的设备 id 每次都 miss，查库又没有结果：如果只缓存真实结果，这种请求永远直接打库，这是穿透。一个很热的真实设备恰好过期，很多线程同时发现 miss 并查库，这是击穿。大量键一起过期，或者缓存服务整体不可用，让许多业务同时回源，这是雪崩。</p><p>对策要对应原因：空值缓存阻断重复的无结果查询，布隆过滤器快速排除肯定不存在的键；互斥重建把热点回源合并为一份；随机 TTL 打散共同过期时间。缓存宕机时随机 TTL 无效，需要限流、降级、故障转移等保护数据库。</p>
+      <h4>把它放进一个例子</h4><p>一个 key 每秒被读 5,000 次，DB 查一次需要 100ms。它过期后的 100ms 内可能积累约 500 个回源请求。重建锁让一个请求去加载，其他请求短暂等待或按规则读旧值，这才是保护数据库的机制。</p><p>缓存空值只给较短 TTL：否则设备刚创建，客户端却持续读到之前缓存的“不存在”。布隆过滤器可能误判存在，且需要同步新增数据。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>逻辑过期可以返回旧值，但业务必须允许短暂过时；库存、权限等不能无条件套用。等待重建也要有超时与失败处理，不能无限排队。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>给所有 key 的 TTL 加随机值，能解决每次请求都查一个新的无效 id 吗？</p>
+      <details><summary>展开自测解析</summary><p>不能。随机 TTL 针对共同过期；新的无效 id 是穿透，应考虑参数校验、访问控制、限流和不存在数据的过滤策略。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>先区分无结果反复回源、单热点并发回源和整体回源，再选择空值缓存、重建合并或服务降级。</p>
+    </article>
+<article class="card pad qa" id="q8">
+      <h3><span class="pill g">P0</span> 8. 为什么先提交数据库，再删缓存仍有竞态？</h3>
+      <p class="problem"><strong>先看问题：</strong>数据库和 Redis 是两个系统，通常没有一个共同的本地事务。你能安排操作顺序，却不能让所有读写都像一个瞬时动作。</p>
+      <h4>原理怎样推出来</h4><p>Cache Aside 的读是“缓存 miss → 查 DB → 写缓存”，写是“提交 DB → 删除缓存”。若反过来先删缓存，另一请求可在数据库更新前读到旧值并回填，然后 DB 提交后这个旧缓存还在。</p><p>先提交再删除减少了这类窗口，但旧读请求仍可能晚到：读请求在提交前已经拿到了旧数据，写请求提交并删掉缓存，旧读请求随后把旧值写回。因此该顺序提供的是常见最终一致方案，不是强一致证明。</p>
+      <h4>把它放进一个例子</h4><div class="table"><table><thead><tr><th>顺序</th><th>读请求 R</th><th>写请求 W</th><th>缓存</th></tr></thead><tbody><tr><td>1</td><td>miss，查 DB 得到 v1，暂未回填</td><td>—</td><td>空</td></tr><tr><td>2</td><td>暂停</td><td>提交 DB v2，删除缓存</td><td>空</td></tr><tr><td>3</td><td>把之前得到的 v1 写入缓存</td><td>已完成</td><td>旧 v1</td></tr></tbody></table></div><p>TTL 为旧值提供过期边界，删除失败要有可恢复的重试记录；版本控制、串行化同一业务键或订阅数据库变更可以加强方案，但仍需明确各自的失败窗口。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>延迟双删依赖等待时间覆盖慢读窗口，不能证明所有请求都及时完成。若读库是有延迟的副本，删后回源也可能读到旧值。先问允许旧多久，再选一致性方案。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>DB 已提交，进程在发送“删缓存消息”前崩溃，普通异步重试任务能补上吗？</p>
+      <details><summary>展开自测解析</summary><p>没有持久重试记录就可能永远不知道该补什么。可以将缓存失效事件与业务改动写进同一 DB 事务的 outbox，再异步投递；这解决事件丢失窗口，仍要分析回填竞态。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>先提交 DB 再删缓存是常见起点；要分析删除失败、旧读回填和副本延迟，并按业务容忍度兜底。</p>
+    </article>
+<article class="card pad qa" id="q9">
+      <h3><span class="pill g">P0</span> 9. 分布式锁：有锁为什么还会重复执行？</h3>
+      <p class="problem"><strong>先看问题：</strong>两个服务实例都想调度同一机库，进程内 synchronized 管不到另一台机器。大家需要竞争同一个共享锁。</p>
+      <h4>原理怎样推出来</h4><p>单个 Redis 实例上的常见加锁是 <code>SET lock:dock:7 token NX PX 10000</code>：不存在才创建，并同时设置租约，避免进程崩溃后永远不释放。token 是本次持有者的唯一标识；释放时必须用 Lua 原子比较 token 再删除，不能先 GET 再 DEL。</p><p>租约会到期，业务却不一定结束。A 停顿超过 10 秒，锁过期后 B 获取锁开始处理，A 恢复后仍可能继续操作。续租减少正常长任务的过期，却挡不住无限长停顿。锁只是一种协调机制，最终资源还需要拒绝失效持有者的手段。</p>
+      <h4>把它放进一个例子</h4><pre><code>-- 数据库内的原子状态约束，示意
+UPDATE dock SET status = 'BUSY'
+WHERE id = 7 AND status = 'IDLE';</code></pre><p>检查受影响行数，只有成功抢到状态的事务才能继续。在更严格的资源协议里，可使用单调递增 fencing token（栅栏令牌），让下游拒绝旧令牌；前提是下游真的检查它。不要把一个随机锁 token 当作 fencing token。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>Redis 异步复制下，主从切换可能丢失刚写的锁；看门狗也不等于绝对互斥。数据库约束只保护其事务内的数据，下发设备指令等外部副作用仍需业务幂等与状态协议。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>A 的锁过期后 B 已加锁，A 用无条件 DEL 释放，会发生什么？</p>
+      <details><summary>展开自测解析</summary><p>A 会删除 B 的锁，让第三个请求也可能进入。原子比较持有者 token 可避免误删，但不能阻止 A 已经过期后继续执行业务。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>锁要考虑获取原子性、租约、持有者校验与故障；强正确性靠资源端约束和幂等共同完成。</p><p class="source">核对原文：<a href="https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/">Redis：分布式锁与复制风险</a>。</p>
+    </article>
+<article class="card pad qa" id="q10">
+      <h3><span class="pill g">P0</span> 10. RDB 和 AOF：恢复时靠什么把内存找回来？</h3>
+      <p class="problem"><strong>先看问题：</strong>Redis 的数据主要在内存。进程重启后，想恢复就必须提前留下可读取的持久记录，并决定可以接受丢多少最近的数据。</p>
+      <h4>原理怎样推出来</h4><p>RDB 在某个时刻把数据状态保存为快照：恢复时装载结果，不必重放全部写命令。但快照之后的修改如果没进入其他持久记录，就可能丢失。后台保存通常 fork 子进程，写时复制帮助父进程继续服务，仍会有 fork 和额外内存成本。</p><p>AOF 记录写操作，恢复时重放。写入 AOF 缓冲或操作系统缓存不等于已落稳定存储，fsync 策略决定持久性与性能取舍。everysec 常以约一秒的丢失窗口作工程预期，异常存储和调度环境不能拿它作绝对时限承诺。</p>
+      <h4>把它放进一个例子</h4><p>上午做 RDB，下午更新了 1,000 条数据后崩溃：只恢复这份 RDB，就回到上午状态。若使用 AOF，恢复进度取决于实际持久成功的位置。AOF 重写不是停止写入后复制原日志，而是把当前状态压成较短的恢复表示并衔接后续写入。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>现代 Redis 支持多文件 AOF 与 RDB/AOF 混合表示，别把旧版单文件细节当通则。复制负责副本可用性，持久化负责重启恢复，备份负责误删等灾难恢复，三者不能互相替代。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>误执行 DEL 后，AOF 持久化成功了，是不是更容易恢复被删的数据？</p>
+      <details><summary>展开自测解析</summary><p>持久化成功也会忠实记录删除，重放得到的是已删状态。恢复误删依赖删除前的备份或可保留的历史恢复点，而不是“开启 AOF 就不怕误删”。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>RDB 保存时点状态，AOF 保存恢复序列；选择取决于恢复时间、可接受丢失量与运行开销。</p><p class="source">核对原文：<a href="https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/">Redis：持久化机制</a>。</p>
+    </article>
+<article class="card pad qa" id="q11">
+      <h3><span class="pill g">P0</span> 11. Redis 快在哪里，又会被什么拖慢？</h3>
+      <p class="problem"><strong>先看问题：</strong>大量小 GET 很快，但一次查出百万成员可能让别的请求一起卡住。快的是特定工作负载，不是所有 Redis 命令。</p>
+      <h4>原理怎样推出来</h4><p>常见键值命令直接访问内存中的数据结构，省去了数据库执行复杂连接、计划和磁盘数据读取的很多工作。事件循环与 I/O 多路复用让服务端同时管理许多连接，不必给每个连接独占一个执行线程。</p><p>理解经典模型时，可以把普通命令执行看成在主要执行路径上顺序处理：很多短命令排起来很高效，但一个长命令会占住后面请求的机会。网络 I/O、后台持久化与部分实现工作可以在其他线程或进程进行，所以“Redis 只有一个线程”不准确；版本和部署方式也会改变细节。</p>
+      <h4>把它放进一个例子</h4><p><code>GET</code> 一个小值与 <code>SMEMBERS</code> 一个超大集合不是同样工作量。返回 100MB 即使查找快，也要花序列化、传输与客户端处理时间。大 key、长 Lua 脚本、fork、内存换页和网络拥塞都可能成为延迟来源。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>内存操作不等于每条请求耗时只有纳秒；客户端延迟还包括排队和网络。SCAN 可以分批遍历，但不是固定时点快照，应用要处理遍历期间的变化与可能重复。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>把 KEYS * 换成 SCAN，就能把 Redis 变成任意规模下稳定的统计数据库吗？</p>
+      <details><summary>展开自测解析</summary><p>不能。分批减少一次阻塞时长，但总遍历量仍大，期间数据可能变化。高频统计应考虑提前维护聚合值或换适合该查询的存储方案。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>Redis 对短小内存操作高效；性能排查要看命令复杂度、数据体积、排队、后台工作和网络。</p><p class="source">核对原文：<a href="https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/latency/">Redis：延迟原因与诊断</a>。</p>
+    </article></section>
+<section id="concurrent"><div class="head"><h2>4. 并发：执行能力、可见性与原子性</h2><p>先拆步骤，看看另一个线程能在哪一步插进来。</p></div><div class="card diagram"><svg viewBox="0 0 1040 290" role="img" aria-labelledby="pool-title pool-desc">
+<title id="pool-title">线程池在正常运行态下的接纳主线</title><desc id="pool-desc">依次检查工作线程数小于核心数、是否成功入队、能否新增线程到最大数；各条件成功就接纳，否则走下一步，最后拒绝。关闭、创建失败和并发状态复查另行处理。</desc>
+<defs><marker id="pool-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker></defs>
+<rect class="node" x="20" y="35" width="215" height="60" rx="10"/><text class="title" x="127" y="60" text-anchor="middle">线程数小于 core？</text><text class="sub" x="127" y="79" text-anchor="middle">是：创建工作线程</text>
+<rect class="node a" x="280" y="35" width="215" height="60" rx="10"/><text class="title" x="387" y="60" text-anchor="middle">入队成功？</text><text class="sub" x="387" y="79" text-anchor="middle">是：进入等待队列</text>
+<rect class="node v" x="540" y="35" width="215" height="60" rx="10"/><text class="title" x="647" y="60" text-anchor="middle">能新增线程到 max？</text><text class="sub" x="647" y="79" text-anchor="middle">是：新增线程处理</text>
+<rect class="node r" x="800" y="35" width="215" height="60" rx="10"/><text class="title" x="907" y="60" text-anchor="middle">拒绝处理</text><text class="sub" x="907" y="79" text-anchor="middle">handler 决定结果</text>
+<path class="edge" d="M235 65H280" marker-end="url(#pool-arrow)"/><text class="sub" x="257" y="52" text-anchor="middle">否</text>
+<path class="edge" d="M495 65H540" marker-end="url(#pool-arrow)"/><text class="sub" x="517" y="52" text-anchor="middle">否</text>
+<path class="edge" d="M755 65H800" marker-end="url(#pool-arrow)"/><text class="sub" x="777" y="52" text-anchor="middle">否</text>
+<rect class="lane" x="20" y="130" width="995" height="130" rx="12"/>
+<text class="title" x="45" y="161" text-anchor="start">用阻塞任务推演：core=2，max=4，队列容量=2</text>
+<text class="sub" x="45" y="190" text-anchor="start">任务 1、2：新增核心工作线程；任务 3、4：排队；任务 5、6：新增额外工作线程；任务 7：拒绝。</text>
+<text class="sub" x="45" y="220" text-anchor="start">前提：这些任务仍阻塞、线程创建正常且池未关闭。无界队列通常会把任务留在第二步，让 max 难以发挥作用。</text>
+</svg><p>箭头表示该步未成功接纳才继续；每个“是”分支接纳任务后结束判断。实现还有入队后的并发状态复查。</p></div><article class="card pad qa" id="q12">
+      <h3><span class="pill g">P0</span> 12. 线程池：任务来了，为什么先排队再扩线程？</h3>
+      <p class="problem"><strong>先看问题：</strong>图片识别请求突增，你既不想每次 new Thread，也不想无限接任务吃光内存。线程池管理的是执行能力、缓冲能力和超载行为。</p>
+      <h4>原理怎样推出来</h4><p>ThreadPoolExecutor 的核心参数描述三件事：corePoolSize 与 maximumPoolSize 决定工作线程数量；workQueue 决定如何存等待任务；keepAliveTime、unit、threadFactory 和 handler 决定空闲回收、线程创建与拒绝处理。核心线程默认也不是启动时一次全部创建，而是按需创建。</p><p>通常运行流程是：线程数小于 core，创建线程处理任务；否则尝试入队；入队失败后再尝试扩到 max；仍不能接纳就拒绝。入队后实现还会复查运行状态并确保有工作线程，因此流程图是运行态主线，不是完整并发实现。</p>
+      <h4>把它放进一个例子</h4><p>设置 core=2、max=4、队列容量=2，连续提交 7 个一直阻塞的任务，且池未关闭：第 1、2 个创建线程；第 3、4 个排队；第 5、6 个因队列满而创建额外线程；第 7 个触发拒绝。若队列无界，任务通常一直入队，max=4 很可能根本用不到。</p><p>AbortPolicy 抛异常，让调用者处理超载；CallerRunsPolicy 让提交线程执行，能减缓继续提交，但也可能卡住 HTTP 请求线程或事件循环，池关闭时还会丢弃。两种 Discard 策略丢任务，只适合明确允许丢弃的工作。</p><p>若稳定到达率约 100 次/秒，平均执行耗时 0.2 秒，平均执行中的任务约 20 个，这是容量估算的起点。再检查 CPU、数据库连接数、外部服务限额、尾延迟与压测结果；“IO 型=2N”不能取代这些约束。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>有界队列防止无上限积压，却不保证已接纳任务不丢；重要异步业务还需持久任务记录和补偿。图和示例假设运行态、线程创建正常且任务不提前完成。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>队列从 100 扩到 100,000，max 不变，吞吐一定上升吗？</p>
+      <details><summary>展开自测解析</summary><p>通常不会。执行能力没变，只能容纳更多等待，可能让延迟和内存占用上升，并推迟扩线程或暴露拒绝。先判断瓶颈与允许排队时长。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>线程池用线程、队列与拒绝策略控制负载；先核心、再入队、再扩容，参数必须结合任务耗时和下游容量。</p><p class="source">核对原文：<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">Java SE 21：ThreadPoolExecutor</a>。</p>
+    </article>
+<article class="card pad qa" id="q13">
+      <h3><span class="pill g">P0</span> 13. volatile 与 synchronized：看得见就能改得对吗？</h3>
+      <p class="problem"><strong>先看问题：</strong>两个线程给计数器加一，最终却少了一次。每个线程看到了最新值，也可能在同一旧值上各自加一后互相覆盖。</p>
+      <h4>原理怎样推出来</h4><p><code>count++</code> 可以拆成读取、计算、写入。volatile 保证对该字段的读写具有相应可见性与顺序约束，但不会把这三步变成一个不可插入的操作。synchronized 让使用同一监视器的线程互斥进入，并通过解锁与后续加锁建立 happens-before（先行发生）关系。</p><p>happens-before 是 Java 内存模型给程序员的可见性与顺序保证，不是要求按某种固定硬件缓存流程执行。volatile 写先行发生于后续对同一字段的读，因此常用于停止标志或正确发布状态；需要一起维护多个变量的不变式时，通常需要锁或其他原子协议。</p>
+      <h4>把它放进一个例子</h4><pre><code>初始 count = 0
+A 读到 0 → 计算 1
+B 读到 0 → 计算 1
+A 写入 1
+B 写入 1    // 两次加一，结果仍为 1</code></pre><p>用同一锁保护整个加一，或使用 <code>AtomicInteger.incrementAndGet()</code>，才针对这个丢失更新问题。若只是通知循环停止，<code>volatile boolean stop</code> 常能满足需求。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>锁只保护遵守同一加锁协议的访问；其他线程不加锁仍可能破坏状态。偏向锁等优化随 JDK 版本变化，别把历史锁升级口诀当作语言保证。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>把一个对象引用声明为 volatile，该对象里面的普通 count++ 就自动原子了吗？</p>
+      <details><summary>展开自测解析</summary><p>没有。volatile 修饰的是引用字段的访问，不会递归地给对象内部字段加锁，也不让复合操作原子化。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>volatile 解决相关读写的可见性和顺序；synchronized 还提供互斥，复合修改要维护完整不变式。</p><p class="source">核对原文：<a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html">Java 内存模型：happens-before</a>。</p>
+    </article>
+<article class="card pad qa" id="q14">
+      <h3><span class="pill g">P0</span> 14. ConcurrentHashMap：容器安全，业务就安全吗？</h3>
+      <p class="problem"><strong>先看问题：</strong>共享 Map 不会因并发 put 损坏，仍可能让“第一次收到回调才处理”被执行两次。容器操作原子与业务步骤原子不是同一件事。</p>
+      <h4>原理怎样推出来</h4><p>JDK 8 的经典实现把数据分散到桶：空桶安装节点可用 CAS（比较并交换），非空桶的部分更新用 synchronized 等机制协调，扩容可由多个线程协作。不同桶的更新不必全挤在一把全表锁上，读取一般也不用同样的全局锁。</p><p>API 保证要比实现口诀优先：<code>putIfAbsent</code>、<code>compute</code> 等能把针对一个键的判断与更新合并。<code>containsKey</code> 后再 <code>put</code> 是两个操作，其他线程能插入其间。遍历具有弱一致性，并发变化中的 size 不能当严格控制依据。</p>
+      <h4>把它放进一个例子</h4><pre><code>// 不要用 containsKey + put 竞争“第一次”
+if (seen.putIfAbsent(messageId, Boolean.TRUE) == null) {
+    // 本进程内，这个键的首次登记者进入这里
+}</code></pre><p>这只是登记竞争的示意：业务失败后如何重试、记录何时清理、服务重启与跨进程怎么办，都还未解决。Map 里的可变对象也需要自己的线程安全策略。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>compute 回调应短小，阻塞 I/O 可能拖住相关更新。ConcurrentHashMap 不支持 null 键和值；其原子能力也不覆盖两个键或外部数据库组成的事务。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>map.get(key) 得到 ArrayList 后，两个线程直接 add，会因 Map 安全而安全吗？</p>
+      <details><summary>展开自测解析</summary><p>不会。Map 保证的是映射管理；取出的 ArrayList 是另一个共享可变对象，它的操作需要同步、并发集合或不可变替换等协议。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>ConcurrentHashMap 保证其规定的并发操作；复合判断用原子 API，跨键与外部副作用另行设计。</p><p class="source">核对原文：<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">Java SE 21：ConcurrentHashMap 的并发契约</a>。</p>
+    </article></section>
+<section id="jvm"><div class="head"><h2>5. JVM：内存、回收与类型身份</h2><p>先分清对象为什么活着、内存由谁持有，再考虑工具和参数。</p></div><article class="card pad qa" id="q15">
+      <h3><span class="pill g">P0</span> 15. JVM 内存：方法、对象和类信息分别住哪里？</h3>
+      <p class="problem"><strong>先看问题：</strong>递归过深、对象持续积压、加载太多类，都可能让 Java 服务出错，但它们耗尽的不是同一种内存。</p>
+      <h4>原理怎样推出来</h4><p>调用方法要保留参数、局部变量、计算过程和返回位置，这些组成栈帧，进入当前线程的 JVM 栈；每个线程还需要自己的程序计数器。对象实例与数组在共享堆中，局部变量保存的引用可以指向堆里的同一个对象，所以“局部变量在线程栈里”不代表引用对象也线程私有。</p><p>方法区是规范里的概念，保存类结构等运行时信息；HotSpot 在 JDK 8+ 主要用本地内存中的 Metaspace 保存类元数据。堆、元空间、直接内存、线程栈都会影响进程内存，容器限制也不会只计算 Java 堆。</p>
+      <h4>把它放进一个例子</h4><pre><code>void submit() {
+    Task task = new Task();
+    queue.add(task);
+}</code></pre><p>submit 返回后栈帧消失，但 queue 仍引用 task，对象不会因为方法结束就回收。递归没有终止条件可能触发 StackOverflowError；队列不断积压任务可能导致 Java heap space；类加载器被长期引用可能导致元空间增长。</p><p>排查先辨认错误与增长区域，再结合 GC 日志、线程状态、堆对象和引用链。抓 heap dump 前要考虑暂停与文件大小，dump 也可能包含业务数据；不能把工具命令当成已经完成的诊断。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>元空间仍可 OOM；静态字段相关对象也不能笼统说都住元空间。Eden/Survivor 比例、晋升年龄和大对象分配路径随收集器与配置变化，不是 JVM 统一规格。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>把 -Xmx 设为容器内存上限，为什么仍可能被容器终止？</p>
+      <details><summary>展开自测解析</summary><p>堆之外还有元空间、线程栈、直接内存、代码缓存和其他本地开销，进程总量可能超限制。要为这些区域留空间并观察实际使用。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>栈承载方法调用状态，堆承载共享对象，方法区承载类信息；先分清增长区域再诊断。</p><p class="source">核对原文：<a href="https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-2.html">JVM 规范：运行时数据区域</a>。</p>
+    </article>
+<article class="card pad qa" id="q16">
+      <h3><span class="pill g">P0</span> 16. GC：对象没人要了，怎样回收才划算？</h3>
+      <p class="problem"><strong>先看问题：</strong>回收器既要找出不再使用的对象，又要尽量减少对业务的打断。不同算法是在时间、额外空间与碎片之间取舍。</p>
+      <h4>原理怎样推出来</h4><p>GC 从栈上的引用、类静态引用、JNI 等根出发做可达性分析：能沿引用找到的对象要保留。两个对象互相引用，如果从根都到不了，仍可一起回收，所以循环引用本身不构成 Java 内存泄漏。</p><p>标记清除留下可用空洞，但可能碎片化；复制把存活对象搬到另一片空间，省掉逐个清理死对象的成本，却需要目标空间；整理把存活对象集中起来，减轻碎片但要付移动成本。年轻对象通常死得快，复制少量幸存者常划算，这就是分代思想的原因。</p><p>G1 把堆划成 Region，以疏散复制等机制回收选定区域；部分标记工作可并发，年轻代和混合回收仍有暂停。<code>MaxGCPauseMillis</code> 是规划目标，不是每次停顿的硬上限。CMS 适合了解老系统背景，已在 JDK 14 移除，现代选型要按实际 JDK 看。</p>
+      <h4>把它放进一个例子</h4><p>创建一万个临时对象，九千九百个已不可达：复制只需搬那一百个幸存者。反过来，若大部分对象长期存活，每次大量搬迁就昂贵。队列泄漏时对象一直从根可达，GC 无论多勤快都不能替应用删掉它们。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>并发 GC 不等于零暂停，换收集器也修不好仍被引用的对象泄漏。先看分配率、回收后占用和停顿，再谈参数；暂停目标与吞吐、CPU、堆余量有取舍。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>Full GC 后堆占用一周内持续上涨，直接增加 GC 次数能治好吗？</p>
+      <details><summary>展开自测解析</summary><p>若上涨来自仍可达的无用对象，不能。要检查主要对象类型与 GC Roots 引用链，找长期持有它们的缓存、集合、监听器或类加载器。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>GC 先判断可达性，再按存活比例与暂停目标选择回收策略；理解算法成本比背收集器步骤更有用。</p><p class="source">核对原文：<a href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-first-g1-garbage-collector1.html">Oracle：G1 回收模型与暂停目标</a>；<a href="https://docs.oracle.com/en/java/javase/21/migrate/removed-tools-and-components.html">CMS 移除与历史优化变更</a>。</p>
+    </article>
+<article class="card pad qa" id="q17">
+      <h3><span class="pill g">P0</span> 17. 类加载与双亲委派：同名类为什么可能不是同一个类？</h3>
+      <p class="problem"><strong>先看问题：</strong>两个插件都带了 com.example.Task，却希望互不干扰。JVM 除了类名，还需要知道是谁加载了这个类。</p>
+      <h4>原理怎样推出来</h4><p>加载取得类的字节表示；链接包括验证、准备和解析；初始化执行类初始化代码。准备与初始化要分开：普通静态字段先有默认值，再执行赋值和 static 块；常量变量有专门规则，解析也不必机械地理解成所有符号都在初始化前一次完成。</p><p>ClassLoader 的常见加载策略是先委托父加载器，父找不到再自己找。这样应用通常复用平台已有类，减少重复定义与类型冲突。“父”主要是委托关系，不是 Java 类继承关系。一个运行时类型的身份由二进制名与定义它的加载器共同决定。</p>
+      <h4>把它放进一个例子</h4><p>插件加载器 L1 与 L2 各自定义同名 Task，名字相同仍是两种类型，强制转换可能报 ClassCastException。插件隔离需要这样做，但跨边界交互的接口应由共享父加载器定义，否则接口本身也会分裂。</p><p>线程上下文类加载器让平台代码按约定发现应用提供的 SPI 实现；部分容器使用不同的委托顺序实现隔离。这些是加载策略调整，不是 JVM 的类型身份规则失效。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>双亲委派是常见类加载策略，不能说任何 JVM 实现和自定义加载器都不可改变。JDK 8 的扩展加载器与 JDK 9+ 的平台加载器名称也有版本差异。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>两个插件的 Task 都打印为同一个全限定名，能据此判断可以互相强转吗？</p>
+      <details><summary>展开自测解析</summary><p>不能。还要比较定义它们的类加载器和真实的类型继承关系；名字相同不足以确定运行时类型身份。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>加载、链接、初始化负责不同工作；委托促进类复用，而类身份还包含定义加载器。</p><p class="source">核对原文：<a href="https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-5.html">JVM 规范：加载、链接与初始化</a>。</p>
+    </article></section>
+<section id="spring"><div class="head"><h2>6. Spring：对象怎样装配，调用怎样被拦截</h2><p>容器管理对象，代理管理调用；沿真实入口分析生命周期与事务。</p></div><div class="card diagram"><svg viewBox="0 0 1040 200" role="img" aria-labelledby="proxy-title proxy-desc"><title id="proxy-title">事务代理调用路径</title><desc id="proxy-desc">调用方先经过 Spring 代理，事务拦截器开启或加入事务，再进入目标方法；目标内部的 this 调用不重新经过这个代理入口。</desc><defs><marker id="proxy-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker></defs><rect class="node " x="25" y="72" width="210" height="70" rx="12"/><text class="title" x="130" y="101" text-anchor="middle">调用方</text><text class="sub" x="130" y="124" text-anchor="middle">通过容器取得 Bean</text><path class="edge" d="M235 107H275" marker-end="url(#proxy-arrow)"/><rect class="node v" x="285" y="72" width="210" height="70" rx="12"/><text class="title" x="390" y="101" text-anchor="middle">Spring 代理</text><text class="sub" x="390" y="124" text-anchor="middle">事务、审计等拦截入口</text><path class="edge" d="M495 107H535" marker-end="url(#proxy-arrow)"/><rect class="node g" x="545" y="72" width="210" height="70" rx="12"/><text class="title" x="650" y="101" text-anchor="middle">目标方法 A</text><text class="sub" x="650" y="124" text-anchor="middle">进入真实业务对象</text><path class="edge" d="M755 107H795" marker-end="url(#proxy-arrow)"/><rect class="node a" x="805" y="72" width="210" height="70" rx="12"/><text class="title" x="910" y="101" text-anchor="middle">this.methodB()</text><text class="sub" x="910" y="124" text-anchor="middle">同对象内调用，未重经代理</text></svg><p>看 Q20：A 若已在事务内，B 可以沿用该事务；但 B 注解的新传播语义不会因这次自调用而生效。</p></div><article class="card pad qa" id="q18">
+      <h3><span class="pill a">P1</span> 18. Bean 生命周期：new 完为什么还不能用？</h3>
+      <p class="problem"><strong>先看问题：</strong>一个 Bean 已经运行过构造方法，但依赖字段还没注入，连接池也还没初始化。对象存在与容器管理完成是两个时刻。</p>
+      <h4>原理怎样推出来</h4><p>典型流程是实例化、依赖注入、相关 Aware 回调、初始化前处理、初始化、初始化后处理，随后对外提供 Bean。<code>@PostConstruct</code> 由相应后处理器调用；如果同时配置多种初始化方式，通常再执行 afterPropertiesSet 与自定义 init 方法。</p><p>BeanPostProcessor 可以在前后阶段扩展对象行为，常规 AOP 代理通常在初始化后形成。对外拿到的可能是代理，并不只是构造方法里产生的原始对象。循环依赖的早期引用等场景会改变部分细节，所以这条主线不是所有 Bean 的完整时间表。</p>
+      <h4>把它放进一个例子</h4><p>在构造方法里读取字段注入的 repository，可能还是 null；改用构造器注入，依赖成为构造参数。若启动后要打开后台资源，就安排在合适的初始化或生命周期接口；关闭容器时通过销毁回调释放连接、线程等资源。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>prototype Bean 被创建交付后，容器通常不负责自动调用其销毁回调。也不要假定在 @PostConstruct 中调用自身事务方法已经经过完整 AOP 代理。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>为什么业务线程池只创建不关闭，应用重载时可能产生问题？</p>
+      <details><summary>展开自测解析</summary><p>它是有生命周期的外部资源，可能持有线程、任务与旧类加载器；应明确谁创建、谁关闭以及关闭时怎样处理未完成任务。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>Bean 从实例化到注入、初始化和代理包装才适合对外使用；资源的创建与销毁都要有归属。</p><p class="source">核对原文：<a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-nature.html">Spring：初始化与销毁回调</a>。</p>
+    </article>
+<article class="card pad qa" id="q19">
+      <h3><span class="pill a">P1</span> 19. 循环依赖：三级缓存为什么保存“工厂”？</h3>
+      <p class="problem"><strong>先看问题：</strong>A 需要 B，B 又需要 A，容器创建 A 时还没完成，却被 B 要求交出来。核心难题是怎样处理未完成的对象与最终代理的一致性。</p>
+      <h4>原理怎样推出来</h4><p>在允许循环引用的某些单例属性注入场景中，A 可以先实例化，再注册生成早期引用的工厂。创建 B 时，B 需要 A，容器就使用工厂取得 A 的早期引用；B 完成后，再继续给 A 注入 B。</p><p>这里的三级缓存是成品单例 singletonObjects、已生成的早期引用 earlySingletonObjects、早期引用工厂 singletonFactories。保存工厂可以延迟到真的被依赖时才获取早期引用，并给支持该流程的后处理器机会提供代理，避免其他 Bean 持有错误的原始对象。</p>
+      <h4>把它放进一个例子</h4><pre><code>实例化 A → 注册 A 的早期引用工厂
+填充 A 需要 B → 创建 B
+填充 B 需要 A → 工厂提供 A 的早期引用
+B 完成 → 注入 A → A 完成</code></pre><p>构造器环则不同：要 new A 得先有 B，要 new B 又得先有 A，连可提前暴露的 A 实例都没有。拆分职责、抽取共同服务，通常比硬启用循环引用更容易维护。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>不是所有循环都能解决：构造器、prototype 和某些代理组合要单独判断。Spring Boot 2.6 起默认禁止循环引用，不要把内部能力当成项目一定开启的功能。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>把一边改成 @Lazy 可以启动，就说明依赖设计合理了吗？</p>
+      <details><summary>展开自测解析</summary><p>不说明。它可能通过延迟解析打破启动环，但运行时仍有双向耦合；应检查职责是否可拆开、调用是否形成递归，以及初始化时是否提前触发懒代理。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>三级缓存帮助特定单例场景协调早期引用与代理；能启动只是底线，先分析为什么有双向依赖。</p><p class="source">核对原文：<a href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">Spring：构造器循环依赖与依赖注入</a>；<a href="https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-2.6-Release-Notes">Boot 2.6 的循环引用默认行为</a>。</p>
+    </article>
+<article class="card pad qa" id="q20">
+      <h3><span class="pill a">P1</span> 20. 事务“失效”：没开启、没回滚，还是没覆盖到？</h3>
+      <p class="problem"><strong>先看问题：</strong>同样写着 @Transactional，有时根本没进入事务，有时事务正常提交了，有时只有主线程的数据库操作受保护。先把这三种问题分开。</p>
+      <h4>原理怎样推出来</h4><p>默认代理模式下，调用先经过事务拦截器，再进入目标方法。拦截器决定开启或加入事务，方法完成后按规则提交或回滚。自己 new 的对象、绕过代理的自调用等情况，没有触发被标注方法的事务拦截。</p><p>异常被吞掉，拦截器看到正常返回，通常会提交；默认受检异常通常也不触发回滚，除非改变回滚规则。线程绑定的 JDBC 事务不会自动传给新线程；Redis 操作、HTTP 请求也不会自动加入数据库本地事务。</p>
+      <h4>把它放进一个例子</h4><pre><code>class OrderService {
+    public void place() {
+        this.save();   // 直接进入目标对象，未经过 save 的代理入口
+    }
+    @Transactional
+    public void save() { /* 写数据库 */ }
+}</code></pre><p>若 place 没有外层事务，save 的注解不会因此开启事务；若 place 已通过代理进入了事务，save 仍可处在现有事务里，但自身注解的 REQUIRES_NEW 等语义不会被这次自调用应用。常见修复是调整职责，把事务边界放到真正经代理调用的服务方法上。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>“非 public 都失效”不是通则：Spring 6 的类代理默认可支持 protected 和包可见方法；接口代理要求 public 接口方法。private 方法与类代理的 final 方法等仍有代理限制，先核对版本和代理方式。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>事务方法里先写 DB，再发 HTTP 指令，随后抛异常。DB 回滚能撤回设备收到的指令吗？</p>
+      <details><summary>展开自测解析</summary><p>不能。本地事务只约束参与其中的数据库操作。跨系统副作用需要 outbox、补偿或业务状态协议，并考虑命令已经执行但回执丢失的情况。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>事务排查按代理入口、事务管理器与传播、回滚规则、线程和资源范围逐层检查。</p><p class="source">核对原文：<a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">Spring：@Transactional 的代理与可见性规则</a>。</p>
+    </article>
+<article class="card pad qa" id="q21">
+      <h3><span class="pill a">P1</span> 21. IOC 与 AOP：容器和代理各解决哪种重复？</h3>
+      <p class="problem"><strong>先看问题：</strong>每个服务自己 new 数据库访问对象会紧耦合；每个业务方法自己写审计、计时和事务又会重复。IOC 与 AOP 分别处理这些问题。</p>
+      <h4>原理怎样推出来</h4><p>IOC 把对象装配控制权交给容器，DI（依赖注入）把依赖传入对象。业务类依赖接口或明确协作者，测试或配置可以换实现，不必到处修改 new 的位置。IOC 本身不意味着所有类都必须有接口。</p><p>AOP 把跨多个入口重复出现的行为放到统一拦截逻辑中。切点选择哪些方法，通知定义进入、返回、异常或环绕时做什么，代理把调用连接起来。环绕通知要理解 proceed：不执行它就可能阻止业务，执行两次就可能重复业务。</p>
+      <h4>把它放进一个例子</h4><pre><code>调用方 → 代理：记录开始时间
+       → 目标方法：执行业务
+       → 代理：记录耗时与结果/异常</code></pre><p>JDK 代理通过接口转发，类代理通过生成子类拦截可覆盖的方法。具体选择受 Spring 与 Boot 配置影响；审计应避免记录密码、完整凭证等字段，也不要让日志异常无意改变正常业务的异常语义。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>代理只拦截经它发起的可拦截调用，自调用是共同边界。普通业务分支并非都适合塞进切面，否则读代码时很难看出流程。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>一个环绕通知 catch 到业务异常后只记日志并返回 null，会影响什么？</p>
+      <details><summary>展开自测解析</summary><p>调用方不再收到原异常，依赖异常判断的事务回滚或重试也可能改变。切面要明确是否传播异常，并保留业务契约。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>IOC 管装配与生命周期，AOP 管横切调用行为；理解代理路径和异常传播才能用对切面。</p><p class="source">核对原文：<a href="https://docs.spring.io/spring-framework/reference/core/aop/proxying.html">Spring：代理机制与自调用</a>。</p>
+    </article></section>
+<section id="javabase"><div class="head"><h2>7. Java 基础：从键的位置到内容稳定</h2><p>用一组具体数值理解集合，用对象与引用区分不可变。</p></div><article class="card pad qa" id="q22">
+      <h3><span class="pill a">P1</span> 22. HashMap：桶、碰撞和扩容如何连在一起？</h3>
+      <p class="problem"><strong>先看问题：</strong>把任意键放进有限的数组，不同键可能落到同一格。HashMap 要同时解决“落在哪”“同格怎么找”“装不下怎么搬”。</p>
+      <h4>原理怎样推出来</h4><p>JDK 8 的 HashMap 把 hashCode 做高低位扰动，再用 <code>(n-1) &amp; hash</code> 找桶；容量取 2 的幂，让这个位运算等价于对容量取余。同桶中还要用 equals 判断是不是同一个键，hash 相同不代表键相等。</p><p>碰撞条目以链表组织，达到树化触发条件且容量足够时转成树；容量较小时更倾向先扩容。树化阈值 8、最小容量 64 是实现里的常见数字，不应把插入触发与所有退化场景都说成一个严格统一的长度规则。</p><p>容量翻倍时掩码多了一位，旧桶条目只会留在原位置或移到原位置加 oldCap：判断 <code>hash &amp; oldCap</code> 是 0 还是非 0 即可。不是判断结果是否“等于 1”，因为 oldCap 可能是 16、32 等。</p>
+      <h4>把它放进一个例子</h4><pre><code>旧容量 16：只看 hash 的低 4 位
+新容量 32：再多看第 5 位
+hash = 3  → 旧桶 3，新桶 3
+hash = 19 → 旧桶 3，新桶 19 (= 3 + 16)</code></pre><p>若键插入后改变了参与 hashCode/equals 的字段，之后按新 hash 查找可能走到别的桶，原条目仍在旧位置，于是“明明放进去却取不出来”。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>JDK 7 并发扩容的历史问题不是使用 HashMap 并发写的唯一风险；JDK 8 也未提供线程安全契约。负载因子是空间与碰撞概率的取舍，不是固定业务最优值。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>两个不同对象 hashCode 相等，HashMap 一定把后者覆盖前者吗？</p>
+      <details><summary>展开自测解析</summary><p>不一定。还要 equals 判等；hash 只定位候选桶。hash 相同而 equals 不同的键可以共存，但增加桶内查找工作。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>hash 定位桶、equals 区分键，碰撞靠桶内结构处理；翻倍扩容只按新增的一位分流。</p><p class="source">核对原文：<a href="https://github.com/openjdk/jdk8u/blob/master/jdk/src/share/classes/java/util/HashMap.java">OpenJDK 8u：HashMap 实现</a>。</p>
+    </article>
+<article class="card pad qa" id="q23">
+      <h3><span class="pill a">P1</span> 23. String 不可变：为什么 final 数组还不够？</h3>
+      <p class="problem"><strong>先看问题：</strong>多个模块共享一个字符串作为路径或 Map 的键，如果其中一个悄悄改掉内容，其他模块会在毫不知情时改变行为。</p>
+      <h4>原理怎样推出来</h4><p>不可变意味着构造完成后，通过正常 API 不能修改同一个字符串的字符内容。final 类避免子类改写行为；内部存储不向外暴露可修改入口，构造时按需要复制输入，操作方法返回结果而不改原内容。这是一整套封装，单靠 final 引用不够。</p><p>final 数组引用不能改指向，但数组元素仍能赋值。因此不可变对象还要控制对内部可变存储的访问。稳定内容让字符串可以共享字面量、缓存 hash，并降低作为键或参数时被其他代码修改的风险。</p>
+      <h4>把它放进一个例子</h4><pre><code>String a = "dock";
+String b = a.concat("-7");
+// a 仍是 "dock"；b 是 "dock-7"
+final char[] chars = {'a'};
+chars[0] = 'b';  // final 引用并未阻止元素修改</code></pre><p>反复拼接大字符串会创建中间结果，单线程构建常用 StringBuilder。StringBuffer 的方法同步不等于你的一组多步操作自动构成事务。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>JDK 8 的典型存储为 char[]，JDK 9 引入紧凑字符串，常用 byte[] 加编码标记；不能把数组类型当作不可变性的本质。字符串对象不可变，也不让保存它的可变容器自动安全。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>把 String 放进 HashMap 做键后，执行 key = key + "x" 会修改 Map 里的旧键吗？</p>
+      <details><summary>展开自测解析</summary><p>不会。赋值让局部变量指向另一个字符串，原字符串不变，Map 仍持有旧键。要改变映射键应显式删除旧映射并添加新映射。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>不可变靠封装与 API 契约，带来安全共享与稳定键；final 引用只是其中一环。</p><p class="source">核对原文：<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">Java SE 21：String 契约</a>；<a href="https://github.com/openjdk/jdk/blob/jdk-21%2B35/src/java.base/share/classes/java/lang/String.java">JDK 21 的 String 存储实现</a>。</p>
+    </article></section>
+<section id="mq"><div class="head"><h2>8. 消息队列：接纳、处理与确认不是一件事</h2><p>逐段插入崩溃点，推导可靠性、重复与幂等。</p></div><article class="card pad qa" id="q24">
+      <h3><span class="pill a">P1</span> 24. Kafka 与 RabbitMQ：先问要怎样消费数据</h3>
+      <p class="problem"><strong>先看问题：</strong>监控事件想保存几天、随时重放；发邮件任务希望被一个消费者处理后确认完成。两者都异步，但消费语义不同。</p>
+      <h4>原理怎样推出来</h4><p>Kafka 的核心是分区追加日志，消费者用 offset 表示读到哪里；一个组的进度不等于另一个组的进度，消费也不直接删除消息，保留策略决定数据生命周期。因此它很适合多订阅者、历史重放与流处理。</p><p>RabbitMQ 的经典队列模型经 exchange 按规则把消息路由到队列，消费者确认后消息可从队列移除，适合围绕任务交付、路由和确认组织业务。RabbitMQ 也有 stream 等能力，所以不是“永远不能重放”的绝对二分。</p>
+      <h4>把它放进一个例子</h4><p>同一份设备事件要被统计、告警、审计三个系统独立回放，可以考虑 Kafka 的不同消费者组。一个异步通知要按类型路由给对应工作队列，可以考虑 RabbitMQ exchange 与队列。最终还要比较团队已有运维、顺序范围、可靠性、延迟和容量要求。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>“Kafka 百万、RabbitMQ 万级”没有消息大小、复制、确认、硬件和批量条件就没有比较意义。TTL+死信的经典延迟方案还可能受队头等行为影响，不能直接称为精确任意延迟调度器。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>Kafka 同一个组里 10 个消费者，某 topic 只有 3 个分区，能都同时分担这 3 个分区的消费吗？</p>
+      <details><summary>展开自测解析</summary><p>在经典消费者组分区分配模型下，最多 3 个消费者各持有分区，其余没有该 topic 分区可处理。提高并行度需考虑分区数，同时评估键内顺序与运维成本。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>先比较日志重放与队列交付的消费模型，再结合路由、顺序、延迟和已有运维选型。</p><p class="source">核对原文：<a href="https://kafka.apache.org/41/design/design/">Kafka：日志、分区与消费设计</a>。</p>
+    </article>
+<article class="card pad qa" id="q25">
+      <h3><span class="pill a">P1</span> 25. 消息不丢：要跨过哪几个崩溃窗口？</h3>
+      <p class="problem"><strong>先看问题：</strong>订单数据库提交成功，服务还没把事件发出去就崩溃；或者消费者先确认消息，再写数据库时崩溃。这两头都可能丢业务。</p>
+      <h4>原理怎样推出来</h4><p>第一段是业务提交到生产发送。本地消息表（outbox）把业务记录和待发送事件写在同一个数据库事务里；后台发送成功再标记，超时可重试。这样进程即使崩溃，也有待办记录可恢复。</p><p>第二段是 Broker 接收与保存。RabbitMQ publisher confirm 表明 Broker 按相应队列规则接纳了发布，不代表消费者已经处理；未路由消息还要按 mandatory/returns 等机制检查。持久消息与持久队列不能代替发布确认和副本策略。</p><p>第三段是消费处理与确认。先提交业务，再 ack 或提交消费进度；若提交后确认前崩溃，下次会重复，所以可靠交付必须与幂等一起设计。Kafka 可结合 acks=all、min.insync.replicas 与合理副本数，但它们保护的范围仍不包含任意外部业务副作用。</p>
+      <h4>把它放进一个例子</h4><pre><code>DB 事务：写订单 + 写 outbox → COMMIT
+发送器：读 outbox → 发布 → 等确认 → 标记发送成功
+消费者：执行幂等业务 → COMMIT → ack / 提交 offset</code></pre><p>发送器得到超时，不知道消息是否已接收，因此要重试且允许重复。失败后的补偿需要记录、可控退避、告警和处理入口，不能无限 requeue 形成忙循环。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>“保证不丢”必须说明故障范围、保存期限与恢复机制；超期删除、磁盘损坏或错误人工操作不由一句确认配置解决。不要混用 RabbitMQ ack 与 Kafka offset 的具体 API。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>生产端收到 confirm 后，可以断言邮件已经发给用户了吗？</p>
+      <details><summary>展开自测解析</summary><p>不能。它说明的是 Broker 发布接纳，邮件任务还可能等待消费或处理失败。业务完成要由消费结果或业务状态确认。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>按业务提交、Broker 接纳、消费完成三段逐个封闭崩溃窗口，并接受重试会带来重复。</p><p class="source">核对原文：<a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ：发布确认与消费确认的范围</a>。</p>
+    </article>
+<article class="card pad qa" id="q26">
+      <h3><span class="pill a">P1</span> 26. 幂等：去重记录和业务执行为什么要一起看？</h3>
+      <p class="problem"><strong>先看问题：</strong>你先用 Redis SETNX 记下“处理过”，随后扣款前崩溃。重试看到记录直接跳过，结果钱没扣，但消息也没再处理。</p>
+      <h4>原理怎样推出来</h4><p>幂等要求同一个业务操作重复到达，最终业务效果仍像执行一次。需要稳定的业务幂等键，而不是每次重试重新生成一个 id。去重记录只记录“见过”，不能单独证明“完成”。</p><p>数据库内业务可把幂等记录与业务修改放在同一事务：插入唯一的事件键，执行修改，一起提交。首次执行失败则一起回滚；重试可再执行。若首次已提交，唯一约束会识别同一事件。冲突后的事务如何结束要遵循数据库与框架规则，别 catch 后继续在失效事务里写。</p>
+      <h4>把它放进一个例子</h4><pre><code>BEGIN
+INSERT INTO processed_event(event_id) VALUES (稳定事件键); -- 唯一约束
+UPDATE account SET balance = balance - 100 WHERE id = 7;
+COMMIT
+-- 外部确认在提交成功后</code></pre><p>这是数据库内效果的示意，余额校验等业务规则仍要执行。设备下发、支付网关等外部副作用无法被此事务自动回滚，应把同一幂等键传给支持幂等的下游，或使用可恢复状态机和结果查询。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>终态保护适合拒绝不合法的重复状态流转，不自动等于所有外部动作只发生一次。Redis 去重还要分析 TTL、持久性、重启与业务事务间的窗口；Kafka 的 exactly-once 能力也有处理范围。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>改成先扣款再 SETNX，就能解决上面的崩溃问题吗？</p>
+      <details><summary>展开自测解析</summary><p>不能。扣款后记录前崩溃，重试又会扣一次。两个动作的顺序都留下窗口，关键是把相关效果置于一个原子边界或让下游接受同一个幂等键。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>幂等围绕稳定业务键与效果原子性设计；登记、处理中、完成以及失败恢复必须分清。</p>
+    </article>
+<article class="card pad qa" id="q27">
+      <h3><span class="pill a">P1</span> 27. Kafka 为什么快：批量到底省了什么？</h3>
+      <p class="problem"><strong>先看问题：</strong>一条 100 字节事件单独发一次，每次都要付协议、系统调用和网络往返成本。把很多事件打包，单位事件成本就能下降。</p>
+      <h4>原理怎样推出来</h4><p>分区日志追加写使数据布局更顺序，操作系统 page cache 帮助吸收和复用 I/O。批量发送把许多小事件摊在一次请求里；压缩减少网络与存储字节，代价是 CPU。分区则把写入和读取工作分散到多个执行单元。</p><p>合适的明文传输路径可利用 sendfile 等减少用户态数据复制与上下文切换，常称零拷贝；不是整个机器没有任何复制。TLS 加密等路径可能改变这一优化，实际性能仍由磁盘、网络、复制与消费者处理能力共同限制。</p>
+      <h4>把它放进一个例子</h4><p>把 1,000 条小事件分别发送，与打成几个 batch，后者付的请求固定成本更少。等待攒批会增加少量延迟，linger.ms 与 batch.size 是吞吐和延迟的取舍；不能只增大批次而不看尾延迟。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>顺序写也不意味着消息已立即持久到介质，page cache 与磁盘持久性要区分。更多分区可能提高并行度，也会增加资源、协调和顺序管理成本。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>生产端攒批更大，端到端延迟会一定下降吗？</p>
+      <details><summary>展开自测解析</summary><p>不一定。吞吐可能提高，但低流量时等批次的时间反而增加；消费端排队与业务处理时间也可能主导总延迟。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>Kafka 用顺序日志、缓存、批量压缩和分区并行降低单位消息成本，同时在吞吐与延迟间取舍。</p><p class="source">核对原文：<a href="https://kafka.apache.org/41/design/design/">Kafka：批量与高效数据传输</a>。</p>
+    </article></section>
+<section id="p2"><div class="head"><h2>9. 工程边界：请求如何找到服务并安全到达</h2><p>P2 的篇幅也用于解释原因，不只列组件名。</p></div><article class="card pad qa" id="q28">
+      <h3><span class="pill a">P2</span> 28. 微服务组件：一次请求分别由谁保护？</h3>
+      <p class="problem"><strong>先看问题：</strong>订单服务地址会变化，下游可能变慢，入口也可能突然被大量请求打满。注册中心、网关、限流与熔断处理的是不同故障。</p>
+      <h4>原理怎样推出来</h4><p>服务发现维护“服务名对应哪些可用实例”，调用方据此选址；配置中心管理可动态分发的参数。网关集中处理入口路由与过滤，不能代替下游自己的容量保护。</p><p>限流限制某段时间内允许进入的工作量，防止过载；熔断在依赖持续失败或过慢时暂时停止尝试，避免请求耗尽线程，再经过探测恢复。超时限制单次等待，舱壁隔离避免一个依赖占光所有资源，几种机制可以配合。</p>
+      <h4>把它放进一个例子</h4><p>设备服务变慢：订单服务的独立调用池限制并发，超时释放等待，熔断减少继续访问。入口限流则防止订单服务本身被过量请求压垮。Nacos 可承担发现和配置，Gateway 承担路由，具体容错框架要看项目实际选型。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>不要用一句“AP/CP”概括整个组件的所有接口与版本。重试会放大流量，非幂等请求更不能无条件重试；降级返回旧数据也须满足业务语义。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>下游已经处理了扣款，但返回超时，自动再重试一次有什么风险？</p>
+      <details><summary>展开自测解析</summary><p>可能重复扣款。超时表示未拿到结果，不等于业务未执行。需要稳定幂等键、结果查询或可恢复状态协议。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>发现解决找谁，网关解决入口，超时与隔离控制等待，限流与熔断控制过载和故障传播。</p>
+    </article>
+<article class="card pad qa" id="q29">
+      <h3><span class="pill a">P2</span> 29. MyBatis：参数绑定为什么防注入，字符串替换为什么危险？</h3>
+      <p class="problem"><strong>先看问题：</strong>用户输入一个名称，你希望它是数据；但拼接 SQL 后，数据库可能把输入里的引号和 OR 当成语法。</p>
+      <h4>原理怎样推出来</h4><p><code>#{name}</code> 通常生成 PreparedStatement 的参数占位，值通过参数接口传入，SQL 结构与参数数据分离。<code>${name}</code> 则先替换成文本，数据库收到的是已经改变的 SQL，不能区分哪段来自用户。</p><p>表名、列名与排序关键字通常不能用值参数占位；需要先把用户选项映射到固定白名单标识符，再形成结构。参数绑定保护的是值位置，不能承诺一段含动态结构的任意查询都安全。</p>
+      <h4>把它放进一个例子</h4><pre><code>WHERE name = #{name}    -- 输入作为值
+WHERE name = '${name}' -- 输入可能改变 SQL 结构
+ORDER BY ${sortField}  -- 只允许服务端白名单映射结果</code></pre><p>一级缓存主要在 SqlSession 范围，生命周期和配置影响共享；二级缓存按 namespace 等规则组织，修改会触发相应失效。跨 namespace 更新、多表查询和多实例环境要检查失效链路，不应把它当自动一致的全局缓存。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>把危险字符删掉不是可靠的标识符白名单；也不要把 ${} 用于可绑定的普通值。改为 Redis 仍需设计一致性与失效，换存储并不会消除问题。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>前端传 sortField="price DESC; ..."，后端直接用 ${sortField}，即使其他值都用 #{}，安全吗？</p>
+      <details><summary>展开自测解析</summary><p>不安全，危险来自排序结构。后端应接收有限选项，映射到固定列名和 ASC/DESC，拒绝其他输入。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>值用参数绑定，结构用服务端白名单；缓存按实际会话和失效范围分析。</p><p class="source">核对原文：<a href="https://mybatis.org/mybatis-3/sqlmap-xml.html">MyBatis：参数、字符串替换与缓存</a>。</p>
+    </article>
+<article class="card pad qa" id="q30">
+      <h3><span class="pill a">P2</span> 30. Pod、Deployment、Service：谁重建，谁接流量？</h3>
+      <p class="problem"><strong>先看问题：</strong>Pod 重新创建后 IP 可能变化。调用方既需要稳定访问入口，也需要后台有人持续把副本恢复到期望数量。</p>
+      <h4>原理怎样推出来</h4><p>Pod 是一起调度的容器组，容器共享该 Pod 的网络空间，并可使用配置的卷；它承载一次运行实例。Deployment 通过 ReplicaSet 等控制器维护期望副本并组织滚动更新，不是直接给调用方提供固定 IP。</p><p>Service 依据选择器等方式关联后端端点，常以稳定名称和 ClusterIP 提供访问入口；后端 Pod 可以变化。readiness 表达实例是否适合接业务流量，liveness 表达是否需要重启容器，startup 给慢启动应用额外启动时间。</p>
+      <h4>把它放进一个例子</h4><p>发布三个副本的新版本，Deployment 按 maxSurge 与 maxUnavailable 限制新旧副本切换。新 Pod 已 Running 却未 Ready，通常不会作为普通 Service 的可用后端。旧 Pod 终止时还要处理摘流量传播、优雅退出与进行中的请求。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>不是所有 Service 都有 ClusterIP，比如 headless Service；未配置 selector 的 Service 也不同。探针不能替代真实业务可用性设计，多副本也不自动解决数据库迁移兼容问题。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>把数据库暂时断开定义为 liveness 失败，会有什么问题？</p>
+      <details><summary>展开自测解析</summary><p>可能让所有实例反复重启，加剧故障。依赖不可用是否影响 readiness、是否需要重启，必须分别判断；进程还活着不等于它能服务，反之暂时不能服务也不一定该重启。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>Pod 承载实例，Deployment 维护副本和发布，Service 提供稳定入口，探针负责不同的健康语义。</p><p class="source">核对原文：<a href="https://kubernetes.io/docs/concepts/services-networking/service/">Kubernetes：Service 与后端端点</a>。</p>
+    </article>
+<article class="card pad qa" id="q31">
+      <h3><span class="pill a">P2</span> 31. TCP 三次握手与关闭：在确认什么？</h3>
+      <p class="problem"><strong>先看问题：</strong>网络里可能有延迟、丢包和旧报文。建立连接要协商双方初始序列号并确认新的连接，关闭还要处理两个独立方向的数据。</p>
+      <h4>原理怎样推出来</h4><p>客户端 SYN 带自己的初始序列号；服务端 SYN+ACK 带服务端序列号并确认客户端；客户端 ACK 确认服务端序列号。这样双方都能确认对端已收到自己的建连信息，减少把旧 SYN 当成完整新连接的风险。</p><p>TCP 是全双工，一端发送 FIN 表示自己不再发送，不代表对方也没数据了。对方可先确认，再发送剩余数据，最后自己发 FIN。因此常见关闭过程有四步；ACK 和 FIN 也可能合并，不能断言每次必有四个独立报文。</p>
+      <h4>把它放进一个例子</h4><pre><code>建立：C SYN(x) → S SYN(y), ACK(x+1) → C ACK(y+1)
+关闭：A FIN → B ACK → B FIN → A ACK
+                       ↑ B 可以在发 FIN 前继续发送数据</code></pre><p>TIME_WAIT 帮助处理最后确认丢失后的 FIN 重传，并让旧连接报文有时间消退；它并不直接证明服务器代码泄漏。CLOSE_WAIT 表示已收到对端 FIN、本地还没完成关闭，大量长期滞留时应查应用是否忘记关闭或卡在处理流程中。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>TCP 提供有序字节流，没有业务消息边界；一次 write 不对应一次 read。SSE 是 HTTP 事件流格式，其重连和业务事件恢复仍需上层设计，不能都归因于 TCP 保证。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>对方已发 FIN，本端还能继续发送待发数据吗？</p>
+      <details><summary>展开自测解析</summary><p>可以，只要本端发送方向仍未关闭。FIN 关闭一个方向的发送，体现半关闭语义；最终双方都完成关闭才结束连接。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>握手同步序列号与连接状态，关闭分别结束两个方向；连接状态用于定位问题，但不直接替代业务诊断。</p><p class="source">核对原文：<a href="https://www.rfc-editor.org/rfc/rfc9293">RFC 9293：TCP 连接与关闭</a>。</p>
+    </article>
+<article class="card pad qa" id="q32">
+      <h3><span class="pill a">P2</span> 32. HTTPS：怎样知道对方是谁，又怎样保密？</h3>
+      <p class="problem"><strong>先看问题：</strong>只把数据加密给某个公钥还不够：如果这个公钥来自攻击者，你保密地把密码送给了错误的人。身份认证和加密要同时解决。</p>
+      <h4>原理怎样推出来</h4><p>常见 HTTPS 以 TLS 在连接上建立安全通道。客户端验证服务端证书链、目标域名与有效期等，确认公钥属于预期身份；密钥协商使双方建立会话秘密；之后使用对称认证加密保护应用数据的机密性与完整性。</p><p>常见 TLS 1.3 完整握手中，ClientHello 与 ServerHello 带临时密钥交换参数，双方通常用 (EC)DHE 形成共享秘密；服务端通过证书相关签名认证，Finished 验证握手。证书公钥主要参与认证，不是“永远把预主密钥用 RSA 公钥加密发送”。后者是旧版 TLS 的一种握手方式。</p>
+      <h4>把它放进一个例子</h4><pre><code>客户端：我支持这些算法，附临时密钥份额
+服务端：选择算法，附临时份额、证书与身份认证
+双方：导出密钥，验证握手
+后续：用对称认证加密传应用数据</code></pre><p>临时密钥交换可提供前向保密：以后服务器长期私钥泄露，不应直接解密过去已录制的会话；前提是采用相应协议且临时秘密未泄露。</p>
+      <div class="callout warn"><p><strong>边界与反例：</strong>TLS 1.2、1.3、会话恢复与 PSK 模式流程不同；HTTP/3 还以 QUIC 承载，不是所有 HTTPS 都先走普通 TCP。TLS 保护传输，不能修复 SQL 注入、越权或业务端点泄露。</p></div>
+      <p class="quiz"><strong>停一下，自己推：</strong>为了测试方便关闭证书验证，只保留加密，还能防止中间人读取密码吗？</p>
+      <details><summary>展开自测解析</summary><p>不能可靠防止。攻击者可分别与两端建立加密连接，冒充服务器；加密到谁必须靠身份验证确认。</p></details>
+      <p class="recap"><strong>理解后，再这样简述：</strong>HTTPS 同时需要身份认证、密钥建立和数据保护；讲流程要声明 TLS 版本及握手类型。</p><p class="source">核对原文：<a href="https://www.rfc-editor.org/rfc/rfc8446">RFC 8446：TLS 1.3</a>。</p>
+    </article></section>
+<section id="proj"><div class="head"><h2>10. 用真实项目检验理解</h2><p>下面是复盘问题，不是已经替你确认的个人经历。只写你实际参与、能给出证据的部分。</p></div>
+<div class="card pad"><h3>把一个经历讲完整</h3><p>按“具体问题 → 约束 → 候选方案 → 为什么选择 → 失败边界 → 验证结果”讲。例如任务列表变慢，先交代数据量和查询条件，拿计划解释扫描与排序，再说明索引改动减少了哪些工作；没有耗时记录就不要填虚构提升数字。</p><p>别人设计而你只接入的部分，说清参与边界；没有做过的机制，可以用手册里的假设场景解释方案，明确这是设计推演。</p></div>
+<div class="card pad table reading-map"><table><thead><tr><th>真实场景</th><th>关联题目</th><th>要自己回答的追问</th><th>可用证据</th></tr></thead><tbody>
+<tr><td>任务列表查询</td><td>Q1–6</td><td>索引列怎么排序？查询真的覆盖吗？返回字段改动后会怎样？</td><td>查询、表结构、计划、同条件耗时</td></tr>
+<tr><td>设备或配置缓存</td><td>Q7、Q8、Q11</td><td>允许旧多久？删失败与旧值回填怎么处理？缓存宕机怎么办？</td><td>读写路径、TTL、补偿记录、监控</td></tr>
+<tr><td>机库调度竞争</td><td>Q5、Q9</td><td>锁过期后旧执行者继续跑怎么办？数据库保护到哪一步？</td><td>状态条件更新、锁配置、设备协议</td></tr>
+<tr><td>指令回调</td><td>Q20、Q25、Q26</td><td>幂等键稳定吗？先登记后失败能重试吗？终态保护是否覆盖外部动作？</td><td>状态机、唯一约束、重复与崩溃处理</td></tr>
+<tr><td>异步识别任务</td><td>Q12、Q15</td><td>队列满了怎么办？下游连接池会先满吗？进程重启任务还在吗？</td><td>线程池参数、任务存储、压测、拒绝指标</td></tr>
+<tr><td>Spring 事务与审计</td><td>Q18–21</td><td>调用经过哪个代理？异常传播了吗？哪些副作用不在 DB 事务里？</td><td>调用链、事务管理器配置、失败案例</td></tr>
+<tr><td>消息与部署</td><td>Q24–30</td><td>确认在哪一层？重试怎样避免重复？发布时流量怎样切换？</td><td>消息配置、失败队列、发布与探针配置</td></tr>
+</tbody></table></div>
+<div class="callout reading-map"><p><strong>掌握标准：</strong>把条件改掉你仍能推结果，比如“缓存读的是从库”“锁只有 5 秒”“队列无界”“事务在新线程里”“消息先 ack”。若只能重复标准句，回到对应例子再走一遍。</p></div>
+<div class="callout warn reading-map"><p><strong>资料边界：</strong>这里只覆盖常见问题的主干与重要反例，不能替代完整源码或生产验证。版本相关细节应按项目依赖核对；未核实的项目事实不作为结论。</p></div>
+</section></main>
+<footer><div class="shell">Java 后端八股速成手册 · 能解释原因，能推新场景，能说明边界。</div></footer>
+<nav class="dock" aria-label="页面快捷导航"><a href="../index.html">首页</a><a href="#">↑ 顶部</a></nav>
+<script>
+    (()=>{const root=document.documentElement,key="html-docs-theme";/* 全站共享主题 key，值：paper / dark，勿改成文档专属 */
       const saved=localStorage.getItem(key);
-      if(saved)root.dataset.theme=saved;document.getElementById("theme").addEventListener("click",()=>{
-        const next=root.dataset.theme==="dark"?"light":"dark";root.dataset.theme=next;localStorage.setItem(key,next)})})();
-  </script>
-</body>
-</html>
+      if(saved)root.dataset.theme=saved==="dark"?"dark":"paper";document.getElementById("theme").addEventListener("click",()=>{
+        const next=root.dataset.theme==="dark"?"paper":"dark";root.dataset.theme=next;localStorage.setItem(key,next)})})();
+  </script></body></html>

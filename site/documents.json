@@ -12,6 +12,12 @@
     "url": "viewer.html?src=documents/uav-backend-review-handbook.md"
   },
   {
+    "title": "Java 后端八股速成手册（理解版 · 32 题原理与自测）",
+    "description": "Java 后端 32 题理解手册：从具体问题推导 MySQL、Redis、并发、JVM、Spring 与消息队列原理，逐题配例子、反例、自测解析和简短表达，标明版本与项目边界。",
+    "date": "2026-10-14",
+    "url": "documents/java-backend-interview-prep.html"
+  },
+  {
     "title": "基础能力专栏 · 操作系统、网络与故障推演",
     "description": "独立基础能力专栏：43 道深度题、12 幅图解、5 个故障场景，串起 CPU、进程与并发、虚拟内存、I/O、文件持久化、DNS、TCP、HTTP 与 TLS，附记忆关键词和验证思路。",
     "date": "2026-10-13",
@@ -22,12 +28,6 @@
     "description": "技术原理解析系列：10个独立专栏、63个深挖主题、21幅机制与故障图、10个可运行练习，附记忆关键词、工程场景和官方资料。",
     "date": "2026-10-13",
     "url": "documents/resume-tech-columns.html"
-  },
-  {
-    "title": "Java 后端八股速成手册（32 题 · P0/P1/P2 分级）",
-    "description": "面向 1-3 年经验 Java 后端的小厂面试八股速查手册：32 道高频题全部带口述版答案，按 P0 必背 / P1 高频 / P2 速览分级，附项目挂靠话术与两周复习计划。",
-    "date": "2026-10-13",
-    "url": "documents/java-backend-interview-prep.html"
   },
   {
     "title": "Java 后端与 Agent / AI 应用 · 面试图解手册",
