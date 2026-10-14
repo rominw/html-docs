@@ -1,5 +1,17 @@
 [
   {
+    "title": "无人机巡检平台后端 · 六周直读复习手册",
+    "description": "对照两个自动建模分支的六周复习手册：共享资源、两段锁、CAS、GC与ABA、设备幂等及Java/MySQL/Redis/AI/Agent八股扩展。",
+    "date": "2026-10-14",
+    "url": "documents/uav-backend-review-handbook.html"
+  },
+  {
+    "title": "无人机巡检平台后端 · 六周直读复习手册（md 版）",
+    "description": "围绕一个真实无人机巡检平台的自动建模、多机库调度、分布式一致性、AI 工程化、智能体集成与违章停车多轮复核的六周面试复习手册，对照两个自动建模分支，重点解释共享资源、锁范围、CAS、GC与恢复窗口，并扩展简历技术的原理追问。",
+    "date": "2026-10-14",
+    "url": "viewer.html?src=documents/uav-backend-review-handbook.md"
+  },
+  {
     "title": "基础能力专栏 · 操作系统、网络与故障推演",
     "description": "独立基础能力专栏：43 道深度题、12 幅图解、5 个故障场景，串起 CPU、进程与并发、虚拟内存、I/O、文件持久化、DNS、TCP、HTTP 与 TLS，附记忆关键词和验证思路。",
     "date": "2026-10-13",
@@ -10,18 +22,6 @@
     "description": "技术原理解析系列：10个独立专栏、63个深挖主题、21幅机制与故障图、10个可运行练习，附记忆关键词、工程场景和官方资料。",
     "date": "2026-10-13",
     "url": "documents/resume-tech-columns.html"
-  },
-  {
-    "title": "无人机巡检平台后端 · 六周直读复习手册",
-    "description": "无人机巡检平台后端六周直读复习手册：自动建模调度、分布式一致性、状态机与断点续飞、AI 工程化、智能体集成与违章停车多轮复核，百余道面试追问与代码级事实。",
-    "date": "2026-10-13",
-    "url": "documents/uav-backend-review-handbook.html"
-  },
-  {
-    "title": "无人机巡检平台后端 · 六周直读复习手册（md 版）",
-    "description": "围绕一个真实无人机巡检平台的自动建模、多机库调度、分布式一致性、AI 工程化、智能体集成与违章停车多轮复核的六周面试复习手册，百余道追问结合项目实现、故障时序和能力边界。",
-    "date": "2026-10-13",
-    "url": "viewer.html?src=documents/uav-backend-review-handbook.md"
   },
   {
     "title": "Java 后端八股速成手册（32 题 · P0/P1/P2 分级）",
