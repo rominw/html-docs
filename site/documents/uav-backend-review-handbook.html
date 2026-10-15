@@ -498,13 +498,21 @@ Result routeSafetyResult = missionRouteSafetyService.checkAndRegisterBeforeDispa
 <a class="back-link" href="#q-135">↑ 回到本题</a></div></details>
 
 <details class="question" id="q-136"><summary><span class="qnum">019</span><span class="question-title">面试官问：sourceEnv、droneSn、routeCode够不够当执行幂等键</span></summary><div class="answer"><blockquote>
-<p class="memory-cue"><strong>记忆关键词：</strong> 命名空间 · 设备/航线占用 · 无尝试代际</p>
+<p class="memory-cue"><strong>记忆关键词：</strong> 命名空间 · 身份非唯一 · TTL兜底 · 无尝试代际</p>
 </blockquote>
 <blockquote>
-<p>三元组用于定位活跃登记、续签及删除：sourceEnv隔离命名空间，droneSn定位设备，routeCode定位航线。同设备同航线重新下发可能复用同一登记；其中没有commandId或attempt，因此不能证明同一业务动作不重复，也不能拒绝锁失效后的旧执行者。</p>
+<p>当“占用记录的键”够，当“严格幂等键”不够，先分清幂等的对象：这个三元组保证登记、复用、续签、删除四类操作始终落在同一条活跃航线记录上，重复调用不产生脏记录。三个字段各管一层：routeCode在环境内唯一，由航线表自增ID派生（hex(id+10000)），定位“哪条航线被占用”；droneSn不承担唯一性、承担身份——同一架机断点续飞重新下发时exists命中自己的记录直接复用，换一架机查同一条航线时这条记录要算碰撞，中心要靠droneSn区分“机主续命”和“别机抢飞”，冲突归因来源格式就是sourceEnv+droneSn；sourceEnv隔离共用中心的多套部署，routeCode和droneSn只在本环境唯一，两套环境可能产生相同编码，不加环境标识会互相误判碰撞、误删记录。TTL让操作趋近幂等：重复登记同键等于覆盖续期，删除已过期记录返回0不算失败，删除接口可以放心重试。同设备同航线重新下发可能复用同一登记；其中没有commandId或attempt，因此不能证明同一业务动作不重复，也不能拒绝锁失效后的旧执行者。</p>
 </blockquote>
-<p><strong>历史算法八股（旧提交/v3 SELF）：</strong> 候选当顶点、冲突当边，按机库分组回溯安全集合；目标按重试、估计轮次、并发条数和间距比较。矩阵约n²，搜索可达∏(kᵢ+1)，估计轮次不等于最短工期。当前v2.5已经移除该搜索，改为顺序动态准入。</p>
 <a class="back-link" href="#q-136">↑ 回到本题</a></div></details>
+
+<details class="question" id="q-234"><summary><span class="qnum">020</span><span class="question-title">面试官问：同一环境一条航线不是只能一架飞机在飞吗，为什么键里还要droneSn</span></summary><div class="answer"><blockquote>
+<p class="memory-cue"><strong>记忆关键词：</strong> 结果非前提 · 几何特例 · 归属识别</p>
+</blockquote>
+<blockquote>
+<p>对，但“只能一架”是活跃航线检测拦出来的结果，不是键设计的前提。第二架飞机下发同一条航线时，exists按三元组查不到自己的登记，会走全量检测，然后撞上第一架的活跃航线记录被blockType=3阻飞，流程根本走不到重复登记那一步。droneSn在键里解决的是归属识别：复用检测、排除自己、精确删除续签、冲突归因，这四件事都要对准具体那架飞机。还有一个容易忽略的点：检测判定是几何层面的，不同routeCode的两条航线只要空域重叠同样会被拦，“同航线互斥”只是通用空域规则的特例。</p>
+</blockquote>
+<a class="back-link" href="#q-234">↑ 回到本题</a></div></details>
+<p><strong>历史算法八股（旧提交/v3 SELF）：</strong> 候选当顶点、冲突当边，按机库分组回溯安全集合；目标按重试、估计轮次、并发条数和间距比较。矩阵约n²，搜索可达∏(kᵢ+1)，估计轮次不等于最短工期。当前v2.5已经移除该搜索，改为顺序动态准入。</p>
 </section><section class="chapter" id="sec-7-ch-2"><h2>1.7 下发结果分类与同步补位</h2><p><strong>v2.5当前工作树</strong> 返回基础可用候选列表，逐条重新拿样板间锁，复检后CAS，随后碰撞准入与IoT；不是先选一组本地最优集合。</p>
 <div class="table"><table>
 <thead>
@@ -549,7 +557,7 @@ Result routeSafetyResult = missionRouteSafetyService.checkAndRegisterBeforeDispa
 </table></div>
 <p>内部抛异常与返回错误不完全一样：IoT未尝试时外层catch会清理并标FAILED，已经尝试时记未知。不要把所有技术异常概括成同一个状态分支。</p>
 
-<details class="question" id="q-137"><summary><span class="qnum">020</span><span class="question-title">面试官问：逐条准入能保证全局并发最优吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-137"><summary><span class="qnum">021</span><span class="question-title">面试官问：逐条准入能保证全局并发最优吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 实时登记 · 顺序有偏好 · 不保证最优</p>
 </blockquote>
 <blockquote>
@@ -557,7 +565,7 @@ Result routeSafetyResult = missionRouteSafetyService.checkAndRegisterBeforeDispa
 </blockquote>
 <a class="back-link" href="#q-137">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-138"><summary><span class="qnum">021</span><span class="question-title">面试官问：完成事件为什么要先清理登记</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-138"><summary><span class="qnum">022</span><span class="question-title">面试官问：完成事件为什么要先清理登记</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 释放事实 · 监听顺序 · 失败与TTL</p>
 </blockquote>
 <blockquote>
@@ -618,7 +626,7 @@ Result routeSafetyResult = missionRouteSafetyService.checkAndRegisterBeforeDispa
 <li>重跑：须核对实际入口和重新提交身份；本次核对的核心流程没有FORCE跳过去重/就绪的分支。</li>
 </ul>
 
-<details class="question" id="q-22"><summary><span class="qnum">022</span><span class="question-title">面试官问：为什么不能收到图片上传完成事件就直接建模</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-22"><summary><span class="qnum">023</span><span class="question-title">面试官问：为什么不能收到图片上传完成事件就直接建模</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 父任务聚合 → 组锁 → 全组就绪 → 状态去重；跨系统另查证</p>
 </blockquote>
 <blockquote>
@@ -626,12 +634,12 @@ Result routeSafetyResult = missionRouteSafetyService.checkAndRegisterBeforeDispa
 </blockquote>
 <a class="back-link" href="#q-22">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-23"><summary><span class="qnum">023</span><span class="question-title">面试官问：为什么锁要按父任务 ID，而不是当前 missionId</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-23"><summary><span class="qnum">024</span><span class="question-title">面试官问：为什么锁要按父任务 ID，而不是当前 missionId</span></summary><div class="answer"><blockquote>
 <p>并发竞争发生在同一个父子任务组内。不同子 Mission 的 missionId 不同，如果分别加锁，多个事件仍可能同时通过校验并重复提交。父任务 ID 才是这次建模的业务幂等键，因此所有父子任务共用同一把组锁。</p>
 </blockquote>
 <a class="back-link" href="#q-23">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-24"><summary><span class="qnum">024</span><span class="question-title">面试官问：为什么必须提交成功后再更新 modeling_status</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-24"><summary><span class="qnum">025</span><span class="question-title">面试官问：为什么必须提交成功后再更新 modeling_status</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 远端返回 projectId → 标已提交 → 保存关联；远端/本地有窗口</p>
 </blockquote>
 <blockquote>
@@ -640,7 +648,7 @@ Result routeSafetyResult = missionRouteSafetyService.checkAndRegisterBeforeDispa
 </blockquote>
 <a class="back-link" href="#q-24">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-25"><summary><span class="qnum">025</span><span class="question-title">面试官问：事件入口和用户入口有什么区别，能绕过校验吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-25"><summary><span class="qnum">026</span><span class="question-title">面试官问：事件入口和用户入口有什么区别，能绕过校验吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> EVENT 静默 · USER 反馈 · 两路同校验 · 当前无 FORCE 绕过</p>
 </blockquote>
 <blockquote>
@@ -686,19 +694,19 @@ Result routeSafetyResult = missionRouteSafetyService.checkAndRegisterBeforeDispa
 </tbody>
 </table></div>
 
-<details class="question" id="q-139"><summary><span class="qnum">026</span><span class="question-title">面试官问：为什么配置变化只影响新批次</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-139"><summary><span class="qnum">027</span><span class="question-title">面试官问：为什么配置变化只影响新批次</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 归属固化 · 防双调度 · 存量跑完 · 灰度</p>
 </blockquote>
 <p>一个运行中的批次不能因为白名单变化就同时被两个调度器接管。创建时固化模式，清空白名单只让新批次回到 SELF；存量 EXTERNAL 仍按原模式执行。这是调度所有权隔离，不是锁租约问题。</p>
 <a class="back-link" href="#q-139">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-140"><summary><span class="qnum">027</span><span class="question-title">面试官问：有 taskId 就能证明外部服务提交幂等吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-140"><summary><span class="qnum">028</span><span class="question-title">面试官问：有 taskId 就能证明外部服务提交幂等吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 有身份≠有约束 · 查远端契约 · 未知结果对账</p>
 </blockquote>
 <p>不能。taskId 出现在请求中只说明身份可传递；必须验证远端是否按身份原子去重、是否检查相同身份不同参数、能否查询原结果。SwarmClient 当前展示的是分配、提交、暂停、继续、取消接口，没有展示查询恢复入口，不能编造“超时后本地自动查询并恢复”。</p>
 <a class="back-link" href="#q-140">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-141"><summary><span class="qnum">028</span><span class="question-title">面试官问：SELF 和 EXTERNAL 共存时还要考虑什么</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-141"><summary><span class="qnum">029</span><span class="question-title">面试官问：SELF 和 EXTERNAL 共存时还要考虑什么</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 模式隔离≠物理资源隔离</p>
 </blockquote>
 <p>两个模式不重复处理同一批次，但仍可能使用同一样板间的机库与空域。需要核对两个调度器共同的资源准入协议；仅有 excludeExternal 条件不足以证明物理资源互斥。远端调度器实现不在这两个分支的证据范围内。</p>
@@ -805,13 +813,13 @@ Result routeSafetyResult = missionRouteSafetyService.checkAndRegisterBeforeDispa
 <p><code>dockBusyExtra</code>则调用<code>isDockReadyForDispatch</code>：就绪为0，否则为1。在二维评分中，它按每个新分配区域累加。例如D3惩罚1且新分到两块区域，busyScore贡献2。自动候选可能满足规划状态，但电池不足导致这个惩罚为1。</p>
 <p>两个并发批次可能读到同一份负载快照，再分别写入绑定；这会影响均衡质量。后面保存分配的本地事务只原子提交本批绑定，不会把“读负载—计算—写绑定”自动变成跨批次资源领取协议。<strong>规划均衡的近似性与执行互斥的正确性要分开说明。</strong></p>
 
-<details class="question" id="q-219"><summary><span class="qnum">029</span><span class="question-title">面试官问：为什么先分配机库，再调度时还要重新判断</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-219"><summary><span class="qnum">030</span><span class="question-title">面试官问：为什么先分配机库，再调度时还要重新判断</span></summary><div class="answer"><blockquote>
 <p><strong>记忆关键词：位置依赖 · 时间变化 · 两类承诺。</strong></p>
 <p>规划必须先知道从哪座机库出发、使用哪架飞机和吊舱，才能生成航线。但规划完成后可能排队、暂停或者等待充电，之前的状态会变化。所以规划绑定回答“计划由谁执行”，最终调度回答“现在是否能执行”。机库分配允许同库多个区域排队；执行时必须重新检查同库未结束链、设备与电池，并做空域准入。</p>
 </blockquote>
 <a class="back-link" href="#q-219">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-220"><summary><span class="qnum">030</span><span class="question-title">面试官问：候选稀缺优先是不是先抢唯一名额</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-220"><summary><span class="qnum">031</span><span class="question-title">面试官问：候选稀缺优先是不是先抢唯一名额</span></summary><div class="answer"><blockquote>
 <p><strong>记忆关键词：无硬容量 · 决策顺序 · 保留灵活度。</strong></p>
 <p>当前分配没有每机库只能分一个区域的容量限制，D1被分一次不会从后面候选中移除。候选少的先确定，让选择多的区域根据前面形成的负载与空间关系作调整；这是启发式顺序，不是抢名额。如果一个区域候选为空，先后顺序也不能凭空创造机库，只能等待重试或失败。</p>
 </blockquote>
@@ -981,13 +989,13 @@ public int compareTo(AssignmentScore other) {
   A[原方案 两库各1条 交叉1] --&gt; B[单区域移动 极差变2 拒绝]
   A --&gt; C[两区域交换 极差仍0 交叉0 接受]</pre></details></figure><p>上限<code>max(4, 区域数×2)</code>限制优化轮数，无严格改善就提前停。本例五区域初解已没有更好的合法移动/交换，提前结束；并不是一定跑满10轮。有轮次上限不等于每轮便宜，更不等于达到全局最优。</p>
 
-<details class="question" id="q-221"><summary><span class="qnum">031</span><span class="question-title">面试官问：如何现场证明你的算法不是最近距离贪心</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-221"><summary><span class="qnum">032</span><span class="question-title">面试官问：如何现场证明你的算法不是最近距离贪心</span></summary><div class="answer"><blockquote>
 <p><strong>记忆关键词：四元组 · 全方案打分 · 严格优先级。</strong></p>
 <p>我会先写compareTo，再举R3：已有负载(3,1,0)，分给D2变(3,2,0)、极差3；分给D3变(3,1,1)、极差2，因此选D3，即使它有忙碌惩罚。每次试放都对整个部分方案打分，而非只计算当前区域距离。这个优先级保证按当前启发式目标选择，不保证总工期最短。</p>
 </blockquote>
 <a class="back-link" href="#q-221">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-222"><summary><span class="qnum">032</span><span class="question-title">面试官问：连接线没有交叉，为什么还可能发生碰撞</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-222"><summary><span class="qnum">033</span><span class="question-title">面试官问：连接线没有交叉，为什么还可能发生碰撞</span></summary><div class="answer"><blockquote>
 <p><strong>记忆关键词：代理指标 · 严格相交 · 完整航迹 · 动态占用。</strong></p>
 <p>连接线只是机库到区域中心的线段，不包括区域内覆盖航迹、返航、时间、高度或偏航；scoreAssignment也只比较本批连接线。segmentsIntersect用两组叉积乘积严格小于0，只统计线段内部穿越，端点接触与共线重叠不计数，同机库两条线也跳过。因此交叉为0只能说明这个代理指标为0，飞行可行性还需最终统一碰撞准入。</p>
 </blockquote>
@@ -1130,13 +1138,13 @@ tx.executeWithoutResult(status -&gt; assignment.forEach((taskAreaId, dock) -&gt;
 </code></pre>
 <p>事务保存后还会更新内存taskArea.dockSn，再返回assignedAreas和unassignedAreas。事务保证这批写库的提交/回滚边界，不校验机库排他占用、不冻结候选状态，也不把后续远端规划/碰撞/IoT纳入本地事务。</p>
 
-<details class="question" id="q-223"><summary><span class="qnum">033</span><span class="question-title">面试官问：这个算法复杂度是多少，为什么不能只说有界所以快</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-223"><summary><span class="qnum">034</span><span class="question-title">面试官问：这个算法复杂度是多少，为什么不能只说有界所以快</span></summary><div class="answer"><blockquote>
 <p><strong>记忆关键词：候选数 · 全量评分 · 邻域枚举 · 实测。</strong></p>
 <p>设n个区域、平均k个候选、m个有效机库。一轮评分有区域两两判交，约O(n²+m)。贪心约nk次评分；局部优化一轮有nk级别移动和n²级别交换，还带候选集校验与Map复制，最多max(4,2n)轮。粗略主项是O(nk(n²+m)+n(nk+n²)(n²+m))，候选成员检查若线性扫描还要额外计入成本。k固定且m同阶时最坏主项可到O(n⁵)。因此有界只是限制搜索，不代表大量区域时没有成本；应按候选数、评分次数、耗时和方案质量做测量，再决定是否增量评分或更换算法。</p>
 </blockquote>
 <a class="back-link" href="#q-223">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-224"><summary><span class="qnum">034</span><span class="question-title">面试官问：为什么不是二分图最大匹配或匈牙利算法</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-224"><summary><span class="qnum">035</span><span class="question-title">面试官问：为什么不是二分图最大匹配或匈牙利算法</span></summary><div class="answer"><blockquote>
 <p><strong>记忆关键词：一对多 · 方案耦合 · 目标不独立。</strong></p>
 <p>这里一个机库可以分到多块区域，负载极差依赖整个方案，连接线交叉又依赖两条分配边，不能直接当一对一、每条边固定代价的标准指派。可以通过容量展开、整数规划等重新建模，但不能只报一个算法名字就说已经解决。当前选择贪心加有限邻域搜索，是对实际目标和实现成本的折中。</p>
 </blockquote>
@@ -1264,13 +1272,13 @@ return checkResult;
 <h3>第五步：本轮补位不是无限重试</h3>
 <p>候选for循环会继续尝试后面的区域；检查出某条明确FAILED后，scheduleShowroom再做基础扫描，给此前被同库优先关系挡住的候选补位，最多同步32轮。临时等待与结果未知不驱动无限同步重扫；其后由完成、机库就绪、继续和定时补偿推进。32是同步失败补位预算，不是机库分配2次重试，也不是起飞超时2次重发预算。</p>
 
-<details class="question" id="q-225"><summary><span class="qnum">035</span><span class="question-title">面试官问：为什么两段都要锁，候选阶段加一次锁不够吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-225"><summary><span class="qnum">036</span><span class="question-title">面试官问：为什么两段都要锁，候选阶段加一次锁不够吗</span></summary><div class="answer"><blockquote>
 <p><strong>记忆关键词：快照会旧 · 最终副作用 · 同库跨行。</strong></p>
 <p>第一次锁保护恢复和候选收集，释放后不保证名单仍可下发。每条真正派飞前再拿同一把样板间锁，重读区域、批次、同库执行链、Mission和电池；条件更新领取后做最新空域准入再调用IoT。第二段把多入口对同库、跨区域资源的正常竞争串起来，CAS再挡同一行重复领取。锁失效和旧执行者仍是另外一层问题。</p>
 </blockquote>
 <a class="back-link" href="#q-225">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-226"><summary><span class="qnum">036</span><span class="question-title">面试官问：只按机库加锁，碰撞检测交给统一服务，能否缩小锁粒度</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-226"><summary><span class="qnum">037</span><span class="question-title">面试官问：只按机库加锁，碰撞检测交给统一服务，能否缩小锁粒度</span></summary><div class="answer"><blockquote>
 <p><strong>记忆关键词：设备资源 · 空域资源 · 原子裁决 · 接口时延。</strong></p>
 <p>可以作为重构方向，但先验证统一碰撞服务是否原子完成检测与登记、是否覆盖所有参与者。同库还需要明确的资源归属和尝试代际；锁外IoT要有执行端fencing/幂等。只把showroom锁替换成dock锁，跨机库空域和超时恢复的竞态不会自动消失。当前先用较粗范围协调，代价是同一样板间一次网络调用慢会挡住其他派飞判断。</p>
 </blockquote>
@@ -1382,13 +1390,13 @@ return checkResult;
 <p>具体推演：A已CAS并确认登记，在execMission前长暂停；看门狗无法及时续期，锁到期。B的补偿进入，达到下发超时阈值且Mission仍WAITING，当前requeueStaleAreaToPending把区域回PENDING，B再CAS、可能复用同一三元组活跃登记并下发。A恢复后原栈继续，也下发。锁到期、状态回退、远端登记复用、旧栈续执行共同形成窗口；<strong>默认两分钟回退阈值与实际Redis锁TTL不是同一个值，补偿执行时间还受fixedDelay和持锁时长影响</strong>。</p>
 <p>现有代码对普通超时保留未知占用是一种防护，但后续超时恢复仍可能重新开放，不能说系统已彻底避免重复。对应改进分三层：数据库attempt/epoch阻旧回写；机库和空域的原子资源归属阻跨行双领；副作用入口执行端fencing阻旧主人，稳定commandId幂等阻同一命令重复。处于UNKNOWN时先查询或确认撤销，再释放。详细代码与时序见第2周2.7、2.8。</p>
 
-<details class="question" id="q-227"><summary><span class="qnum">037</span><span class="question-title">面试官问：两个批次区域不重叠、机库不同，为什么还要等</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-227"><summary><span class="qnum">038</span><span class="question-title">面试官问：两个批次区域不重叠、机库不同，为什么还要等</span></summary><div class="answer"><blockquote>
 <p><strong>记忆关键词：锁等待 · 资源等待 · 航迹不等于区域。</strong></p>
 <p>两次调度进入同样板间临界区会短暂互斥；拿到锁以后，如果完整航迹兼容、设备就绪，就可以分别下发并行飞，不需要等别的批次飞完。区域不重叠只描述作业范围，去程、返航仍可能穿越同一空域。先区分拿不到锁、设备不可用、空域冲突，再判断这种等待是否合理。</p>
 </blockquote>
 <a class="back-link" href="#q-227">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-228"><summary><span class="qnum">038</span><span class="question-title">面试官问：能不能直接把超时任务改FAILED，然后发下一条</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-228"><summary><span class="qnum">039</span><span class="question-title">面试官问：能不能直接把超时任务改FAILED，然后发下一条</span></summary><div class="answer"><blockquote>
 <p><strong>记忆关键词：超时非失败 · 副作用未知 · 释放需证据。</strong></p>
 <p>IoT可能已经受理，只是响应丢失。把状态改FAILED并释放登记，会让下一条同库或冲突航迹获得机会，而旧命令仍可能执行。应查询设备/IoT受理状态，或通过可靠撤销确认旧命令不能再执行，再更新资源归属。当前代码保留结果未知，但基于本地状态的自动回退仍是需要加强的边界。</p>
 </blockquote>
@@ -1474,30 +1482,30 @@ return checkResult;
 </tbody>
 </table></div>
 
-<details class="question" id="q-229"><summary><span class="qnum">039</span><span class="question-title">面试官问：如果让你改进，优先做算法还是并发安全</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-229"><summary><span class="qnum">040</span><span class="question-title">面试官问：如果让你改进，优先做算法还是并发安全</span></summary><div class="answer"><blockquote>
 <p><strong>记忆关键词：事实先行 · 正确性边界 · 瓶颈数据。</strong></p>
 <p>先查真实瓶颈与故障：记录分配耗时、候选数、下发临界区RTT、同库/空域等待及结果未知比例。存在重复执行风险时，先补执行幂等、资源归属/代际和未知对账，避免拿效率换错误执行。若主要慢在每轮全量几何评分，考虑增量计算；若主要慢在设备充电或远端RTT，换更复杂分配算法未必有收益。没有线上统计就不承诺提升倍数。</p>
 </blockquote>
 <a class="back-link" href="#q-229">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-230"><summary><span class="qnum">040</span><span class="question-title">面试官问：不同版本具体区别，能不能画一条线说明</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-230"><summary><span class="qnum">041</span><span class="question-title">面试官问：不同版本具体区别，能不能画一条线说明</span></summary><div class="answer"><blockquote>
 <p><strong>记忆关键词：当前工作树 · SELF历史筛选 · EXTERNAL派飞权。</strong></p>
 <p>v2.5当前工作树：本地负载/空间启发式分配→并行规划→静态创建检查→顺序逐条动态碰撞登记确认→IoT。v3当前提交SELF：本地分配核心相同，但保留JTS对占用和候选两两冲突筛选、按机库分组搜索；最终派飞未接新增checkAndRegisterBeforeDispatch。v3 EXTERNAL：分配入口转Swarm assignDocks，准备后submitTaskGroup，派飞权归外部，本地队列通过模式守卫排除。模式隔离本批控制权，不代表两个模式的实际设备/空域天然隔离。</p>
 </blockquote>
 <a class="back-link" href="#q-230">↑ 回到本题</a></div></details>
 <h3>三道现场推演，答案必须沿着代码讲</h3>
 
-<details class="question" id="q-231"><summary><span class="qnum">041</span><span class="question-title">面试官问：首轮名单里同机库出现两条区域，是不是一定同时下发</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-231"><summary><span class="qnum">042</span><span class="question-title">面试官问：首轮名单里同机库出现两条区域，是不是一定同时下发</span></summary><div class="answer"><blockquote>
 <p>不会仅因进入名单就同时下发。当前reserveDispatchCandidates没有整体CAS占库。第一条最终锁内下发后形成DISPATCHING/SUCCESS未结束链，第二条拿最终锁复检时会看到同库阻塞，保持PENDING。如果第一条明确失败并释放后，第二条则可能继续；这就是必须做最终复检的原因。这个结论依赖正常锁协调，不能外推为锁失效后的无条件保证。</p>
 </blockquote>
 <a class="back-link" href="#q-231">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-232"><summary><span class="qnum">042</span><span class="question-title">面试官问：D3电量不足但分配评分选了它，是算法错误吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-232"><summary><span class="qnum">043</span><span class="question-title">面试官问：D3电量不足但分配评分选了它，是算法错误吗</span></summary><div class="answer"><blockquote>
 <p>要先看是否符合规划资格。busyExtra只是第三目标，前面负载极差或交叉更好就可能选电量未就绪的规划候选。它可以准备航线并等待设备恢复；最终派飞检查电池会挡住。所以不是低电量照样起飞，但这种策略是否拖慢总工期需要数据评估，条数均衡也不等于时间均衡。</p>
 </blockquote>
 <a class="back-link" href="#q-232">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-233"><summary><span class="qnum">043</span><span class="question-title">面试官问：临时碰撞失败后，是重新给它分一个机库吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-233"><summary><span class="qnum">044</span><span class="question-title">面试官问：临时碰撞失败后，是重新给它分一个机库吗</span></summary><div class="answer"><blockquote>
 <p>当前正常错误分支releaseDispatchReservation回PENDING并记录等待，没有自动重新分配dockSn、重做航线和Mission。下一次再按既定任务与最新空域准入。如果要支持跨库改派，需要完整重规划与任务一致性流程，不能只改一个字段。明确永久阻飞则FAILED，和等待资源释放分开。</p>
 </blockquote>
 <hr />
@@ -1558,13 +1566,13 @@ return checkResult;
 </code></pre>
 <p><code>@EventListener</code> 默认并不等于新开线程，也不等于自动跨节点广播。并发来自实际的异步回调、Web 请求、定时线程和不同 JVM。<code>@Scheduled(fixedDelay=120000)</code> 是本次执行结束后再延迟默认两分钟，不是集群全局每两分钟恰好执行一次。<a href="https://docs.spring.io/spring-framework/reference/integration/scheduling.html">Spring 调度说明</a>。</p>
 
-<details class="question" id="q-142"><summary><span class="qnum">044</span><span class="question-title">面试官问：我的服务收到任务 X 到底是什么意思</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-142"><summary><span class="qnum">045</span><span class="question-title">面试官问：我的服务收到任务 X 到底是什么意思</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 持久任务 · 多入口重扫 · 无节点归属</p>
 </blockquote>
 <p>在这段代码里，更准确的说法是“一个入口开始调度样板间”。规划完成拿 taskId 找 showroomId；补偿直接找活跃 showroomId；它们都扫描该范围内的可派区域。不存在“创建任务的节点以后独占它”的查询条件。</p>
 <a class="back-link" href="#q-142">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-143"><summary><span class="qnum">045</span><span class="question-title">面试官问：为什么顺序代码还会并发</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-143"><summary><span class="qnum">046</span><span class="question-title">面试官问：为什么顺序代码还会并发</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 单调用顺序 · 多调用交错 · 多 JVM</p>
 </blockquote>
 <p>for 循环只规定本次调用内部先后。两个节点各有自己的方法栈，能够同时执行 SELECT、计算、UPDATE。线程池也只是规划执行器，不负责集群互斥。</p>
@@ -1576,19 +1584,19 @@ return checkResult;
 </code></pre>
 <p>锁键为 <code>modeling:airspace:dispatch:{showroomId}</code>。它让遵守协议的节点轮流决策；它不让飞机停止，也不把任务表自动变成物理世界的真值。</p>
 
-<details class="question" id="q-144"><summary><span class="qnum">046</span><span class="question-title">面试官问：为什么按样板间而不是 task 加锁</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-144"><summary><span class="qnum">047</span><span class="question-title">面试官问：为什么按样板间而不是 task 加锁</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 跨批次同库 · 跨机库空域 · 一个决策范围</p>
 </blockquote>
 <p>按 task 加锁时，两个 task 分别拿各自锁仍可争同一机库。样板间锁覆盖跨批次候选和占用视图；全局锁会阻塞独立样板间。旧版JTS只查相应样板间的建模占用；当前v2.5跨业务活跃航线由远端准入协调，锁仍不自动覆盖不遵守协议的业务。</p>
 <a class="back-link" href="#q-144">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-145"><summary><span class="qnum">047</span><span class="question-title">面试官问：机库和区域都不同也会被阻塞吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-145"><summary><span class="qnum">048</span><span class="question-title">面试官问：机库和区域都不同也会被阻塞吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 调度串行 · 发送串行 · 飞行可并行</p>
 </blockquote>
 <p>会等待同一样板间的调度临界区，尤其是最终下发中的远端调用。下发完释放锁后，兼容任务可以开始飞行，无需等上一条飞完。不能把锁粒度解释成“同样板间只能一架飞机飞”。</p>
 <a class="back-link" href="#q-145">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-146"><summary><span class="qnum">048</span><span class="question-title">面试官问：只改成机库级锁能提高并发吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-146"><summary><span class="qnum">049</span><span class="question-title">面试官问：只改成机库级锁能提高并发吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 多资源约束 · 统一裁决 · 固定顺序</p>
 </blockquote>
 <p>机库锁只能解决同库占用，不能解决跨库航迹冲突。细化需要同时设计空域准入、候选归属和原子资源领取；多资源加锁还要固定顺序避免死锁。可以优化，但不能只替换字符串。</p>
@@ -1638,12 +1646,12 @@ for (ModelingTaskAreaEntity area : selected) {
 </tbody>
 </table></div>
 
-<details class="question" id="q-147"><summary><span class="qnum">049</span><span class="question-title">面试官问：为什么筛选阶段不立即写 DISPATCHING</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-147"><summary><span class="qnum">050</span><span class="question-title">面试官问：为什么筛选阶段不立即写 DISPATCHING</span></summary><div class="answer"><blockquote>
 <p>候选是基础可派资格，设备和活跃航线仍可能变化。当前v2.5在最终阶段CAS后做碰撞准入，未确认时释放这次预占等待；已调用IoT且结果未知时保留。筛选、占用领取、远端登记与真实发送是四个不同动作。</p>
 </blockquote>
 <a class="back-link" href="#q-147">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-148"><summary><span class="qnum">050</span><span class="question-title">面试官问：有最终复检是否所有资源都安全了</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-148"><summary><span class="qnum">051</span><span class="question-title">面试官问：有最终复检是否所有资源都安全了</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 当前有动态准入 · v3旧链不同 · 外部原子性仍核对</p>
 </blockquote>
 <blockquote>
@@ -1652,7 +1660,7 @@ for (ModelingTaskAreaEntity area : selected) {
 </blockquote>
 <a class="back-link" href="#q-148">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-149"><summary><span class="qnum">051</span><span class="question-title">面试官问：能否把 IoT 移到锁外缩短持锁时间</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-149"><summary><span class="qnum">052</span><span class="question-title">面试官问：能否把 IoT 移到锁外缩短持锁时间</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 先持久领取 · 外部准入 · 未知占用不能回收</p>
 </blockquote>
 <p>可以设计，但必须先在短临界区持久化资源归属及发送意图，其他任务以该归属判占用；发送后按归属回写，未知结果保留占用。简单移出锁会允许暂停、取消和其他调度插入，还可能让旧指令在资源已转交后执行。</p>
@@ -1669,19 +1677,19 @@ WHERE id = :taskAreaId AND dispatch_status = &#x27;PENDING&#x27;;
 </code></pre>
 <p>这是 CAS 思想的乐观并发裁决，InnoDB 实现更新时仍会获取数据库锁，不能称为 CPU CAS 或“完全无锁”。<a href="https://dev.mysql.com/doc/refman/8.4/en/innodb-locking.html">InnoDB 锁说明</a>。</p>
 
-<details class="question" id="q-150"><summary><span class="qnum">052</span><span class="question-title">面试官问：为什么锁和条件更新同时用，单用不行吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-150"><summary><span class="qnum">053</span><span class="question-title">面试官问：为什么锁和条件更新同时用，单用不行吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 锁协调跨行 · 条件守本行 · 外部另防</p>
 </blockquote>
 <p>锁串行化当前协议中的多任务决策，条件更新让数据库最终裁决这条任务的旧状态。只用本行条件更新不够表达跨任务机库和空域约束；只依赖租约锁则没有持久状态裁决和重复处理依据。可以采用其他正确协议，例如持久资源行加短事务与唯一约束，但不能删掉一层后让同样的普通查询自动具有原子性。</p>
 <a class="back-link" href="#q-150">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-151"><summary><span class="qnum">053</span><span class="question-title">面试官问：如果失败影响零行，应该不断重试吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-151"><summary><span class="qnum">054</span><span class="question-title">面试官问：如果失败影响零行，应该不断重试吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 业务冲突≠瞬时技术故障</p>
 </blockquote>
 <p>先重读原因。已领取、取消、完成时应停止这次发送；数据库死锁或版本冲突是否可重试要按操作语义决定。批次聚合 updateForward 会重读并有限重试，说明“状态条件失败一律放弃”和“version 冲突一律重试”都过于绝对。</p>
 <a class="back-link" href="#q-151">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-152"><summary><span class="qnum">054</span><span class="question-title">面试官问：数据库锁能替代 Redisson 吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-152"><summary><span class="qnum">055</span><span class="question-title">面试官问：数据库锁能替代 Redisson 吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 公共资源行 · 短事务 · 外部非原子</p>
 </blockquote>
 <p>可以用同一 showroom/dock 资源行的 SELECT FOR UPDATE 或条件占用串行化数据库决策，关键是所有竞争者锁同一份资源。只锁各自 taskArea 行仍无共享互斥。不要在数据库事务中长时间等 IoT；事务提交和远端执行之间还需要身份、查证与幂等。</p>
@@ -1731,19 +1739,19 @@ WHERE id = :taskAreaId AND dispatch_status = &#x27;PENDING&#x27;;
 </table></div>
 <p>看门狗周期延长 Redis 中锁的到期时间，降低业务尚未结束却因固定租约失效的风险；客户端无法及时续期时仍会过期。官方默认 watchdog 超时 30 秒，实际部署值、依赖版本与续期参数本次未核实。<a href="https://redisson.pro/docs/data-and-services/locks-and-synchronizers/">Redisson 官方锁说明</a>。</p>
 
-<details class="question" id="q-153"><summary><span class="qnum">055</span><span class="question-title">面试官问：为什么 finally 检查 isHeldByCurrentThread</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-153"><summary><span class="qnum">056</span><span class="question-title">面试官问：为什么 finally 检查 isHeldByCurrentThread</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 防错误解锁 · 不停止旧业务</p>
 </blockquote>
 <p>RLock 所有权绑定客户端和线程。当前 finally 只允许本线程释放，避免解掉别人接手的锁。这个检查发生在业务执行后，阻止错误解锁，不阻止锁已过期的 A 恢复后继续发送。</p>
 <a class="back-link" href="#q-153">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-154"><summary><span class="qnum">056</span><span class="question-title">面试官问：lockInterruptibly 能终止已发送的设备指令吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-154"><summary><span class="qnum">057</span><span class="question-title">面试官问：lockInterruptibly 能终止已发送的设备指令吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 中断等待 · 协作取消 · 设备回执</p>
 </blockquote>
 <p>它允许加锁等待被中断。Java 中断是协作信号，不自动撤销已经运行的逻辑或远端已接收指令；捕获 InterruptedException 要恢复中断标志或传递取消，真正设备停止需要设备协议及回执。</p>
 <a class="back-link" href="#q-154">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-155"><summary><span class="qnum">057</span><span class="question-title">面试官问：getLock 是公平锁吗，业务顺序是否有保证</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-155"><summary><span class="qnum">058</span><span class="question-title">面试官问：getLock 是公平锁吗，业务顺序是否有保证</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 普通锁 · 候选排序 · 公平非完成顺序</p>
 </blockquote>
 <p>代码使用普通 getLock，没有使用 getFairLock。获得锁的顺序与任务候选排序是两件事；即便锁公平，也不能保证任务完成顺序或解决不可飞队头。候选等待时长和任务饥饿仍需观测。</p>
@@ -1751,19 +1759,19 @@ WHERE id = :taskAreaId AND dispatch_status = &#x27;PENDING&#x27;;
 </section><section class="chapter" id="sec-6-ch-3"><h2>2.6 重复触发和结果未知：防重的保证范围</h2><p>入口可以重复执行；在锁有效、状态未被回退、各写路径遵守协议时，后进入者重读非 PENDING 状态，跳过同一任务。<strong>重复触发</strong> 不等于上游一定按 at-least-once 投递，本次只确认代码存在多个触发源，MQ/MQTT 的具体送达契约须单独核对。</p>
 <p>IoT success → SUCCESS；明确拒绝 → FAILED；异常/空结果 → 留在 DISPATCHING 并记未知。未知不是业务失败：可能指令没发出、已接收但响应丢失、已执行但本地未记录。</p>
 
-<details class="question" id="q-156"><summary><span class="qnum">058</span><span class="question-title">面试官问：为什么不能遇到超时就重试</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-156"><summary><span class="qnum">059</span><span class="question-title">面试官问：为什么不能遇到超时就重试</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 超时非未执行 · 稳定身份 · 查证再重发</p>
 </blockquote>
 <p>调用方没有响应只能证明自己没看到结果。若设备已执行，再发就是重复副作用。需要按稳定业务身份查询或由执行端幂等；当前两分钟回退只是恢复策略，不能单凭 WAITING 证明没收到。</p>
 <a class="back-link" href="#q-156">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-157"><summary><span class="qnum">059</span><span class="question-title">面试官问：Lua 或单行 CAS 能保证设备恰好执行一次吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-157"><summary><span class="qnum">060</span><span class="question-title">面试官问：Lua 或单行 CAS 能保证设备恰好执行一次吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 状态原子≠外部效果原子</p>
 </blockquote>
 <p>它们在各自数据存储裁决读写，不与网络和设备动作构成一个原子提交。消息可以重复、回调可以迟到，执行端要有身份去重及可查询结果；本地状态同步还需要对账。</p>
 <a class="back-link" href="#q-157">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-158"><summary><span class="qnum">060</span><span class="question-title">面试官问：事件和补偿并发时怎么处理</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-158"><summary><span class="qnum">061</span><span class="question-title">面试官问：事件和补偿并发时怎么处理</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 同锁重读 · 同行条件 · 回退另论</p>
 </blockquote>
 <p>正常情形争同一 showroom 锁，后入者重新读取候选和占用，同一行 CAS 防重复领取。若旧执行者停顿后失去锁、任务又被补偿退回 PENDING，这个保证前提已破坏，必须按下一节推演。</p>
@@ -1814,19 +1822,19 @@ t6  A：恢复，原方法栈仍在 → execMission(mission1)
 <p>统一登记的sourceEnv/droneSn/routeCode不含尝试代际；同Mission重发可能复用已有登记，不会自动撤销A的旧发送资格。任务状态经历PENDING→DISPATCHING→PENDING，形成<strong>ABA风险</strong> ；A 已经领取后的旧执行权限也没有被隔离。<code>updateDispatchSuccess/Failed</code> 按 routeCode 回写，没有携带尝试代际条件，旧结果也可能覆盖新尝试的记录。</p>
 <p>两次发送是否造成两次真实起飞，取决于 IoT/设备幂等和忙碌拒绝契约。本次核对到 commonExecMission/execMissionV4 的调用边界，未验证设备端行为，不编造它已经有去重。</p>
 
-<details class="question" id="q-159"><summary><span class="qnum">061</span><span class="question-title">面试官问：不是有看门狗，为什么长 GC 还会有这个问题</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-159"><summary><span class="qnum">062</span><span class="question-title">面试官问：不是有看门狗，为什么长 GC 还会有这个问题</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 续期要运行 · Redis 独立计时 · 旧栈继续</p>
 </blockquote>
 <p>STW 暂停期间客户端业务与续期线程无法正常推进，而独立 Redis 服务仍会让 TTL 到期。网络隔离、进程被挂起也可产生类似窗口。短暂停通常可在剩余租期内恢复，但不能凭默认 30 秒推出绝对安全。<a href="https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/">Redis 分布式锁官方边界</a>。</p>
 <a class="back-link" href="#q-159">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-160"><summary><span class="qnum">062</span><span class="question-title">面试官问：只有一个用户请求为什么 B 也能进来</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-160"><summary><span class="qnum">063</span><span class="question-title">面试官问：只有一个用户请求为什么 B 也能进来</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 任务持久化 · 节点独立补偿 · 同资源重扫</p>
 </blockquote>
 <p>用户创建一次后任务就存在共享数据库。A 的规划回调和 B 的定时方法是两个执行入口，不需要用户再点一次；即使单个实例的定时执行顺序不重叠，也不限制另一 JVM 的规划回调。</p>
 <a class="back-link" href="#q-160">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-161"><summary><span class="qnum">063</span><span class="question-title">面试官问：为什么在调用前检查一次锁不够</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-161"><summary><span class="qnum">064</span><span class="question-title">面试官问：为什么在调用前检查一次锁不够</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 检查后可暂停 · TOCTOU · 接收端裁决</p>
 </blockquote>
 <p>A 检查持锁=true，下一行前暂停；B 接手；A 恢复发送。这仍是检查到动作之间的竞态。加检查能减少窗口，不能强制旧操作在远端失效。调大 TTL、降低 GC 同样是概率缓解。</p>
@@ -1876,32 +1884,32 @@ t6  A：恢复，原方法栈仍在 → execMission(mission1)
 <p>fencing 校验必须在真正接收并裁决执行的边界生效；应用先查 DB，再发 HTTP 仍有窗口。执行侧接收命令、更新代际/命令去重记录与后续动作的衔接也要可靠，不能只存一条“成功”缓存。普通 RLock 不携带这套完整协议。</p>
 <p>若设备能力暂不支持，保守路径是将超时占用作为 UNKNOWN，查询 Mission/设备执行事实或取得可靠撤销确认后再释放；查询“还未看到”也不等于旧请求不可能晚到。不能证明旧命令不再执行时，保持占用并人工查证，接受可用性损失。</p>
 
-<details class="question" id="q-162"><summary><span class="qnum">064</span><span class="question-title">面试官问：只用数据库条件更新是不是也可以</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-162"><summary><span class="qnum">065</span><span class="question-title">面试官问：只用数据库条件更新是不是也可以</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 将不变量落到公共资源 · 同行不是跨行</p>
 </blockquote>
 <p>可以设计为共享资源行的原子领取和释放，配合任务尝试与发送意图的短事务。不变量必须由数据约束表达，并覆盖所有竞争路径；当前 taskArea 条件更新没有这样表达。外部执行和空域协调仍要单独解决。</p>
 <a class="back-link" href="#q-162">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-163"><summary><span class="qnum">065</span><span class="question-title">面试官问：fencing 和幂等有什么区别</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-163"><summary><span class="qnum">066</span><span class="question-title">面试官问：fencing 和幂等有什么区别</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 旧主人拒绝 · 同命令去重</p>
 </blockquote>
 <p>fencing 管谁还有权使用资源，commandId 管同一个动作是否已处理。新主人执行另一命令不能让旧主人继续操作；同主人因响应丢失重发也不能执行两次。两者互补，既不能以任务ID代替资源代际，也不能每次重试生成新幂等键。</p>
 <a class="back-link" href="#q-163">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-164"><summary><span class="qnum">066</span><span class="question-title">面试官问：不自动回退会不会卡住</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-164"><summary><span class="qnum">067</span><span class="question-title">面试官问：不自动回退会不会卡住</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 安全与可用性取舍 · 可查询恢复 · 人工兜底</p>
 </blockquote>
 <p>可能暂时等待，因此需要 UNKNOWN 的监控、截止时间和对账入口。超时触发调查，而不是提供“设备没执行”的证据。自动接管只有在旧命令已可靠失效或执行端可隔离旧主人时才可承诺安全；不能用一个大超时掩盖不确定性。</p>
 <a class="back-link" href="#q-164">↑ 回到本题</a></div></details>
 </section><section class="chapter" id="sec-added-21-ch-3"><h2>2.9 队头阻塞、公平性与粗锁吞吐</h2><p><code>findDispatchCandidatesForShowroom</code> 不是只拿 sort 最小的一条，而是扫描全样板间候选，再过滤当前资源。当前v2.5逐条动态准入；旧提交/v3 SELF还搜索组合。不可飞队头能被跳过，但旧提交/v3 SELF的组合目标也会改变选择，当前顺序准入同样受扫描顺序影响，不能承诺先到先服务。</p>
 
-<details class="question" id="q-165"><summary><span class="qnum">067</span><span class="question-title">面试官问：怎样区分队头阻塞与锁阻塞</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-165"><summary><span class="qnum">068</span><span class="question-title">面试官问：怎样区分队头阻塞与锁阻塞</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 候选不可飞 · 临界区等待 · 两类延迟</p>
 </blockquote>
 <p>队头阻塞是候选策略让可飞后续任务无法入选；锁阻塞是另一个调用持有同一样板间锁。当前扫描候选并逐条准入改善前者；旧提交使用组合筛选，粗锁和锁内 IoT 仍可能造成后者。分别记录候选等待原因、锁等待、持锁时间和远端耗时。</p>
 <a class="back-link" href="#q-165">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-166"><summary><span class="qnum">068</span><span class="question-title">面试官问：怎样验证这个并发方案</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-166"><summary><span class="qnum">069</span><span class="question-title">面试官问：怎样验证这个并发方案</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 同任务 · 跨任务 · 旧执行者 · 未知结果</p>
 </blockquote>
 <p>至少覆盖：同一行并发 CAS；不同 task 同库领取；两段锁间空域变化（当前v2.5由最终远端准入处理；v3旧链需重查）；CAS 后暂停再超时回退；设备已接收但响应丢失；旧结果回写；暂停取消与下发竞争；续飞子任务晚生成；EXTERNAL 提交未知。正常多线程压测不能替代这些定点交错场景。</p>
@@ -1945,7 +1953,7 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
     FAILED --&gt; [*]
     CANCELLED --&gt; [*]</pre></details></figure><p>其中下发 SUCCESS 只表示设备下发链路成功，不表示飞行完成。真实飞行进度仍以 <code>Mission.status</code> 及续飞子 Mission 为准。</p>
 
-<details class="question" id="q-42"><summary><span class="qnum">069</span><span class="question-title">面试官问：为什么不能只使用一个任务状态</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-42"><summary><span class="qnum">070</span><span class="question-title">面试官问：为什么不能只使用一个任务状态</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 批次 · 规划 · Mission · 下发 · 飞行；分层事实再聚合</p>
 </blockquote>
 <blockquote>
@@ -1953,7 +1961,7 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
 </blockquote>
 <a class="back-link" href="#q-42">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-43"><summary><span class="qnum">070</span><span class="question-title">面试官问：批次状态具体怎么聚合的</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-43"><summary><span class="qnum">071</span><span class="question-title">面试官问：批次状态具体怎么聚合的</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 明细聚合 · PARTIAL_FAILED · updateForward · 旧状态条件 · 终态粘滞</p>
 </blockquote>
 <blockquote>
@@ -1976,7 +1984,7 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
 <h3>哪里用到了状态机思想</h3>
 <p>区域 <code>dispatchStatus</code> 是一张真实的状态图，而且含回退和循环：下发超时 DISPATCHING/SUCCESS 回退 PENDING，起飞超时重试也是 SUCCESS 回 PENDING 再下发。当前实现的转移规则分散在多个更新方法里，靠每个调用点自己写状态条件保证合法。合理的演进方向是显式转移表：FROM、TO、前置条件、动作，收敛到唯一转移入口；同时把现在编码在 failReason 文本里的重试次数（&quot;第N/2次&quot;再字符串解析还原）改成显式计数字段。这是把状态机当建模工具用，而不是引入引擎当架构。</p>
 
-<details class="question" id="q-44"><summary><span class="qnum">071</span><span class="question-title">面试官问：为什么不直接引入 Spring Statemachine 这样的框架</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-44"><summary><span class="qnum">072</span><span class="question-title">面试官问：为什么不直接引入 Spring Statemachine 这样的框架</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 现有规则/对账 · 框架适配成本 · 持久化可集成 · 副作用仍查证</p>
 </blockquote>
 <blockquote>
@@ -1985,7 +1993,7 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
 </blockquote>
 <a class="back-link" href="#q-44">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-45"><summary><span class="qnum">072</span><span class="question-title">面试官问：那什么系统适合状态机模型</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-45"><summary><span class="qnum">073</span><span class="question-title">面试官问：那什么系统适合状态机模型</span></summary><div class="answer"><blockquote>
 <p>订单、审批、设备任务都可以用状态机表达合法生命周期，事件也可能重复和乱序。是否采用框架主要看转移规则数量、动作编排、可视化/测试需求及持久化集成成本。</p>
 <p>例如支付成功通知重复到达，可以通过事件去重、合法转移和条件写入做到重复不再次入账；支付通知来自外部并不妨碍使用状态机。任务调度也可显式建模，同时保留设备查询和定时对账。</p>
 </blockquote>
@@ -1994,7 +2002,7 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
 </section><section class="chapter" id="sec-3-ch-4"><h2>3.3 事件驱动加定时补偿</h2><p>Mission 完成事件可以释放机库和空域，机库就绪事件可以恢复未实际起飞任务并推进队列。事件驱动能够快速开始下一轮。</p>
 <p>设备消息、网络、处理异常和服务重启可能漏掉推进机会。当前 SELF 的 fixedDelay 默认在上次补偿执行结束后延迟两分钟，扫描 READY/EXECUTING 且未暂停的样板间，再进入同一个调度入口。多实例各有调度方法，当前没有展示集群选主；v3 查询还排除 EXTERNAL。暂停任务或扫描失败不在“下一次必恢复”的承诺内。</p>
 
-<details class="question" id="q-46"><summary><span class="qnum">073</span><span class="question-title">面试官问：为什么有事件还要定时任务</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-46"><summary><span class="qnum">074</span><span class="question-title">面试官问：为什么有事件还要定时任务</span></summary><div class="answer"><blockquote>
 <p>事件降低正常等待时间，补偿重读持久事实弥补漏触发。共用入口、锁和条件更新处理正常重复；锁失效、回退后旧执行者和设备确认缺失仍需查证。不能把“有补偿”说成所有故障自动恢复或所有重复都安全。</p>
 </blockquote>
 <p><strong>八股扩展：</strong> fixedDelay/fixedRate、每实例定时与集群单执行、事件通知与持久事实、补偿扫描覆盖范围。入口幂等必须限定状态世代与执行端契约，不能只背“事件快、补偿稳”。</p>
@@ -2013,12 +2021,12 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
 <p>说明飞机已经收到任务，但没有在默认五分钟内进入飞行。此时标记为起飞超时重试，优先重新下发同一个任务。</p>
 <p>普通起飞超时最多自动重试两次，耗尽后转为 FAILED，避免无限循环。</p>
 
-<details class="question" id="q-47"><summary><span class="qnum">074</span><span class="question-title">面试官问：为什么 WAITING 和 ALREADY_RECEIVED 不能使用同一种恢复方式</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-47"><summary><span class="qnum">075</span><span class="question-title">面试官问：为什么 WAITING 和 ALREADY_RECEIVED 不能使用同一种恢复方式</span></summary><div class="answer"><blockquote>
 <p>WAITING 是本地没有记录接收；ALREADY_RECEIVED 是已记录设备接收。当前前者超过下发阈值回退，后者按起飞超时及预算优先重发同一个任务，但两种观测都要核对设备契约。WAITING 并不是可以安全重发的充分条件，GC 与 ABA 时序见 2.7。</p>
 </blockquote>
 <a class="back-link" href="#q-47">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-48"><summary><span class="qnum">075</span><span class="question-title">面试官问：两分钟和五分钟的阈值怎么定，回退 PENDING 安全吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-48"><summary><span class="qnum">076</span><span class="question-title">面试官问：两分钟和五分钟的阈值怎么定，回退 PENDING 安全吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 确认延迟 · 起飞耗时 · 实测阈值 · 本地 WAITING 非未送达证明</p>
 </blockquote>
 <blockquote>
@@ -2035,7 +2043,7 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
 </ul>
 <p>当前实现会查询父 Mission 的续飞子任务，并只处理最新且未结束的子 Mission。续飞下发或起飞超时后，重试当前子 Mission，而不是重新下发父 Mission。</p>
 
-<details class="question" id="q-49"><summary><span class="qnum">076</span><span class="question-title">面试官问：断点续飞最关键的防重点是什么</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-49"><summary><span class="qnum">077</span><span class="question-title">面试官问：断点续飞最关键的防重点是什么</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 父子链 · 资源仍占用 · 只恢复最新子任务 · 不重发父任务</p>
 </blockquote>
 <blockquote>
@@ -2043,7 +2051,7 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
 </blockquote>
 <a class="back-link" href="#q-49">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-167"><summary><span class="qnum">077</span><span class="question-title">面试官问：为什么机库、电池或航迹冲突等待不应消耗续飞重试次数</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-167"><summary><span class="qnum">078</span><span class="question-title">面试官问：为什么机库、电池或航迹冲突等待不应消耗续飞重试次数</span></summary><div class="answer"><blockquote>
 <p>外部条件等待与真正再次尝试发送是两种动作。当前v2.5的续飞也调用统一碰撞准入；旧提交/v3 SELF使用本地航迹判断；等待不烧起飞重试预算，符合条件后仍有有限发送重试。重试预算不能提供幂等保证。</p>
 </blockquote>
 <p><strong>八股扩展：</strong> 父子任务聚合、资源占用生命周期与当前执行腿身份。只重试最新子Mission需要正确的排序和归属；父任务返航不是整条链完成。v3 EXTERNAL关闭本地续飞，不能套这段SELF解释。</p>
@@ -2060,7 +2068,7 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
 </ul>
 <p>系统把批次 <code>paused</code> 条件更新为 1，并关闭每个父 Mission 的自动续飞开关。首次暂停时保存原开关快照，重复暂停时不会用已经临时关闭后的 0 覆盖原值。</p>
 
-<details class="question" id="q-51"><summary><span class="qnum">078</span><span class="question-title">面试官问：为什么暂停不强制终止在飞任务</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-51"><summary><span class="qnum">079</span><span class="question-title">面试官问：为什么暂停不强制终止在飞任务</span></summary><div class="answer"><blockquote>
 <p>无人机强制中断涉及飞行安全和设备能力，修改数据库状态并不能安全让飞机停下。当前暂停语义是阻止后续调度和新续飞腿，让在飞任务自然结束，风险更可控。</p>
 </blockquote>
 <p><strong>八股扩展：</strong> 暂停意图、物理副作用、快照与幂等。重复暂停保留原开关是业务幂等；它不是已起飞任务撤销，也不隔离锁失效后的旧发送。</p>
@@ -2075,7 +2083,7 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
 </ol>
 <p>逐条清理快照的设计使继续操作可以重试：已经恢复成功的不会再次触发，失败的仍保留快照作为补偿依据。</p>
 
-<details class="question" id="q-52"><summary><span class="qnum">079</span><span class="question-title">面试官问：继续执行到一半失败怎么办</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-52"><summary><span class="qnum">080</span><span class="question-title">面试官问：继续执行到一半失败怎么办</span></summary><div class="answer"><blockquote>
 <p>继续操作不是一次性把所有快照清空。每个续飞链恢复成功后才清理自己的快照，失败区域仍保留原快照；批次 paused 也要等所有恢复成功后才解除。因此再次调用继续时，可以跳过已完成部分，补偿未完成部分。</p>
 </blockquote>
 <p><strong>八股扩展：</strong> 部分成功可重入、逐项持久化与补偿。外部恢复成功、快照清理前宕机仍可能再次恢复；每项效果仍须依赖执行身份，不能从逐项清理推出严格一次。</p>
@@ -2090,12 +2098,12 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
 </ul>
 <p>取消请求和返航后异步生成续飞子任务之间可能存在竞态。因此每次调度前，还会重新扫描已取消批次，收敛后来生成的 WAITING 子 Mission。</p>
 
-<details class="question" id="q-53"><summary><span class="qnum">080</span><span class="question-title">面试官问：为什么取消不能直接把所有区域状态改成 CANCELLED</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-53"><summary><span class="qnum">081</span><span class="question-title">面试官问：为什么取消不能直接把所有区域状态改成 CANCELLED</span></summary><div class="answer"><blockquote>
 <p>数据库状态不能改变飞机的真实状态。如果任务已经被飞机接收或正在飞行，直接改成 CANCELLED 会让平台误以为资源和空域已经释放，可能继续下发冲突任务。取消必须根据 Mission 真实阶段处理，已在飞任务等待自然结束，同时阻止后续任务和续飞腿。</p>
 </blockquote>
 <a class="back-link" href="#q-53">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-54"><summary><span class="qnum">081</span><span class="question-title">面试官问：取消和返航后生成续飞子任务的竞态怎么处理</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-54"><summary><span class="qnum">082</span><span class="question-title">面试官问：取消和返航后生成续飞子任务的竞态怎么处理</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 取消扫表 → 子任务晚生 → 锁内 reconcile → 补取消</p>
 </blockquote>
 <blockquote>
@@ -2104,25 +2112,25 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
 <p><strong>八股扩展：</strong> 业务终态与设备活动分离、异步晚生子任务、收敛扫描范围。取消释放占用必须尊重实际执行链，不能只看父任务状态。</p>
 <a class="back-link" href="#q-54">↑ 回到本题</a></div></details>
 </section><section class="chapter" id="sec-added-31-ch-4"><h2>3.9 八股扩展：状态机、重试与可靠消息</h2>
-<details class="question" id="q-168"><summary><span class="qnum">082</span><span class="question-title">面试官问：状态机、幂等和对账各解决什么</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-168"><summary><span class="qnum">083</span><span class="question-title">面试官问：状态机、幂等和对账各解决什么</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 合法转移 · 重复无额外效果 · 事实修复</p>
 </blockquote>
 <p>状态机定义可以从哪里到哪里；幂等约束同一操作重复到达的效果；对账检查本地观测与远端事实并修复。合法地再次从 PENDING 发送，不代表远端上一次没有执行；三者不能互相替代。</p>
 <a class="back-link" href="#q-168">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-169"><summary><span class="qnum">083</span><span class="question-title">面试官问：重试怎样避免雪崩</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-169"><summary><span class="qnum">084</span><span class="question-title">面试官问：重试怎样避免雪崩</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 分类 · 预算 · 退避抖动 · 单处重试</p>
 </blockquote>
 <p>先区分永久错误、临时资源等待和未知结果；仅对可安全重复的调用设预算、截止时间和退避抖动。多个服务层同时重试会乘法放大请求，重复触发与自动重发要分开统计。当前机库分配两次、起飞两次、同步补位32轮是不同预算。</p>
 <a class="back-link" href="#q-169">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-170"><summary><span class="qnum">084</span><span class="question-title">面试官问：如果换成 MQ 就可靠了吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-170"><summary><span class="qnum">085</span><span class="question-title">面试官问：如果换成 MQ 就可靠了吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 持久消息 · ACK · 消费幂等 · Outbox</p>
 </blockquote>
 <p>MQ 可以改善进程内事件在宕机时的交付，但消息持久化、生产确认、消费确认和重投都要核对。数据库已提交但消息没发是双写窗口，Outbox 可在本地事务写业务记录及事件意图，再异步发送；消费者仍需业务幂等，设备动作仍需自己的执行契约。这是演进方案，本地 @EventListener 不能冒充持久队列。</p>
 <a class="back-link" href="#q-170">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-171"><summary><span class="qnum">085</span><span class="question-title">面试官问：取消时修改状态为什么不能代表停止飞行</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-171"><summary><span class="qnum">086</span><span class="question-title">面试官问：取消时修改状态为什么不能代表停止飞行</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 意图与事实 · 已接收 · 撤销回执 · 占用保留</p>
 </blockquote>
 <p>取消是业务意图，飞机的实际停止是设备事实。若指令已接收或在飞，写 CANCELLED 不能令物理世界回滚；须区分未发送、已受理、运行中并按协议撤销或等待结束。父任务取消后出现的新子任务还需收敛。</p>
@@ -2152,35 +2160,35 @@ WAITING：本地尚未确认接收；ALREADY_RECEIVED：已记录接收，仍需
 <li>使用独立执行器，避免占用通用线程池。</li>
 </ul>
 
-<details class="question" id="q-55"><summary><span class="qnum">086</span><span class="question-title">面试官问：线程池参数怎么设置</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-55"><summary><span class="qnum">087</span><span class="question-title">面试官问：线程池参数怎么设置</span></summary><div class="answer"><blockquote>
 <p>核心5、最大10、队列100与CallerRunsPolicy是默认配置，需按下游容量、任务等待及执行耗时压测。池内线程数与实际下游并发分开统计：CallerRuns让提交线程也执行，所以10不是硬上限。执行器关闭后的拒绝任务恢复也要验收。示例和上下文边界回查1.3。</p>
 </blockquote>
 <a class="back-link" href="#q-55">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-56"><summary><span class="qnum">087</span><span class="question-title">面试官问：CompletableFuture.allOf 有什么作用</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-56"><summary><span class="qnum">088</span><span class="question-title">面试官问：CompletableFuture.allOf 有什么作用</span></summary><div class="answer"><blockquote>
 <p>它把多个区域规划任务组合成一个收口 Future，让系统在全部异步任务结束后统一查询最新状态、创建 Mission 并启动调度。它本身不会自动返回每个任务结果，所以单任务状态仍写入数据库，收口时重新聚合。</p>
 </blockquote>
 <a class="back-link" href="#q-56">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-172"><summary><span class="qnum">088</span><span class="question-title">面试官问：线程池的入队和扩容顺序是什么</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-172"><summary><span class="qnum">089</span><span class="question-title">面试官问：线程池的入队和扩容顺序是什么</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 核心 → 队列 → 最大 → 拒绝</p>
 </blockquote>
 <p>通常先创建到 coreSize，再入队；队列满才尝试扩到 maxSize，仍无法接收则执行拒绝策略。此处默认5/10/100意味着队列未满时通常只有核心线程处理；队列容量还应由容忍等待、到达率及内存占用决定，不是数字越大越稳。<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor API</a>。</p>
 <a class="back-link" href="#q-172">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-173"><summary><span class="qnum">089</span><span class="question-title">面试官问：allOf、thenCompose、whenComplete、exceptionally 如何区分</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-173"><summary><span class="qnum">090</span><span class="question-title">面试官问：allOf、thenCompose、whenComplete、exceptionally 如何区分</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 收口 · 链式展开 · 观察 · 恢复</p>
 </blockquote>
 <p>allOf 等待所有给定 Future 完成，返回 Void，不自动收集每个结果，也不把兄弟任务自动取消。thenCompose 把返回 Future 的后续步骤展开，thenApply 只是映射值；whenComplete 用于观察完成并可能因自身抛错改变后续结果，exceptionally 提供异常恢复值。当前每个区域 catch 后写 FAILED，因此 Future 正常完成也可能是业务失败，收口必须重读数据库。<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture API</a>。</p>
 <a class="back-link" href="#q-173">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-174"><summary><span class="qnum">090</span><span class="question-title">面试官问：Future 超时或 cancel 是否真的停止远程规划</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-174"><summary><span class="qnum">091</span><span class="question-title">面试官问：Future 超时或 cancel 是否真的停止远程规划</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 等待超时≠动作撤销 · 协作中断 · 晚结果隔离</p>
 </blockquote>
 <p>等待超时只是调用方放弃等结果，CompletableFuture.cancel 不保证中断底层运行或撤销 HTTP。需要下游超时、可取消句柄及完成后的身份校验；否则超时重试后旧规划结果仍可能晚到并覆盖新结果。</p>
 <a class="back-link" href="#q-174">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-175"><summary><span class="qnum">091</span><span class="question-title">面试官问：Semaphore 能限制集群整体并发吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-175"><summary><span class="qnum">092</span><span class="question-title">面试官问：Semaphore 能限制集群整体并发吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 本 JVM 许可 · 所有路径 · 集群配额</p>
 </blockquote>
 <p>本地 Semaphore 可以覆盖池线程与 CallerRuns 提交线程的调用，但多个 JVM 各有自己的许可。若每节点限制10且有3节点，不能因此承诺集群最多10。集群硬上限需要共享准入，或把配额下沉到统一下游。<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/Semaphore.html">Semaphore API</a>。</p>
@@ -2192,30 +2200,30 @@ SET dispatch_status = DISPATCHING
 </code></pre>
 <p>就是一种跨线程、跨实例的 CAS 思想。</p>
 
-<details class="question" id="q-57"><summary><span class="qnum">092</span><span class="question-title">面试官问：为什么不用 synchronized 保护调度</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-57"><summary><span class="qnum">093</span><span class="question-title">面试官问：为什么不用 synchronized 保护调度</span></summary><div class="answer"><blockquote>
 <p>synchronized不能在多实例之间互斥。SELF以样板间Redisson锁协调跨实例决策，数据库条件更新裁决单行预占；二者有各自范围，设备侧重复指令、锁失效与跨行资源互斥还需分别核对。</p>
 </blockquote>
 <a class="back-link" href="#q-57">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-176"><summary><span class="qnum">093</span><span class="question-title">面试官问：volatile、synchronized、ReentrantLock、CAS 的边界</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-176"><summary><span class="qnum">094</span><span class="question-title">面试官问：volatile、synchronized、ReentrantLock、CAS 的边界</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 可见性 · 临界区 · 条件原子 · JVM 范围</p>
 </blockquote>
 <p>volatile 写与后续读建立可见性关系，但 i++ 仍分成读、加、写；synchronized 管同一监视器的互斥并自动释放，ReentrantLock 提供显式锁、可中断/超时获取和 Condition；CAS 对一个位置做条件原子更新，失败可能重试。它们默认都只管理本 JVM，不能保护另一个节点的任务表。<a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 内存模型</a>。</p>
 <a class="back-link" href="#q-176">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-177"><summary><span class="qnum">094</span><span class="question-title">面试官问：AQS 是什么，和 Redisson 锁是同一个机制吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-177"><summary><span class="qnum">095</span><span class="question-title">面试官问：AQS 是什么，和 Redisson 锁是同一个机制吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 同步状态 · 等待队列 · park/unpark · 分布式另协议</p>
 </blockquote>
 <p>AQS 提供 volatile int 状态和等待队列骨架，子类定义获取/释放逻辑；争抢失败的线程排队并阻塞，释放推进等待者。ReentrantLock 表达独占，Semaphore 表达共享许可。RLock 的跨节点所有权由 Redis 协议协调，不能把本地 AQS 队列当跨 JVM 资源锁。<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/AbstractQueuedSynchronizer.html">AQS API</a>。</p>
 <a class="back-link" href="#q-177">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-178"><summary><span class="qnum">095</span><span class="question-title">面试官问：CPU CAS 和这里的 UPDATE 有什么不同</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-178"><summary><span class="qnum">096</span><span class="question-title">面试官问：CPU CAS 和这里的 UPDATE 有什么不同</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 指令位置 · 存储裁决 · DB仍加锁</p>
 </blockquote>
 <p>AtomicInteger 等使用原子指令约束内存位置；数据库 UPDATE 把期望值放在 WHERE，在服务器执行并使用数据库锁和事务。共同点是“符合旧条件才更新”，实现机制、持久性、作用范围不同。</p>
 <a class="back-link" href="#q-178">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-179"><summary><span class="qnum">096</span><span class="question-title">面试官问：ABA 是不是必须出现 A→B→A 这三个字母</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-179"><summary><span class="qnum">097</span><span class="question-title">面试官问：ABA 是不是必须出现 A→B→A 这三个字母</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 值复原 · 历史不同 · 代际不复用</p>
 </blockquote>
 <p>ABA 指值回到观察时的值，但中间已发生别的处理。此项目是 PENDING→DISPATCHING→PENDING。状态条件无法区分这两次 PENDING；version/attempt 要随新的领取推进，旧尝试按旧代际回写。代际只能防其校验范围内的旧动作，外部命令另需 fencing。</p>
@@ -2229,12 +2237,12 @@ SET dispatch_status = DISPATCHING
 </ul>
 <p>但数据库事务只能约束数据库，不能回滚 IoT 设备已经执行的动作。</p>
 
-<details class="question" id="q-58"><summary><span class="qnum">097</span><span class="question-title">面试官问：远程下发为什么不能放在一个大事务中解决</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-58"><summary><span class="qnum">098</span><span class="question-title">面试官问：远程下发为什么不能放在一个大事务中解决</span></summary><div class="answer"><blockquote>
 <p>数据库事务无法覆盖远程设备。即使本地事务回滚，设备可能已经收到任务；同时长事务会占用连接和数据库锁。系统应该缩短本地事务，用业务状态记录调用前后事实，再通过幂等、状态查询和补偿收敛远程结果。</p>
 </blockquote>
 <a class="back-link" href="#q-58">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-59"><summary><span class="qnum">098</span><span class="question-title">面试官问：先查状态再更新有什么问题</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-59"><summary><span class="qnum">099</span><span class="question-title">面试官问：先查状态再更新有什么问题</span></summary><div class="answer"><blockquote>
 <p>这是典型的 check-then-act 竞态：</p>
 </blockquote>
 <figure class="diagram mmd-fig"><div class="svg-scroll"><svg style="width:951.5px;min-width:0;max-width:none;height:auto" id="mermaid-1791812052670" width="951.5" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" height="616" viewBox="-50 -10 951.5 616" role="graphics-document document" aria-roledescription="sequence"><g><rect x="700" y="530" fill="#eaeaea" stroke="#666" width="150" height="65" name="T2" rx="3" ry="3" class="actor actor-bottom"></rect><text x="775" y="562.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="775" dy="0">线程2</tspan></text></g><g><rect x="296" y="530" fill="#eaeaea" stroke="#666" width="150" height="65" name="DB" rx="3" ry="3" class="actor actor-bottom"></rect><text x="371" y="562.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="371" dy="0">数据库</tspan></text></g><g><rect x="0" y="530" fill="#eaeaea" stroke="#666" width="150" height="65" name="T1" rx="3" ry="3" class="actor actor-bottom"></rect><text x="75" y="562.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="75" dy="0">线程1</tspan></text></g><g><line id="actor5" x1="775" y1="5" x2="775" y2="530" class="200" stroke-width="0.5px" stroke="#999"></line><g id="root-5"><rect x="700" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" name="T2" rx="3" ry="3" class="actor actor-top"></rect><text x="775" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="775" dy="0">线程2</tspan></text></g></g><g><line id="actor4" x1="371" y1="5" x2="371" y2="530" class="200" stroke-width="0.5px" stroke="#999"></line><g id="root-4"><rect x="296" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" name="DB" rx="3" ry="3" class="actor actor-top"></rect><text x="371" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="371" dy="0">数据库</tspan></text></g></g><g><line id="actor3" x1="75" y1="5" x2="75" y2="530" class="200" stroke-width="0.5px" stroke="#999"></line><g id="root-3"><rect x="0" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" name="T1" rx="3" ry="3" class="actor actor-top"></rect><text x="75" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="75" dy="0">线程1</tspan></text></g></g><style>#mermaid-1791812052670{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#000000;}#mermaid-1791812052670 .error-icon{fill:#552222;}#mermaid-1791812052670 .error-text{fill:#552222;stroke:#552222;}#mermaid-1791812052670 .edge-thickness-normal{stroke-width:2px;}#mermaid-1791812052670 .edge-thickness-thick{stroke-width:3.5px;}#mermaid-1791812052670 .edge-pattern-solid{stroke-dasharray:0;}#mermaid-1791812052670 .edge-pattern-dashed{stroke-dasharray:3;}#mermaid-1791812052670 .edge-pattern-dotted{stroke-dasharray:2;}#mermaid-1791812052670 .marker{fill:#666;stroke:#666;}#mermaid-1791812052670 .marker.cross{stroke:#666;}#mermaid-1791812052670 svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#mermaid-1791812052670 .actor{stroke:hsl(0, 0%, 83%);fill:#eee;}#mermaid-1791812052670 text.actor&gt;tspan{fill:#333;stroke:none;}#mermaid-1791812052670 .actor-line{stroke:#666;}#mermaid-1791812052670 .messageLine0{stroke-width:1.5;stroke-dasharray:none;stroke:#333;}#mermaid-1791812052670 .messageLine1{stroke-width:1.5;stroke-dasharray:2,2;stroke:#333;}#mermaid-1791812052670 #uav-fig-8-arrowhead path{fill:#333;stroke:#333;}#mermaid-1791812052670 .sequenceNumber{fill:white;}#mermaid-1791812052670 #uav-fig-8-sequencenumber{fill:#333;}#mermaid-1791812052670 #uav-fig-8-crosshead path{fill:#333;stroke:#333;}#mermaid-1791812052670 .messageText{fill:#333;stroke:none;}#mermaid-1791812052670 .labelBox{stroke:hsl(0, 0%, 83%);fill:#eee;}#mermaid-1791812052670 .labelText,#mermaid-1791812052670 .labelText&gt;tspan{fill:#333;stroke:none;}#mermaid-1791812052670 .loopText,#mermaid-1791812052670 .loopText&gt;tspan{fill:#333;stroke:none;}#mermaid-1791812052670 .loopLine{stroke-width:2px;stroke-dasharray:2,2;stroke:hsl(0, 0%, 83%);fill:hsl(0, 0%, 83%);}#mermaid-1791812052670 .note{stroke:#999;fill:#666;}#mermaid-1791812052670 .noteText,#mermaid-1791812052670 .noteText&gt;tspan{fill:#fff;stroke:none;}#mermaid-1791812052670 .activation0{fill:#f4f4f4;stroke:#666;}#mermaid-1791812052670 .activation1{fill:#f4f4f4;stroke:#666;}#mermaid-1791812052670 .activation2{fill:#f4f4f4;stroke:#666;}#mermaid-1791812052670 .actorPopupMenu{position:absolute;}#mermaid-1791812052670 .actorPopupMenuPanel{position:absolute;fill:#eee;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);filter:drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4));}#mermaid-1791812052670 .actor-man line{stroke:hsl(0, 0%, 83%);fill:#eee;}#mermaid-1791812052670 .actor-man circle,#mermaid-1791812052670 line{stroke:hsl(0, 0%, 83%);fill:#eee;stroke-width:2px;}#mermaid-1791812052670 :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g></g><defs><symbol id="uav-fig-8-computer" width="24" height="24"><path transform="scale(.5)" d="M2 2v13h20v-13h-20zm18 11h-16v-9h16v9zm-10.228 6l.466-1h3.524l.467 1h-4.457zm14.228 3h-24l2-6h2.104l-1.33 4h18.45l-1.297-4h2.073l2 6zm-5-10h-14v-7h14v7z"></path></symbol></defs><defs><symbol id="uav-fig-8-database" fill-rule="evenodd" clip-rule="evenodd"><path transform="scale(.5)" d="M12.258.001l.256.004.255.005.253.008.251.01.249.012.247.015.246.016.242.019.241.02.239.023.236.024.233.027.231.028.229.031.225.032.223.034.22.036.217.038.214.04.211.041.208.043.205.045.201.046.198.048.194.05.191.051.187.053.183.054.18.056.175.057.172.059.168.06.163.061.16.063.155.064.15.066.074.033.073.033.071.034.07.034.069.035.068.035.067.035.066.035.064.036.064.036.062.036.06.036.06.037.058.037.058.037.055.038.055.038.053.038.052.038.051.039.05.039.048.039.047.039.045.04.044.04.043.04.041.04.04.041.039.041.037.041.036.041.034.041.033.042.032.042.03.042.029.042.027.042.026.043.024.043.023.043.021.043.02.043.018.044.017.043.015.044.013.044.012.044.011.045.009.044.007.045.006.045.004.045.002.045.001.045v17l-.001.045-.002.045-.004.045-.006.045-.007.045-.009.044-.011.045-.012.044-.013.044-.015.044-.017.043-.018.044-.02.043-.021.043-.023.043-.024.043-.026.043-.027.042-.029.042-.03.042-.032.042-.033.042-.034.041-.036.041-.037.041-.039.041-.04.041-.041.04-.043.04-.044.04-.045.04-.047.039-.048.039-.05.039-.051.039-.052.038-.053.038-.055.038-.055.038-.058.037-.058.037-.06.037-.06.036-.062.036-.064.036-.064.036-.066.035-.067.035-.068.035-.069.035-.07.034-.071.034-.073.033-.074.033-.15.066-.155.064-.16.063-.163.061-.168.06-.172.059-.175.057-.18.056-.183.054-.187.053-.191.051-.194.05-.198.048-.201.046-.205.045-.208.043-.211.041-.214.04-.217.038-.22.036-.223.034-.225.032-.229.031-.231.028-.233.027-.236.024-.239.023-.241.02-.242.019-.246.016-.247.015-.249.012-.251.01-.253.008-.255.005-.256.004-.258.001-.258-.001-.256-.004-.255-.005-.253-.008-.251-.01-.249-.012-.247-.015-.245-.016-.243-.019-.241-.02-.238-.023-.236-.024-.234-.027-.231-.028-.228-.031-.226-.032-.223-.034-.22-.036-.217-.038-.214-.04-.211-.041-.208-.043-.204-.045-.201-.046-.198-.048-.195-.05-.19-.051-.187-.053-.184-.054-.179-.056-.176-.057-.172-.059-.167-.06-.164-.061-.159-.063-.155-.064-.151-.066-.074-.033-.072-.033-.072-.034-.07-.034-.069-.035-.068-.035-.067-.035-.066-.035-.064-.036-.063-.036-.062-.036-.061-.036-.06-.037-.058-.037-.057-.037-.056-.038-.055-.038-.053-.038-.052-.038-.051-.039-.049-.039-.049-.039-.046-.039-.046-.04-.044-.04-.043-.04-.041-.04-.04-.041-.039-.041-.037-.041-.036-.041-.034-.041-.033-.042-.032-.042-.03-.042-.029-.042-.027-.042-.026-.043-.024-.043-.023-.043-.021-.043-.02-.043-.018-.044-.017-.043-.015-.044-.013-.044-.012-.044-.011-.045-.009-.044-.007-.045-.006-.045-.004-.045-.002-.045-.001-.045v-17l.001-.045.002-.045.004-.045.006-.045.007-.045.009-.044.011-.045.012-.044.013-.044.015-.044.017-.043.018-.044.02-.043.021-.043.023-.043.024-.043.026-.043.027-.042.029-.042.03-.042.032-.042.033-.042.034-.041.036-.041.037-.041.039-.041.04-.041.041-.04.043-.04.044-.04.046-.04.046-.039.049-.039.049-.039.051-.039.052-.038.053-.038.055-.038.056-.038.057-.037.058-.037.06-.037.061-.036.062-.036.063-.036.064-.036.066-.035.067-.035.068-.035.069-.035.07-.034.072-.034.072-.033.074-.033.151-.066.155-.064.159-.063.164-.061.167-.06.172-.059.176-.057.179-.056.184-.054.187-.053.19-.051.195-.05.198-.048.201-.046.204-.045.208-.043.211-.041.214-.04.217-.038.22-.036.223-.034.226-.032.228-.031.231-.028.234-.027.236-.024.238-.023.241-.02.243-.019.245-.016.247-.015.249-.012.251-.01.253-.008.255-.005.256-.004.258-.001.258.001zm-9.258 20.499v.01l.001.021.003.021.004.022.005.021.006.022.007.022.009.023.01.022.011.023.012.023.013.023.015.023.016.024.017.023.018.024.019.024.021.024.022.025.023.024.024.025.052.049.056.05.061.051.066.051.07.051.075.051.079.052.084.052.088.052.092.052.097.052.102.051.105.052.11.052.114.051.119.051.123.051.127.05.131.05.135.05.139.048.144.049.147.047.152.047.155.047.16.045.163.045.167.043.171.043.176.041.178.041.183.039.187.039.19.037.194.035.197.035.202.033.204.031.209.03.212.029.216.027.219.025.222.024.226.021.23.02.233.018.236.016.24.015.243.012.246.01.249.008.253.005.256.004.259.001.26-.001.257-.004.254-.005.25-.008.247-.011.244-.012.241-.014.237-.016.233-.018.231-.021.226-.021.224-.024.22-.026.216-.027.212-.028.21-.031.205-.031.202-.034.198-.034.194-.036.191-.037.187-.039.183-.04.179-.04.175-.042.172-.043.168-.044.163-.045.16-.046.155-.046.152-.047.148-.048.143-.049.139-.049.136-.05.131-.05.126-.05.123-.051.118-.052.114-.051.11-.052.106-.052.101-.052.096-.052.092-.052.088-.053.083-.051.079-.052.074-.052.07-.051.065-.051.06-.051.056-.05.051-.05.023-.024.023-.025.021-.024.02-.024.019-.024.018-.024.017-.024.015-.023.014-.024.013-.023.012-.023.01-.023.01-.022.008-.022.006-.022.006-.022.004-.022.004-.021.001-.021.001-.021v-4.127l-.077.055-.08.053-.083.054-.085.053-.087.052-.09.052-.093.051-.095.05-.097.05-.1.049-.102.049-.105.048-.106.047-.109.047-.111.046-.114.045-.115.045-.118.044-.12.043-.122.042-.124.042-.126.041-.128.04-.13.04-.132.038-.134.038-.135.037-.138.037-.139.035-.142.035-.143.034-.144.033-.147.032-.148.031-.15.03-.151.03-.153.029-.154.027-.156.027-.158.026-.159.025-.161.024-.162.023-.163.022-.165.021-.166.02-.167.019-.169.018-.169.017-.171.016-.173.015-.173.014-.175.013-.175.012-.177.011-.178.01-.179.008-.179.008-.181.006-.182.005-.182.004-.184.003-.184.002h-.37l-.184-.002-.184-.003-.182-.004-.182-.005-.181-.006-.179-.008-.179-.008-.178-.01-.176-.011-.176-.012-.175-.013-.173-.014-.172-.015-.171-.016-.17-.017-.169-.018-.167-.019-.166-.02-.165-.021-.163-.022-.162-.023-.161-.024-.159-.025-.157-.026-.156-.027-.155-.027-.153-.029-.151-.03-.15-.03-.148-.031-.146-.032-.145-.033-.143-.034-.141-.035-.14-.035-.137-.037-.136-.037-.134-.038-.132-.038-.13-.04-.128-.04-.126-.041-.124-.042-.122-.042-.12-.044-.117-.043-.116-.045-.113-.045-.112-.046-.109-.047-.106-.047-.105-.048-.102-.049-.1-.049-.097-.05-.095-.05-.093-.052-.09-.051-.087-.052-.085-.053-.083-.054-.08-.054-.077-.054v4.127zm0-5.654v.011l.001.021.003.021.004.021.005.022.006.022.007.022.009.022.01.022.011.023.012.023.013.023.015.024.016.023.017.024.018.024.019.024.021.024.022.024.023.025.024.024.052.05.056.05.061.05.066.051.07.051.075.052.079.051.084.052.088.052.092.052.097.052.102.052.105.052.11.051.114.051.119.052.123.05.127.051.131.05.135.049.139.049.144.048.147.048.152.047.155.046.16.045.163.045.167.044.171.042.176.042.178.04.183.04.187.038.19.037.194.036.197.034.202.033.204.032.209.03.212.028.216.027.219.025.222.024.226.022.23.02.233.018.236.016.24.014.243.012.246.01.249.008.253.006.256.003.259.001.26-.001.257-.003.254-.006.25-.008.247-.01.244-.012.241-.015.237-.016.233-.018.231-.02.226-.022.224-.024.22-.025.216-.027.212-.029.21-.03.205-.032.202-.033.198-.035.194-.036.191-.037.187-.039.183-.039.179-.041.175-.042.172-.043.168-.044.163-.045.16-.045.155-.047.152-.047.148-.048.143-.048.139-.05.136-.049.131-.05.126-.051.123-.051.118-.051.114-.052.11-.052.106-.052.101-.052.096-.052.092-.052.088-.052.083-.052.079-.052.074-.051.07-.052.065-.051.06-.05.056-.051.051-.049.023-.025.023-.024.021-.025.02-.024.019-.024.018-.024.017-.024.015-.023.014-.023.013-.024.012-.022.01-.023.01-.023.008-.022.006-.022.006-.022.004-.021.004-.022.001-.021.001-.021v-4.139l-.077.054-.08.054-.083.054-.085.052-.087.053-.09.051-.093.051-.095.051-.097.05-.1.049-.102.049-.105.048-.106.047-.109.047-.111.046-.114.045-.115.044-.118.044-.12.044-.122.042-.124.042-.126.041-.128.04-.13.039-.132.039-.134.038-.135.037-.138.036-.139.036-.142.035-.143.033-.144.033-.147.033-.148.031-.15.03-.151.03-.153.028-.154.028-.156.027-.158.026-.159.025-.161.024-.162.023-.163.022-.165.021-.166.02-.167.019-.169.018-.169.017-.171.016-.173.015-.173.014-.175.013-.175.012-.177.011-.178.009-.179.009-.179.007-.181.007-.182.005-.182.004-.184.003-.184.002h-.37l-.184-.002-.184-.003-.182-.004-.182-.005-.181-.007-.179-.007-.179-.009-.178-.009-.176-.011-.176-.012-.175-.013-.173-.014-.172-.015-.171-.016-.17-.017-.169-.018-.167-.019-.166-.02-.165-.021-.163-.022-.162-.023-.161-.024-.159-.025-.157-.026-.156-.027-.155-.028-.153-.028-.151-.03-.15-.03-.148-.031-.146-.033-.145-.033-.143-.033-.141-.035-.14-.036-.137-.036-.136-.037-.134-.038-.132-.039-.13-.039-.128-.04-.126-.041-.124-.042-.122-.043-.12-.043-.117-.044-.116-.044-.113-.046-.112-.046-.109-.046-.106-.047-.105-.048-.102-.049-.1-.049-.097-.05-.095-.051-.093-.051-.09-.051-.087-.053-.085-.052-.083-.054-.08-.054-.077-.054v4.139zm0-5.666v.011l.001.02.003.022.004.021.005.022.006.021.007.022.009.023.01.022.011.023.012.023.013.023.015.023.016.024.017.024.018.023.019.024.021.025.022.024.023.024.024.025.052.05.056.05.061.05.066.051.07.051.075.052.079.051.084.052.088.052.092.052.097.052.102.052.105.051.11.052.114.051.119.051.123.051.127.05.131.05.135.05.139.049.144.048.147.048.152.047.155.046.16.045.163.045.167.043.171.043.176.042.178.04.183.04.187.038.19.037.194.036.197.034.202.033.204.032.209.03.212.028.216.027.219.025.222.024.226.021.23.02.233.018.236.017.24.014.243.012.246.01.249.008.253.006.256.003.259.001.26-.001.257-.003.254-.006.25-.008.247-.01.244-.013.241-.014.237-.016.233-.018.231-.02.226-.022.224-.024.22-.025.216-.027.212-.029.21-.03.205-.032.202-.033.198-.035.194-.036.191-.037.187-.039.183-.039.179-.041.175-.042.172-.043.168-.044.163-.045.16-.045.155-.047.152-.047.148-.048.143-.049.139-.049.136-.049.131-.051.126-.05.123-.051.118-.052.114-.051.11-.052.106-.052.101-.052.096-.052.092-.052.088-.052.083-.052.079-.052.074-.052.07-.051.065-.051.06-.051.056-.05.051-.049.023-.025.023-.025.021-.024.02-.024.019-.024.018-.024.017-.024.015-.023.014-.024.013-.023.012-.023.01-.022.01-.023.008-.022.006-.022.006-.022.004-.022.004-.021.001-.021.001-.021v-4.153l-.077.054-.08.054-.083.053-.085.053-.087.053-.09.051-.093.051-.095.051-.097.05-.1.049-.102.048-.105.048-.106.048-.109.046-.111.046-.114.046-.115.044-.118.044-.12.043-.122.043-.124.042-.126.041-.128.04-.13.039-.132.039-.134.038-.135.037-.138.036-.139.036-.142.034-.143.034-.144.033-.147.032-.148.032-.15.03-.151.03-.153.028-.154.028-.156.027-.158.026-.159.024-.161.024-.162.023-.163.023-.165.021-.166.02-.167.019-.169.018-.169.017-.171.016-.173.015-.173.014-.175.013-.175.012-.177.01-.178.01-.179.009-.179.007-.181.006-.182.006-.182.004-.184.003-.184.001-.185.001-.185-.001-.184-.001-.184-.003-.182-.004-.182-.006-.181-.006-.179-.007-.179-.009-.178-.01-.176-.01-.176-.012-.175-.013-.173-.014-.172-.015-.171-.016-.17-.017-.169-.018-.167-.019-.166-.02-.165-.021-.163-.023-.162-.023-.161-.024-.159-.024-.157-.026-.156-.027-.155-.028-.153-.028-.151-.03-.15-.03-.148-.032-.146-.032-.145-.033-.143-.034-.141-.034-.14-.036-.137-.036-.136-.037-.134-.038-.132-.039-.13-.039-.128-.041-.126-.041-.124-.041-.122-.043-.12-.043-.117-.044-.116-.044-.113-.046-.112-.046-.109-.046-.106-.048-.105-.048-.102-.048-.1-.05-.097-.049-.095-.051-.093-.051-.09-.052-.087-.052-.085-.053-.083-.053-.08-.054-.077-.054v4.153zm8.74-8.179l-.257.004-.254.005-.25.008-.247.011-.244.012-.241.014-.237.016-.233.018-.231.021-.226.022-.224.023-.22.026-.216.027-.212.028-.21.031-.205.032-.202.033-.198.034-.194.036-.191.038-.187.038-.183.04-.179.041-.175.042-.172.043-.168.043-.163.045-.16.046-.155.046-.152.048-.148.048-.143.048-.139.049-.136.05-.131.05-.126.051-.123.051-.118.051-.114.052-.11.052-.106.052-.101.052-.096.052-.092.052-.088.052-.083.052-.079.052-.074.051-.07.052-.065.051-.06.05-.056.05-.051.05-.023.025-.023.024-.021.024-.02.025-.019.024-.018.024-.017.023-.015.024-.014.023-.013.023-.012.023-.01.023-.01.022-.008.022-.006.023-.006.021-.004.022-.004.021-.001.021-.001.021.001.021.001.021.004.021.004.022.006.021.006.023.008.022.01.022.01.023.012.023.013.023.014.023.015.024.017.023.018.024.019.024.02.025.021.024.023.024.023.025.051.05.056.05.06.05.065.051.07.052.074.051.079.052.083.052.088.052.092.052.096.052.101.052.106.052.11.052.114.052.118.051.123.051.126.051.131.05.136.05.139.049.143.048.148.048.152.048.155.046.16.046.163.045.168.043.172.043.175.042.179.041.183.04.187.038.191.038.194.036.198.034.202.033.205.032.21.031.212.028.216.027.22.026.224.023.226.022.231.021.233.018.237.016.241.014.244.012.247.011.25.008.254.005.257.004.26.001.26-.001.257-.004.254-.005.25-.008.247-.011.244-.012.241-.014.237-.016.233-.018.231-.021.226-.022.224-.023.22-.026.216-.027.212-.028.21-.031.205-.032.202-.033.198-.034.194-.036.191-.038.187-.038.183-.04.179-.041.175-.042.172-.043.168-.043.163-.045.16-.046.155-.046.152-.048.148-.048.143-.048.139-.049.136-.05.131-.05.126-.051.123-.051.118-.051.114-.052.11-.052.106-.052.101-.052.096-.052.092-.052.088-.052.083-.052.079-.052.074-.051.07-.052.065-.051.06-.05.056-.05.051-.05.023-.025.023-.024.021-.024.02-.025.019-.024.018-.024.017-.023.015-.024.014-.023.013-.023.012-.023.01-.023.01-.022.008-.022.006-.023.006-.021.004-.022.004-.021.001-.021.001-.021-.001-.021-.001-.021-.004-.021-.004-.022-.006-.021-.006-.023-.008-.022-.01-.022-.01-.023-.012-.023-.013-.023-.014-.023-.015-.024-.017-.023-.018-.024-.019-.024-.02-.025-.021-.024-.023-.024-.023-.025-.051-.05-.056-.05-.06-.05-.065-.051-.07-.052-.074-.051-.079-.052-.083-.052-.088-.052-.092-.052-.096-.052-.101-.052-.106-.052-.11-.052-.114-.052-.118-.051-.123-.051-.126-.051-.131-.05-.136-.05-.139-.049-.143-.048-.148-.048-.152-.048-.155-.046-.16-.046-.163-.045-.168-.043-.172-.043-.175-.042-.179-.041-.183-.04-.187-.038-.191-.038-.194-.036-.198-.034-.202-.033-.205-.032-.21-.031-.212-.028-.216-.027-.22-.026-.224-.023-.226-.022-.231-.021-.233-.018-.237-.016-.241-.014-.244-.012-.247-.011-.25-.008-.254-.005-.257-.004-.26-.001-.26.001z"></path></symbol></defs><defs><symbol id="uav-fig-8-clock" width="24" height="24"><path transform="scale(.5)" d="M12 2c5.514 0 10 4.486 10 10s-4.486 10-10 10-10-4.486-10-10 4.486-10 10-10zm0-2c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.848 12.459c.202.038.202.333.001.372-1.907.361-6.045 1.111-6.547 1.111-.719 0-1.301-.582-1.301-1.301 0-.512.77-5.447 1.125-7.445.034-.192.312-.181.343.014l.985 6.238 5.394 1.011z"></path></symbol></defs><defs><marker id="uav-fig-8-arrowhead" refX="7.9" refY="5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker></defs><defs><marker id="uav-fig-8-crosshead" markerWidth="15" markerHeight="8" orient="auto" refX="4" refY="4.5"><path fill="none" stroke="#000000" stroke-width="1pt" d="M 1,2 L 6,7 M 6,2 L 1,7" style="stroke-dasharray: 0, 0;"></path></marker></defs><defs><marker id="uav-fig-8-filled-head" refX="15.5" refY="7" markerWidth="20" markerHeight="28" orient="auto"><path d="M 18,7 L9,13 L14,7 L9,1 Z"></path></marker></defs><defs><marker id="uav-fig-8-sequencenumber" refX="15" refY="15" markerWidth="60" markerHeight="40" orient="auto"><circle cx="15" cy="15" r="6"></circle></marker></defs><g><rect x="50" y="471" fill="#EDF2AE" stroke="#666" width="750" height="39" rx="0" ry="0" class="note"></rect><text x="425" y="476" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="noteText" dy="1em" style="font-size: 16px; font-weight: 400;"><tspan x="425">把旧状态放进 UPDATE 的 WHERE 后：只有一个线程影响行数为 1</tspan></text></g><text x="222" y="80" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">SELECT status → PENDING</text><line x1="76" y1="121" x2="367" y2="121" class="messageLine0" stroke-width="2" stroke="none" marker-end="url(#uav-fig-8-arrowhead)" style="fill: none;"></line><text x="575" y="136" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">SELECT status → PENDING（线程1还没提交）</text><line x1="774" y1="177" x2="375" y2="177" class="messageLine0" stroke-width="2" stroke="none" marker-end="url(#uav-fig-8-arrowhead)" style="fill: none;"></line><text x="222" y="192" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">UPDATE status = DISPATCHING</text><line x1="76" y1="233" x2="367" y2="233" class="messageLine0" stroke-width="2" stroke="none" marker-end="url(#uav-fig-8-arrowhead)" style="fill: none;"></line><text x="76" y="248" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">继续下发</text><path d="M 76,289 C 136,279 136,319 76,309" class="messageLine0" stroke-width="2" stroke="none" marker-end="url(#uav-fig-8-arrowhead)" style="fill: none;"></path><text x="575" y="334" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">UPDATE status = DISPATCHING</text><line x1="774" y1="375" x2="375" y2="375" class="messageLine0" stroke-width="2" stroke="none" marker-end="url(#uav-fig-8-arrowhead)" style="fill: none;"></line><text x="776" y="390" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">继续下发 ← 重复下发</text><path d="M 776,431 C 836,421 836,461 776,451" class="messageLine0" stroke-width="2" stroke="none" marker-end="url(#uav-fig-8-arrowhead)" style="fill: none;"></path></svg></div><details class="mm-src"><summary>查看 mermaid 源码</summary><pre>sequenceDiagram
@@ -2252,25 +2260,25 @@ SET dispatch_status = DISPATCHING
 </blockquote>
 <a class="back-link" href="#q-59">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-180"><summary><span class="qnum">099</span><span class="question-title">面试官问：MVCC 为什么不能代替下发条件更新</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-180"><summary><span class="qnum">100</span><span class="question-title">面试官问：MVCC 为什么不能代替下发条件更新</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 快照读 · 历史可见性 · 当前写裁决</p>
 </blockquote>
 <p>MVCC 用版本和读视图为一致性 SELECT 提供可见数据。RR 同事务的普通一致性读通常复用读视图，RC 每次一致性读使用新视图；UPDATE 不能仅照旧 SELECT 快照写入。任务是否还能领取应由带旧状态条件的更新在写入时裁决，不是“RR 里看见 PENDING 就一直可派”。<a href="https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html">MySQL 隔离级别</a>。</p>
 <a class="back-link" href="#q-180">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-181"><summary><span class="qnum">100</span><span class="question-title">面试官问：记录锁、间隙锁、next-key lock 如何结合这个项目讲</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-181"><summary><span class="qnum">101</span><span class="question-title">面试官问：记录锁、间隙锁、next-key lock 如何结合这个项目讲</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 索引记录 · 区间 · 记录加间隙 · 看SQL</p>
 </blockquote>
 <p>记录锁保护索引记录，间隙锁约束区间插入，next-key 是二者组合。主键等值命中与范围扫描的锁范围不同，还受隔离级别、索引选择影响；不能说 WHERE 带 status 就锁全表，也不能说所有 SELECT 都锁行。无合理索引会扩大扫描和锁影响，应查看执行计划与锁等待。</p>
 <a class="back-link" href="#q-181">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-182"><summary><span class="qnum">101</span><span class="question-title">面试官问：死锁怎么处理，能否一律重试整个调度</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-182"><summary><span class="qnum">102</span><span class="question-title">面试官问：死锁怎么处理，能否一律重试整个调度</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 固定顺序 · 短事务 · 重试语义</p>
 </blockquote>
 <p>多个事务按不同顺序获取资源可形成循环等待；保持一致访问顺序、缩短事务、给查询合适索引。数据库回滚受害事务后，可对确实未产生外部副作用的数据库操作有限重试；已经发过 IoT 的整段调度不能盲目重跑。<a href="https://dev.mysql.com/doc/refman/8.4/en/innodb-deadlocks-handling.html">InnoDB 死锁处理</a>。</p>
 <a class="back-link" href="#q-182">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-183"><summary><span class="qnum">102</span><span class="question-title">面试官问：事务一致性是否自动理解一机库一任务</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-183"><summary><span class="qnum">103</span><span class="question-title">面试官问：事务一致性是否自动理解一机库一任务</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 约束要表达 · 同资源原子领取</p>
 </blockquote>
 <p>ACID 不会从字段名推导业务规则。两行不同 taskArea 各成功写 DISPATCHING，可以都满足 SQL 和表约束却违反机库规则。要在公共资源行、唯一约束或统一调度协议中显式表达不变量。</p>
@@ -2285,18 +2293,18 @@ SET dispatch_status = DISPATCHING
 </ul>
 <p>联合索引不能只看单字段出现次数，要结合真实 SQL 的 WHERE、ORDER BY、数据分布和执行计划。</p>
 
-<details class="question" id="q-60"><summary><span class="qnum">103</span><span class="question-title">面试官问：你会怎么判断索引是否合理</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-60"><summary><span class="qnum">104</span><span class="question-title">面试官问：你会怎么判断索引是否合理</span></summary><div class="answer"><blockquote>
 <p>先从慢查询和高频 SQL 出发，使用 EXPLAIN 查看访问类型、使用索引、扫描行数和额外排序，再结合字段区分度设计联合索引。不能只看到查询条件就机械建立多个单列索引，也不能在没有执行计划和数据量证据时声称某个索引一定最优。</p>
 </blockquote>
 <a class="back-link" href="#q-60">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-184"><summary><span class="qnum">104</span><span class="question-title">面试官问：联合索引、覆盖索引和回表怎么讲</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-184"><summary><span class="qnum">105</span><span class="question-title">面试官问：联合索引、覆盖索引和回表怎么讲</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> B+树顺序 · 左前缀 · 所需列 · 写成本</p>
 </blockquote>
 <p>联合索引按列顺序组织键值，能利用哪些列还要看等值、范围与排序。二级索引包含主键，若能直接提供所需列则可覆盖，否则通过主键找聚簇记录回表。status 低基数不代表绝对不能进联合索引，优劣要结合 showroomId/taskId、数据分布及 EXPLAIN。不要把任何范围之后所有列都“完全无用”说死。</p>
 <a class="back-link" href="#q-184">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-185"><summary><span class="qnum">105</span><span class="question-title">面试官问：位置资产唯一索引有哪些容易漏的边界</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-185"><summary><span class="qnum">106</span><span class="question-title">面试官问：位置资产唯一索引有哪些容易漏的边界</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> NULL范围 · 活跃唯一 · 软删历史 · 存量清理</p>
 </blockquote>
 <p>当前 checkNameUnique 在无样板间时明确用 IS NULL。MySQL 唯一索引允许多个 NULL，直接加 user_id/showroom_id/name/status 不能保证 NULL 范围的同名唯一；把软删 status 也加入唯一键，还可能阻止多条历史同名删除记录。应先明确活跃记录范围、规范化空值或生成列等约束方案，清理存量冲突，并把 DuplicateKey 转业务提示。<a href="https://dev.mysql.com/doc/refman/8.4/en/create-index.html">MySQL CREATE INDEX</a>。</p>
@@ -2334,23 +2342,23 @@ SET dispatch_status = DISPATCHING
 <li>SET 并刷新过期时间。</li>
 </ol>
 
-<details class="question" id="q-61"><summary><span class="qnum">106</span><span class="question-title">面试官问：Lua 为什么能保证原子性</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-61"><summary><span class="qnum">107</span><span class="question-title">面试官问：Lua 为什么能保证原子性</span></summary><div class="answer"><blockquote>
 <p>Redis执行脚本时不会插入其他客户端命令，因此脚本内的读取、条件判断和写入具有原子隔离。项目脚本限制终态码转到不同状态，但同态回调会刷新消息与TTL；普通SET初始化不走脚本，仍可绕过它。原子隔离也不提供脚本错误的自动回滚。</p>
 </blockquote>
 <a class="back-link" href="#q-61">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-62"><summary><span class="qnum">107</span><span class="question-title">面试官问：Lua 能保证整个业务一致性吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-62"><summary><span class="qnum">108</span><span class="question-title">面试官问：Lua 能保证整个业务一致性吗</span></summary><div class="answer"><blockquote>
 <p>不能。它只保证单个 Redis key 内状态转换的原子性，不能自动解决消息丢失、Redis 故障、数据库状态和设备真实状态不一致。重要业务结果仍需要业务系统持久化，Redis 更适合短期异步状态协调和查询。</p>
 </blockquote>
 <a class="back-link" href="#q-62">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-63"><summary><span class="qnum">108</span><span class="question-title">面试官问：这套状态机为什么放 Redis 而不是数据库表</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-63"><summary><span class="qnum">109</span><span class="question-title">面试官问：这套状态机为什么放 Redis 而不是数据库表</span></summary><div class="answer"><blockquote>
 <p>指令状态key为voice:assistant:instruction:status:{messageId}，默认TTL十分钟，用于短期异步查询。Lua约束状态转换，但TTL清理也意味着状态可能消失；不存在不能直接解释成没执行或失败，重要业务结果需由业务持久层保存。</p>
 <p>脚本先判断当前状态是否等于目标：相等直接允许，然后仍会SET EX。因此SUCCESS→SUCCESS可更新非空message并刷新TTL；SUCCESS→FAILED被拒。它保护终态状态码不转换为另一状态，不保护终态JSON全文不可变。</p>
 </blockquote>
 <a class="back-link" href="#q-63">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-64"><summary><span class="qnum">109</span><span class="question-title">面试官问：Lua 脚本内部具体怎么写的</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-64"><summary><span class="qnum">110</span><span class="question-title">面试官问：Lua 脚本内部具体怎么写的</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 先同态 → 再判合法转换 → 写状态/消息 → 刷 TTL；终态码非消息冻结</p>
 </blockquote>
 <blockquote>
@@ -2377,7 +2385,7 @@ key已过期：返回-1；无法仅凭不存在推断真实执行结果。
 </blockquote>
 <a class="back-link" href="#q-64">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-65"><summary><span class="qnum">110</span><span class="question-title">面试官问：为什么不用 MULTI/EXEC 事务或分布式锁来保证原子</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-65"><summary><span class="qnum">111</span><span class="question-title">面试官问：为什么不用 MULTI/EXEC 事务或分布式锁来保证原子</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> MULTI 静态入队 · WATCH 冲突重试 · Lua 数据侧判断 · 短脚本</p>
 </blockquote>
 <blockquote>
@@ -2386,19 +2394,19 @@ key已过期：返回-1；无法仅凭不存在推断真实执行结果。
 </blockquote>
 <a class="back-link" href="#q-65">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-186"><summary><span class="qnum">111</span><span class="question-title">面试官问：终态 Lua 保护了，为什么接收同一 messageId 仍可能出问题</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-186"><summary><span class="qnum">112</span><span class="question-title">面试官问：终态 Lua 保护了，为什么接收同一 messageId 仍可能出问题</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 入口直接SET · 脚本外旁路 · 全链路幂等</p>
 </blockquote>
 <p>VoiceAssistantInstructionDispatcher 每次 handle 初始化状态；initInstructionStatus 使用普通 SET 写 RECEIVED，并非 SET NX 或同脚本裁决。同 messageId 再次接收可能把 SUCCESS 重置为 RECEIVED 并再次分发，Lua 只保护之后的转移路径。完整去重需在受理边界按身份原子保存参数摘要及受理结果，执行端同样去重；这是当前边界和改进方案。</p>
 <a class="back-link" href="#q-186">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-187"><summary><span class="qnum">112</span><span class="question-title">面试官问：Redis key 过期为什么不能当作任务没执行</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-187"><summary><span class="qnum">113</span><span class="question-title">面试官问：Redis key 过期为什么不能当作任务没执行</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> TTL清理 · 结果丢失 · 业务持久事实</p>
 </blockquote>
 <p>10分钟的指令状态用于短期查询，过期后返回不存在不能区分从未受理、受理后失效、已成功但缓存清理。若业务需要长期查证或重放防护，稳定结果要有持久记录，不能依赖一次 TTL。</p>
 <a class="back-link" href="#q-187">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-188"><summary><span class="qnum">113</span><span class="question-title">面试官问：Redis 分布式锁的最小正确要素有哪些</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-188"><summary><span class="qnum">114</span><span class="question-title">面试官问：Redis 分布式锁的最小正确要素有哪些</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 原子加锁 · 身份校验释放 · 续期 · 旧主人隔离</p>
 </blockquote>
 <p>教学版单实例可用 SET key randomValue NX PX ttl 原子建立租约，释放用 Lua 比较随机身份后删除，不能 GET/DEL 两步误删新主人。它没有自动提供可重入或 fencing，故障切换、暂停、续期仍有边界；生产 Redisson 的内部实现及副本同步选项须按依赖版本核对，不应把这段教学命令当其全部源码。</p>
@@ -2414,47 +2422,47 @@ key已过期：返回-1；无法仅凭不存在推断真实执行结果。
 <p><code>@Async</code> 执行发生在线程池线程中，请求线程的 ThreadLocal 上下文不会自动安全继承。项目中异步航线规划会显式设置登录用户，并在 finally 中清理。</p>
 <p>自动建模下游也使用了 <code>@Async</code>：<code>ExecuteImageTaskHandler</code> 调用另一个 Spring Bean 的 <code>executeImageTask</code>，能够经过代理进入 <code>ikTaskExecutor</code>。由于它是 <code>void</code> 异步方法，调用方返回只代表任务已交给线程池，不代表建模服务提交成功；异步线程中的异常也不会由事件处理器外层的 try-catch 接收。因此，真实处理结果必须依靠日志和持久化状态判断，不能把处理器中的“提交完成”日志理解成“建模完成”。<code>ikTaskExecutor</code> 定义在共享配置 TaskPoolConfig 中，参数全部外置到配置中心，拒绝策略同样是 CallerRunsPolicy、停机等待任务完成——与建模航线池是同一套纪律。</p>
 
-<details class="question" id="q-189"><summary><span class="qnum">114</span><span class="question-title">面试官问：为什么 `@Async` 要放在另一个 Bean 上调用</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-189"><summary><span class="qnum">115</span><span class="question-title">面试官问：为什么 `@Async` 要放在另一个 Bean 上调用</span></summary><div class="answer"><blockquote>
 <p>Spring 的异步能力依赖代理拦截。同类内部直接调用带 <code>@Async</code> 的方法通常不会经过代理，方法仍会同步执行。当前事件处理器注入建模 Service 并调用其异步方法，调用发生在不同 Bean 之间，能够经过 Spring 代理。因为返回类型是 void，调用方不能直接取得异步结果，所以业务结果通过 modeling_status、projectId 和失败原因落库体现。</p>
 </blockquote>
 <a class="back-link" href="#q-189">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-67"><summary><span class="qnum">115</span><span class="question-title">面试官问：为什么异步任务结束后要清理用户上下文</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-67"><summary><span class="qnum">116</span><span class="question-title">面试官问：为什么异步任务结束后要清理用户上下文</span></summary><div class="answer"><blockquote>
 <p>线程池复用会带来身份串用，异常路径也要清理。但 CallerRunsPolicy 会在提交线程运行；直接 clear 可能清掉原请求上下文。建议按“保存旧值→安装任务值→finally 恢复旧值或 remove”设计，并检查嵌套提交。当前代码显式 set/clear，只能说覆盖普通池线程清理，不能声称所有路径安全。</p>
 </blockquote>
 <a class="back-link" href="#q-67">↑ 回到本题</a></div></details>
 </section><section class="chapter" id="sec-added-39-ch-5"><h2>4.7 JVM 与 GC：为什么暂停会影响分布式协议</h2>
-<details class="question" id="q-190"><summary><span class="qnum">116</span><span class="question-title">面试官问：并发 GC 为什么仍可能 STW</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-190"><summary><span class="qnum">117</span><span class="question-title">面试官问：并发 GC 为什么仍可能 STW</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 并发阶段 · 暂停阶段 · 外部TTL继续</p>
 </blockquote>
 <p>并发回收不是全程零暂停。G1 等仍有需要应用暂停的阶段；堆大小、分配速率、存活对象、晋升、CPU配额及失败退化都会影响停顿。GC暂停的是某个 JVM 的应用推进，不暂停另一个节点或 Redis 的租约计时。<a href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-first-g1-garbage-collector1.html">G1 官方说明</a>。</p>
 <a class="back-link" href="#q-190">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-191"><summary><span class="qnum">117</span><span class="question-title">面试官问：线上如何判断是 GC、锁等待还是网络卡住</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-191"><summary><span class="qnum">118</span><span class="question-title">面试官问：线上如何判断是 GC、锁等待还是网络卡住</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> GC时间线 · 栈/JFR · RedisTTL · 远端耗时</p>
 </blockquote>
 <p>关联 taskId/taskAreaId/missionId/showroomId、节点和线程，串起领取、续期、回退与发送时间。看 GC/安全点日志或 JFR 的停顿，再看线程栈锁等待、Redis 连接及 RTT、IoT 超时。没有证据不把每次慢请求叫 Full GC，也不在真实飞行环境故意挂起进程验证。</p>
 <a class="back-link" href="#q-191">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-192"><summary><span class="qnum">118</span><span class="question-title">面试官问：怎样避免 ThreadLocal 串用户及内存残留</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-192"><summary><span class="qnum">119</span><span class="question-title">面试官问：怎样避免 ThreadLocal 串用户及内存残留</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 线程长寿 · 任务边界 · finally恢复</p>
 </blockquote>
 <p>ThreadLocal 值跟随线程，池线程存活远长于单次请求。不正确清理会残留对象和身份；InheritableThreadLocal 在线程创建时继承，不能解决线程池每次提交时的身份传播。需要每任务显式传递并恢复，尤其考虑 CallerRuns 与异步链回调所在的线程。<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/ThreadLocal.html">ThreadLocal API</a>。</p>
 <a class="back-link" href="#q-192">↑ 回到本题</a></div></details>
 </section><section class="chapter" id="sec-added-40-ch-5"><h2>4.8 Spring 代理、异步与事务边界</h2>
-<details class="question" id="q-193"><summary><span class="qnum">119</span><span class="question-title">面试官问：自调用失败是不是所有事务都会失效</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-193"><summary><span class="qnum">120</span><span class="question-title">面试官问：自调用失败是不是所有事务都会失效</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 代理入口 · 外层事务 · 实际调用链</p>
 </blockquote>
 <p>同类 this 调用不经过代理，内层注解的传播/隔离要求不会被新拦截；如果外层已经被代理开启事务，内层数据库操作仍可参与外层事务。AiRecognitionServiceImpl.handleRouteSaveEvent 自带事务并内部调用 bindAiRecognition，是此区别的代码例子。<a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">Spring 事务注解说明</a>。</p>
 <a class="back-link" href="#q-193">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-194"><summary><span class="qnum">120</span><span class="question-title">面试官问：TransactionTemplate 和 @Transactional 有什么不同</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-194"><summary><span class="qnum">121</span><span class="question-title">面试官问：TransactionTemplate 和 @Transactional 有什么不同</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 编程边界 · 代理边界 · 同线程数据库</p>
 </blockquote>
 <p>TransactionTemplate 在调用处显式包裹数据库代码，适合当前 splitAndSaveAreas 和创建任务的局部事务，不依赖方法自调用代理。声明式事务更简洁，但要检查代理路径与 rollbackFor。两者都不会自动把原事务传给 runAsync 新线程，也不包含设备回滚。</p>
 <a class="back-link" href="#q-194">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-195"><summary><span class="qnum">121</span><span class="question-title">面试官问：本地 commit 后发布事件有什么窗口</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-195"><summary><span class="qnum">122</span><span class="question-title">面试官问：本地 commit 后发布事件有什么窗口</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 提交与发布双写 · afterCommit非持久队列</p>
 </blockquote>
 <p>提交成功后进程退出可能没发事件；提交前发事件又可能让消费者看到未提交数据。事务提交后监听改善顺序，不保证宕机后交付；重要事件可用 Outbox 加幂等消费者。当前无持久事件事实时不能宣称事件最终一定送达。</p>
@@ -2505,7 +2513,7 @@ MVCC管快照读，UPDATE管写裁决；原子性不自动表达业务不变量
 </code></pre>
 <hr />
 </section><section class="chapter" id="ch-6"><h2>第 5 周：AI 工程化与智能体业务侧集成</h2></section><section class="chapter" id="sec-1-ch-6"><h2>5.1 AI 工程化项目介绍</h2>
-<details class="question" id="q-68"><summary><span class="qnum">122</span><span class="question-title">面试官问：请介绍你做的 AI 部分</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-68"><summary><span class="qnum">123</span><span class="question-title">面试官问：请介绍你做的 AI 部分</span></summary><div class="answer"><blockquote>
 <p>我参与的 AI 工作更偏工程落地，而不是纯算法研究。平台统一维护航线与场景识别、图片对比和巡视区配置。飞行过程中，图片上传事件触发识别；系统根据事件类型配置决定直接使用端侧检测结果，还是交给云侧 AI 工作流二次确认。</p>
 <p>云侧流程接收图片、提示词和红外等场景变量，返回统一检测结果。后端负责校验工作流状态、转换 bbox 格式、裁剪坐标、过滤异常结果，再构造告警事件发送给告警服务。这样业务链路与具体模型解耦，检测、VLM 或其他能力可以按场景组合。</p>
 <p>场景侧我参与了安全帽、基坑无围栏、吨袋、船只、人员临水等 5 类以上巡检场景的数据标注、模型训练评测和逻辑开发，并使用 Python 编排 YOLO、SAM、VLM。Java 侧则直接负责过航线 AI 统一配置、图像识别服务接入工作流、端侧结果云侧二次确认、RF-DETR ONNX 置信度后处理、云侧统计结果落库和 IoT 设备指令适配。</p>
@@ -2521,23 +2529,23 @@ MVCC管快照读，UPDATE管写裁决；原子性不自动表达业务不变量
 <p>航线重新编辑后可能生成新的 routeId，因此系统会查询原航线配置，再复制到新航线。特定类型的新航线还可以根据样板间启用的工具包自动关联默认识别事件。</p>
 <p>任务起飞时，系统读取航线绑定的识别类型，区分端侧和云侧配置，并查询飞机实际支持的 AI 能力。只有“航线需要”与“飞机支持”的交集才会通过 IoT 下发，同时携带事件类型库中统一维护的置信度阈值。任务级识别配置写入 Redis，避免同一飞行过程中反复查询和组装；降落事件负责清理缓存中的端侧和云侧识别配置，当前代码没有显式向设备下发关闭指令。</p>
 
-<details class="question" id="q-69"><summary><span class="qnum">123</span><span class="question-title">面试官问：为什么把识别配置放在航线维度</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-69"><summary><span class="qnum">124</span><span class="question-title">面试官问：为什么把识别配置放在航线维度</span></summary><div class="answer"><blockquote>
 <p>航线是实际飞行和图片采集入口，不同航线的场景、巡视区和识别需求不同。把配置与航线关联，可以在任务起飞时一次加载本航线需要的端侧和云侧识别类型，也便于航线重新编辑后继承原配置。</p>
 </blockquote>
 <a class="back-link" href="#q-69">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-70"><summary><span class="qnum">124</span><span class="question-title">面试官问：为什么开启端侧识别前还要查询飞机 AI 能力</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-70"><summary><span class="qnum">125</span><span class="question-title">面试官问：为什么开启端侧识别前还要查询飞机 AI 能力</span></summary><div class="answer"><blockquote>
 <p>航线配置表达业务想识别什么，飞机能力表达当前设备实际能运行什么。两者不能互相替代。系统取两者交集后再下发识别类型和置信度阈值，避免向不支持该模型的飞机发送无效指令；任务级配置写入 Redis，降落时清理本次任务的端侧和云侧识别配置缓存。当前代码没有显式下发设备关闭指令，面试时不能描述成完整的 IoT 动态启停。</p>
 </blockquote>
 <a class="back-link" href="#q-70">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-71"><summary><span class="qnum">125</span><span class="question-title">面试官问：先删后插的保存在事务里吗，重复提交会怎样</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-71"><summary><span class="qnum">126</span><span class="question-title">面试官问：先删后插的保存在事务里吗，重复提交会怎样</span></summary><div class="answer"><blockquote>
 <p>bindAiRecognition 带事务，把删除和插入作为本地全量替换；相同配置重复成功提交时业务最终配置相同，但自增ID或更新时间可能变化。handleRouteSaveEvent 虽内部 this 调用，外层已有事务，因此不等于全链路没有事务。</p>
 <p>并发提交不同配置仍需要定义冲突语义或版本控制：事务提供回滚，不代表最后提交必然符合用户预期，也不自动保证没有混合关联。看具体锁、索引和隔离级别。</p>
 </blockquote>
 <a class="back-link" href="#q-71">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-72"><summary><span class="qnum">126</span><span class="question-title">面试官问：降落事件丢了，Redis 里的识别配置怎么办</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-72"><summary><span class="qnum">127</span><span class="question-title">面试官问：降落事件丢了，Redis 里的识别配置怎么办</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 降落清空 · 漏事件保留 · TTL 限时 · 不证明设备关闭</p>
 </blockquote>
 <blockquote>
@@ -2558,22 +2566,22 @@ MVCC管快照读，UPDATE管写裁决；原子性不自动表达业务不变量
 </ul>
 <p>这一分流以事件类型库配置为准，而不是在处理器里硬编码具体场景。因此同一个端侧检测结果可以按场景选择直接告警，也可以进入云侧工作流做语义确认。</p>
 
-<details class="question" id="q-73"><summary><span class="qnum">127</span><span class="question-title">面试官问：为什么不把所有场景都交给 VLM</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-73"><summary><span class="qnum">128</span><span class="question-title">面试官问：为什么不把所有场景都交给 VLM</span></summary><div class="answer"><blockquote>
 <p>简单、规则稳定的场景直接检测更快、更便宜；需要语义理解或端侧容易误识别的场景再使用工作流或 VLM 二次确认。方案需要在识别效果、推理效率和部署复杂度之间按场景权衡，不是模型越大越好。</p>
 </blockquote>
 <a class="back-link" href="#q-73">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-74"><summary><span class="qnum">128</span><span class="question-title">面试官问：为什么需要工作流</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-74"><summary><span class="qnum">129</span><span class="question-title">面试官问：为什么需要工作流</span></summary><div class="answer"><blockquote>
 <p>工作流把模型编排从业务代码中抽出来。后端只维护统一输入输出契约，具体场景可以在流程中组合检测、分割、VLM 和规则节点。这样更换模型或调整组合时，不需要反复修改整条业务链路。</p>
 </blockquote>
 <a class="back-link" href="#q-74">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-75"><summary><span class="qnum">129</span><span class="question-title">面试官问：你接入 AI 工作流具体做了什么</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-75"><summary><span class="qnum">130</span><span class="question-title">面试官问：你接入 AI 工作流具体做了什么</span></summary><div class="answer"><blockquote>
 <p>我参与将Java图像识别调用按事件类型路由到工作流，统一图片、提示词和场景变量的输入，以及状态和检测结果的输出。异步处理隔离主链路，失败返回由业务分支处理。当前失败/空结果通常不发告警，这是一种现有行为，不等于自动降级成功或不漏报；是否重试与告警抑制要按场景契约决定。</p>
 </blockquote>
 <a class="back-link" href="#q-75">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-76"><summary><span class="qnum">130</span><span class="question-title">面试官问：云侧失败了会回退到端侧吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-76"><summary><span class="qnum">131</span><span class="question-title">面试官问：云侧失败了会回退到端侧吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 分流时跳过端侧 · 云失败无告警 · 不能证明无漏报</p>
 </blockquote>
 <blockquote>
@@ -2599,17 +2607,17 @@ MVCC管快照读，UPDATE管写裁决；原子性不自动表达业务不变量
 <p>事件类型库还支持配置“到达起飞点”和“到达第一个航点”时执行的飞机指令，用于编排设备的感知与取证能力：航线绑定识别事件类型后，飞行事件触发系统读取该类型配置的 JSON 指令，通过 IoT 修改设备属性。业务上，这些指令可以开启端侧 AI 感知能力，也可以配置识别后的设备取证行为。需要注意，后端是在固定飞行阶段下发策略，并不是收到某次 AI 识别结果后临时触发该处理器。</p>
 <p><strong>模型后处理扩展（原AI项目材料，并非这两个建模分支新增）：</strong> RF-DETR ONNX后处理可先比较query的类别logits，而不是对每个类别都计算Sigmoid。后续调整为先找最大 raw logit，只对最大值执行一次 Sigmoid，再与事件类型库的置信度阈值比较。因为 Sigmoid 单调递增，最大 logit 对应的类别不会改变，但减少了无效指数运算。</p>
 
-<details class="question" id="q-77"><summary><span class="qnum">131</span><span class="question-title">面试官问：为什么使用事件驱动</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-77"><summary><span class="qnum">132</span><span class="question-title">面试官问：为什么使用事件驱动</span></summary><div class="answer"><blockquote>
 <p>图片上传、AI 推理和告警处理耗时不同。如果同步串联，会阻塞图片接入链路，也让上游强依赖下游响应。事件驱动让图片上传只发布事实，AI 异步处理，成功后再发布告警事件，既隔离耗时步骤，也便于后续增加落库、通知或 IoT 动作消费者。</p>
 </blockquote>
 <a class="back-link" href="#q-77">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-78"><summary><span class="qnum">132</span><span class="question-title">面试官问：为什么只对最大 logit 做 Sigmoid</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-78"><summary><span class="qnum">133</span><span class="question-title">面试官问：为什么只对最大 logit 做 Sigmoid</span></summary><div class="answer"><blockquote>
 <p>Sigmoid 是单调递增函数，先比较 raw logits 找最大类别，与先把每个 logit 转成概率再找最大类别，最终类别相同。因此可以先找最大 logit，只计算一次 Sigmoid 得到置信度，再做阈值过滤，避免对所有 query 和类别重复执行指数运算。</p>
 </blockquote>
 <a class="back-link" href="#q-78">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-79"><summary><span class="qnum">133</span><span class="question-title">面试官问：bbox 阈值是多少，整批丢弃会不会误杀真实多目标场景</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-79"><summary><span class="qnum">134</span><span class="question-title">面试官问：bbox 阈值是多少，整批丢弃会不会误杀真实多目标场景</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 默认10 · 整批丢弃 · 真多目标风险 · 先评测</p>
 </blockquote>
 <blockquote>
@@ -2618,7 +2626,7 @@ MVCC管快照读，UPDATE管写裁决；原子性不自动表达业务不变量
 </blockquote>
 <a class="back-link" href="#q-79">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-80"><summary><span class="qnum">134</span><span class="question-title">面试官问：AI 工作流失败怎么处理</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-80"><summary><span class="qnum">135</span><span class="question-title">面试官问：AI 工作流失败怎么处理</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 记录异常 · 失败/空结果无告警 · 漏报取舍 · 有界重试待补</p>
 </blockquote>
 <blockquote>
@@ -2626,7 +2634,7 @@ MVCC管快照读，UPDATE管写裁决；原子性不自动表达业务不变量
 </blockquote>
 <a class="back-link" href="#q-80">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-81"><summary><span class="qnum">135</span><span class="question-title">面试官问：模型效果提高了多少</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-81"><summary><span class="qnum">136</span><span class="question-title">面试官问：模型效果提高了多少</span></summary><div class="answer"><blockquote>
 <p>仓库能够证明的是工程链路、端云分流和结果治理，但没有完整可追溯的评测数据集、评测脚本和正式报表，所以我不会给出无法验证的百分比。我可以说明不同场景为什么选择检测或 VLM 二次确认，以及如何根据误识别样本调整流程，但量化指标以正式评测记录为准。</p>
 </blockquote>
 <p><strong>八股扩展：</strong> 输入输出契约、bbox逆变换、置信度与评测、持久化后事件发布及告警去重。结构正确不代表语义正确，识别完成不等于告警送达。</p>
@@ -2635,7 +2643,7 @@ MVCC管快照读，UPDATE管写裁决；原子性不自动表达业务不变量
 <p>口径：简历中智能体是独立项目。本人主要负责业务侧集成（Action 协议、SSE、异步状态、位置资产），开发平台 Channel 与 MCP Server，编写三维重建等 Skill，参与 OpenClaw 其他功能。模型私有化部署、企业微信通道、画面理解为系统能力或他人工作，不揽。</p>
 </blockquote>
 
-<details class="question" id="q-196"><summary><span class="qnum">136</span><span class="question-title">面试官问：请介绍智能体</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-196"><summary><span class="qnum">137</span><span class="question-title">面试官问：请介绍智能体</span></summary><div class="answer"><blockquote>
 <p>该智能体是面向政企客户的无人机业务智能体，基于 OpenClaw 构建：用户通过自然语言／语音对话驱动巡检任务派发、飞行实时操控、三维重建、画面语义问答等 50 余个业务指令，模型私有化部署。我主要负责业务侧集成——参与定义并实现智能体与业务系统间的 Action 执行协议，实现指令接收确认、结果回调与轮询查询语义，通过 SSE 推送交互指令，Redis 保存短期异步状态；此外开发了平台前端与 OpenClaw 通信的 Channel 和平台端 MCP Server，编写了三维重建等业务 Skill。系统分层是：Channel 管消息与身份，MCP 管查询，Action 协议管执行，Skill 管编排，工作流管长流程。</p>
 <p>位置资产方面，我把区域、点位、分割点位和最佳视角等空间数据按名称持久化。位置资产按用户隔离，有样板间上下文时再叠加样板间范围。当用户提到“某个点”或“某个区域”时，智能体可以用名称匹配具体坐标和视角姿态，再把位置数据交给后续业务能力调用。</p>
 </blockquote>
@@ -2657,17 +2665,17 @@ MVCC管快照读，UPDATE管写裁决；原子性不自动表达业务不变量
 <li><code>view</code>：经纬度、高度、俯仰角、偏航角和翻滚角。</li>
 </ul>
 
-<details class="question" id="q-83"><summary><span class="qnum">137</span><span class="question-title">面试官问：为什么把它定位为位置资产，而不是长期记忆系统</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-83"><summary><span class="qnum">138</span><span class="question-title">面试官问：为什么把它定位为位置资产，而不是长期记忆系统</span></summary><div class="answer"><blockquote>
 <p>这里保存的不是对话内容或模型记忆，而是带名称的区域、点位、坐标和视角姿态。核心作用是把用户说的“某个点”映射到平台可以执行的具体空间位置。它没有向量检索、对话摘要、情景记忆或记忆衰减，因此更准确的表述是智能体位置资产管理，而不是大模型长期记忆系统。</p>
 </blockquote>
 <a class="back-link" href="#q-83">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-84"><summary><span class="qnum">138</span><span class="question-title">面试官问：为什么 spatialPayload 使用 JSON</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-84"><summary><span class="qnum">139</span><span class="question-title">面试官问：为什么 spatialPayload 使用 JSON</span></summary><div class="answer"><blockquote>
 <p>ZONE 和 POSE 的空间结构不同，但都属于一条位置资产且生命周期一致。JSON 可以兼容 points、segmentPoints 和 view，减少大量可空列和多表查询；Java 侧仍使用 SpatialPayload 强类型对象。代价是数据库难以高效检索 JSON 内部坐标，如果未来需要高频空间查询，应考虑空间数据库或拆分索引表。</p>
 </blockquote>
 <a class="back-link" href="#q-84">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-85"><summary><span class="qnum">139</span><span class="question-title">面试官问：名称唯一性校验有并发窗口吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-85"><summary><span class="qnum">140</span><span class="question-title">面试官问：名称唯一性校验有并发窗口吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 先查后插 · 事务非唯一约束 · NULL与软删 · 数据层裁决</p>
 </blockquote>
 <blockquote>
@@ -2685,7 +2693,7 @@ MVCC管快照读，UPDATE管写裁决；原子性不自动表达业务不变量
 <li>同一用户、同一样板间下有效名称是否重复。</li>
 </ul>
 
-<details class="question" id="q-86"><summary><span class="qnum">140</span><span class="question-title">面试官问：用户 A 传入用户 B 的记忆 ID 会怎样</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-86"><summary><span class="qnum">141</span><span class="question-title">面试官问：用户 A 传入用户 B 的记忆 ID 会怎样</span></summary><div class="answer"><blockquote>
 <p>修改和删除不是直接按主键操作，而是先使用 id、当前 userId，以及可用的 showroomId 查询归属。查不到就返回位置资产不存在，因此用户 A 无法通过猜测 ID 修改用户 B 的数据。</p>
 </blockquote>
 <p><strong>八股扩展：</strong> 认证、授权、租户范围和对象归属不同层次。单个方法带userId不证明全模块安全；跨用户读取、回调和批量操作也要检查。</p>
@@ -2693,7 +2701,7 @@ MVCC管快照读，UPDATE管写裁决；原子性不自动表达业务不变量
 </section><section class="chapter" id="sec-8-ch-6"><h2>5.8 SSE 和 Redis 状态</h2><p>SSE 用于服务端向当前用户实时推送指令和执行反馈。它适合单向通知，比前端轮询及时，也比为这个场景维护完整双向 WebSocket 更简单。</p>
 <p>Redis 保存短期异步指令状态，Lua 保护走脚本路径的合法转移；初始化入口使用普通SET，整体受理防重不是已完成保证。详见4.5。</p>
 
-<details class="question" id="q-87"><summary><span class="qnum">141</span><span class="question-title">面试官问：SSE 能作为唯一状态来源吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-87"><summary><span class="qnum">142</span><span class="question-title">面试官问：SSE 能作为唯一状态来源吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> SSE 实时通知 · 持久状态真值 · 断线重查</p>
 </blockquote>
 <blockquote>
@@ -2701,7 +2709,7 @@ MVCC管快照读，UPDATE管写裁决；原子性不自动表达业务不变量
 </blockquote>
 <a class="back-link" href="#q-87">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-88"><summary><span class="qnum">142</span><span class="question-title">面试官问：SSE 断线期间的推送丢了怎么办</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-88"><summary><span class="qnum">143</span><span class="question-title">面试官问：SSE 断线期间的推送丢了怎么办</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 平台查messageId · Java Agent补持久事件 · delta不补放 · Python内存不同</p>
 </blockquote>
 <blockquote>
@@ -2723,7 +2731,7 @@ OpenClaw Agent（模型 + 提示词 + 工具调用循环）
    │ 长流程 → agent-scene-workflow（14 态状态机、decide 推进决策点）
 </code></pre>
 
-<details class="question" id="q-89"><summary><span class="qnum">143</span><span class="question-title">面试官问：为什么既有 MCP 又有自研指令协议</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-89"><summary><span class="qnum">144</span><span class="question-title">面试官问：为什么既有 MCP 又有自研指令协议</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> MCP 管契约 · Action 管执行生命周期 · 长流程另编排</p>
 </blockquote>
 <blockquote>
@@ -2731,7 +2739,7 @@ OpenClaw Agent（模型 + 提示词 + 工具调用循环）
 </blockquote>
 <a class="back-link" href="#q-89">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-90"><summary><span class="qnum">144</span><span class="question-title">面试官问：Action 协议的完整生命周期</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-90"><summary><span class="qnum">145</span><span class="question-title">面试官问：Action 协议的完整生命周期</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 接收 → 分发 → ACK → 回调 → 查询；同态可刷新消息/TTL</p>
 </blockquote>
 <blockquote>
@@ -2739,7 +2747,7 @@ OpenClaw Agent（模型 + 提示词 + 工具调用循环）
 </blockquote>
 <a class="back-link" href="#q-90">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-91"><summary><span class="qnum">145</span><span class="question-title">面试官问：Channel 怎么做多租户鉴权</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-91"><summary><span class="qnum">146</span><span class="question-title">面试官问：Channel 怎么做多租户鉴权</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 信封带上下文 → Channel 透传 → 工具附头 → 业务端验身份/租户/资源</p>
 </blockquote>
 <blockquote>
@@ -2747,7 +2755,7 @@ OpenClaw Agent（模型 + 提示词 + 工具调用循环）
 </blockquote>
 <a class="back-link" href="#q-91">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-92"><summary><span class="qnum">146</span><span class="question-title">面试官问：三维重建 Skill 的确认机制</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-92"><summary><span class="qnum">147</span><span class="question-title">面试官问：三维重建 Skill 的确认机制</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 预览 → 等下一轮 → 原话校验 → 防同轮/重放 → 状态转移；授权须可信</p>
 </blockquote>
 <blockquote>
@@ -2755,7 +2763,7 @@ OpenClaw Agent（模型 + 提示词 + 工具调用循环）
 </blockquote>
 <a class="back-link" href="#q-92">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-93"><summary><span class="qnum">147</span><span class="question-title">面试官问：怎么管住模型不让它乱来（B/G 端高频）</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-93"><summary><span class="qnum">148</span><span class="question-title">面试官问：怎么管住模型不让它乱来（B/G 端高频）</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 确认门 · 预构造指令 · 服务端校验 · 循环/副作用防重</p>
 </blockquote>
 <blockquote>
@@ -2784,7 +2792,7 @@ OpenClaw Agent（模型 + 提示词 + 工具调用循环）
 <li>query 中的 sessionId 标识会话，即信封 sessionId 与 reply 路由的键。</li>
 </ul>
 
-<details class="question" id="q-94"><summary><span class="qnum">148</span><span class="question-title">面试官问：为什么不让前端直连 OpenClaw 网关</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-94"><summary><span class="qnum">149</span><span class="question-title">面试官问：为什么不让前端直连 OpenClaw 网关</span></summary><div class="answer"><blockquote>
 <p>一是网络与安全边界：OpenClaw 网关部署在算法内网，若直接对浏览器开放就要处理海量连接、设备鉴权和公网暴露面；现在它只作为 WS 客户端拨出一条连接到业务域的中转服务，Agent 侧零监听。二是身份翻译：中转服务持有用户会话，把&quot;哪个浏览器在说话&quot;翻译成信封里的 accessToken／行业／样板间上下文，OpenClaw 无需感知平台的登录体系。三是它同时是业务侧推送入口——巡检工作流经 Feign 让它给用户推进度，前端一条连接收全所有消息。</p>
 </blockquote>
 <a class="back-link" href="#q-94">↑ 回到本题</a></div></details>
@@ -2827,84 +2835,84 @@ OpenClaw Agent（模型 + 提示词 + 工具调用循环）
 <li>__onHushiAgentReply：agent-bridge 直推 final 回复；turnId 优先显式传入、否则回落会话上下文保存的 turnId——<strong>三维重建 Skill 五重校验里的&quot;轮次&quot;就来自这里的 turnId，跨模块串联点</strong> 。</li>
 </ul>
 
-<details class="question" id="q-95"><summary><span class="qnum">149</span><span class="question-title">面试官问：为什么重连不用框架的自动重启</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-95"><summary><span class="qnum">150</span><span class="question-title">面试官问：为什么重连不用框架的自动重启</span></summary><div class="answer"><blockquote>
 <p>框架 auto-restart 通常带指数退避，断几次后重连间隔会退到分钟级；样板间大屏是常驻展示场景，断线几分钟等于不可用。所以插件自己管理重连：startAccount 内部 while 循环 + 固定 5 秒间隔、永不返回（返回才会触发框架重启）。代价是放弃退避对对端的保护，但目标是内网自建网关，可控。</p>
 </blockquote>
 <a class="back-link" href="#q-95">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-96"><summary><span class="qnum">150</span><span class="question-title">面试官问：快捷回复为什么要随机</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-96"><summary><span class="qnum">151</span><span class="question-title">面试官问：快捷回复为什么要随机</span></summary><div class="answer"><blockquote>
 <p>模型首响应要几秒，先回&quot;收到/好的/马上&quot;把首响压到毫秒级；随机化避免每条都回同一个词显得机械。细节层面的对话体验设计，被追问&quot;你们怎么优化响应体验&quot;时的好例子。</p>
 </blockquote>
 <a class="back-link" href="#q-96">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-97"><summary><span class="qnum">151</span><span class="question-title">面试官问：这个 Channel 和 MCP Server、Action 协议的边界</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-97"><summary><span class="qnum">152</span><span class="question-title">面试官问：这个 Channel 和 MCP Server、Action 协议的边界</span></summary><div class="answer"><blockquote>
 <p>Channel 是 OpenClaw 与前端之间的&quot;消息与身份层&quot;：管连接、会话、鉴权上下文注入和回复通道，不理解任何业务。MCP 是查询契约层，Action 协议是执行语义层——后两者调用平台后端，前者只负责把消息和身份安全地送进/送出 Agent。身份在 Channel 注入一次，MCP 和 Skill 全程复用。</p>
 </blockquote>
 <p><strong>补充代码定位：</strong> 独立Channel快照2ea6729的index.ts。** 八股扩展：** 连接复用、会话路由、凭据作用域和并发上下文；内存Map与generation轮换不是持久恢复协议。</p>
 <a class="back-link" href="#q-97">↑ 回到本题</a></div></details>
 </section><section class="chapter" id="sec-added-53-ch-6"><h2>5.11 AI 工程八股：输入、指标、后处理与失败</h2><p>这里是原理扩展，不声称新增模型训练、部署或评测已由两个建模分支证明。</p>
 
-<details class="question" id="q-197"><summary><span class="qnum">152</span><span class="question-title">面试官问：YOLO、SAM、VLM 为什么要组合</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-197"><summary><span class="qnum">153</span><span class="question-title">面试官问：YOLO、SAM、VLM 为什么要组合</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 检测框 · 分割掩码 · 语义确认 · 分层成本</p>
 </blockquote>
 <p>检测模型定位目标并分类，SAM类分割模型提供像素区域，VLM结合图像和语言理解场景。把简单定位与复杂语义分开可以控制成本，但串联会传播上游漏检，需要保留不确定性并单独评价每一阶段。它们不是越叠越好，实际组合由场景收益决定。</p>
 <a class="back-link" href="#q-197">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-198"><summary><span class="qnum">153</span><span class="question-title">面试官问：Precision、Recall、IoU、mAP 如何解释</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-198"><summary><span class="qnum">154</span><span class="question-title">面试官问：Precision、Recall、IoU、mAP 如何解释</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 误报 · 漏报 · 框重叠 · 多阈值评测</p>
 </blockquote>
 <p>Precision=TP/(TP+FP)，Recall=TP/(TP+FN)；IoU 是预测框与真值框交集/并集，不是置信度。AP汇总精确率召回率关系，mAP还要明确类别、IoU阈值及评测约定。业务可以关心每架次误报、真实事件召回与延迟，不能用训练集分数或一两个案例声称上线提升。<a href="https://huggingface.co/docs/transformers/tasks/object_detection">官方检测任务说明</a>。</p>
 <a class="back-link" href="#q-198">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-199"><summary><span class="qnum">154</span><span class="question-title">面试官问：为什么置信度阈值不能所有事件都设一样</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-199"><summary><span class="qnum">155</span><span class="question-title">面试官问：为什么置信度阈值不能所有事件都设一样</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 分数非准确率 · 场景代价 · 验证集校准</p>
 </blockquote>
 <p>分数通常不是经过校准的“这条告警有多少概率正确”。提高阈值往往减少误报也增加漏报；事件严重程度、目标尺度和数据分布不同，阈值应按验证集及业务损失调优。端侧与云侧分数不可直接比较或相乘当最终置信度。</p>
 <a class="back-link" href="#q-199">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-200"><summary><span class="qnum">155</span><span class="question-title">面试官问：bbox 接入最容易错在哪里</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-200"><summary><span class="qnum">156</span><span class="question-title">面试官问：bbox 接入最容易错在哪里</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 格式 · 坐标域 · resize/pad反变换 · 裁剪</p>
 </blockquote>
 <p>明确是xyxy、xywh还是cxcywh，以及像素还是归一化；缩放、letterbox padding、裁剪后需逆变换回原图。再验证坐标范围、宽高正值、NaN及类别映射。Java 后处理能校验结构和坐标，不能因此证明模型语义正确。</p>
 <a class="back-link" href="#q-200">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-201"><summary><span class="qnum">156</span><span class="question-title">面试官问：NMS 和 DETR 类后处理能混用吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-201"><summary><span class="qnum">157</span><span class="question-title">面试官问：NMS 和 DETR 类后处理能混用吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 看输出契约 · 候选重叠 · 集合预测</p>
 </blockquote>
 <p>NMS按置信度和IoU抑制重复候选，常见于密集检测；DETR类通常训练为集合预测，不能不看导出格式就照搬YOLO后处理。核对类别分数是否需要sigmoid/softmax、是否有背景类、框的归一化及输入输出形状，避免二次激活或错误阈值。详细模型原理在技术专栏，不由Java调用证明。</p>
 <a class="back-link" href="#q-201">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-202"><summary><span class="qnum">157</span><span class="question-title">面试官问：数据划分为什么不能随机拆同一视频相邻帧</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-202"><summary><span class="qnum">158</span><span class="question-title">面试官问：数据划分为什么不能随机拆同一视频相邻帧</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 数据泄漏 · 同航次分组 · 场景分布漂移</p>
 </blockquote>
 <p>相邻帧高度相似，随机进入训练和验证会高估泛化。按航次、地点、时间或设备分组划分，并保留夜间、小目标、遮挡等切片。训练代码跑完不代表覆盖线上分布，发布要保留模型版本、数据和阈值证据。</p>
 <a class="back-link" href="#q-202">↑ 回到本题</a></div></details>
 </section><section class="chapter" id="sec-added-54-ch-6"><h2>5.12 Agent 工程八股：工具、权限与异步协议</h2>
-<details class="question" id="q-203"><summary><span class="qnum">158</span><span class="question-title">面试官问：Function Calling、MCP、RAG 和 Agent 有什么关系</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-203"><summary><span class="qnum">159</span><span class="question-title">面试官问：Function Calling、MCP、RAG 和 Agent 有什么关系</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 参数提议 · 工具协议 · 检索上下文 · 执行循环</p>
 </blockquote>
 <p>Function Calling让模型提出工具名和参数，应用验证并执行；MCP提供工具发现/调用契约；RAG检索资料补充上下文；Agent循环根据结果继续规划。技术可以组合，数据库位置资产按名查不是自动的向量RAG，工具调用也不是已获用户授权。<a href="https://modelcontextprotocol.io/specification/2025-06-18/server/tools">MCP工具规范</a>。</p>
 <a class="back-link" href="#q-203">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-204"><summary><span class="qnum">159</span><span class="question-title">面试官问：提示词里的人工确认为什么还不够</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-204"><summary><span class="qnum">160</span><span class="question-title">面试官问：提示词里的人工确认为什么还不够</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 可信身份 · 绑定参数 · 单次消费 · 过期</p>
 </blockquote>
 <p>提示词是行为指导，模型可以输出“用户已确认”。执行端需要从可信用户通道取得授权，并绑定具体动作/参数摘要、用户和租户、确认身份与有效期，原子消费并防重放。原话关键词和轮次hash能约束流程，但不证明模型传入的文本真实来自用户。</p>
 <a class="back-link" href="#q-204">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-205"><summary><span class="qnum">160</span><span class="question-title">面试官问：Token 透传等于多租户隔离吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-205"><summary><span class="qnum">161</span><span class="question-title">面试官问：Token 透传等于多租户隔离吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 验身份 · 验租户 · 验资源归属 · 默认拒绝</p>
 </blockquote>
 <p>Channel带登录态只提供上下文，业务端仍要验证token、租户/样板间权限及资源归属。不能相信模型或前端任意填userId/showroomId；读、写、事件补拉、回调每条路径都要核对。ThreadLocal只是进程内上下文载体，不是授权机制。</p>
 <a class="back-link" href="#q-205">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-206"><summary><span class="qnum">161</span><span class="question-title">面试官问：为什么 SSE、WebSocket 和轮询并存</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-206"><summary><span class="qnum">162</span><span class="question-title">面试官问：为什么 SSE、WebSocket 和轮询并存</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 传输方向 · 受理协议 · 真值与补拉</p>
 </blockquote>
 <p>SSE适合服务端单向事件，WebSocket适合双向持续会话，轮询用于断线查当前结果。选传输不会自动提供业务幂等或持久重放；seq/messageId负责关联，持久记录和授权检查负责恢复。代理缓冲、心跳、连接限制与背压也影响流式可用性。<a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-async.html">Spring异步请求</a>。</p>
 <a class="back-link" href="#q-206">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-207"><summary><span class="qnum">162</span><span class="question-title">面试官问：runId、messageId、commandId、traceId 能共用吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-207"><summary><span class="qnum">163</span><span class="question-title">面试官问：runId、messageId、commandId、traceId 能共用吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 运行 · 协议消息 · 业务动作 · 诊断链路</p>
 </blockquote>
 <p>它们作用不同：一次Agent运行可以产生多个命令，trace用于观测，commandId用于业务受理防重，messageId用于协议关联。重试应保留同一动作身份，重新运行可能产生新runId；不能每次HTTP重试都换commandId，或把traceId当权限凭据。</p>
@@ -2952,7 +2960,7 @@ Redis Lua 防止终态被并发回调覆盖
 </code></pre>
 <p>端云协同的语义分层：端侧判&quot;瞬时静止&quot;（区域内、那一刻停着的车才拍），云端多轮复现判&quot;持续静止&quot;（隔一轮还在）。两者互补：端侧可减少上云图片量，跨轮复现增加确认依据；等红灯或中途离开再返回仍需业务规则判别，两次拍照存在不证明全程持续静止。</p>
 
-<details class="question" id="q-98"><summary><span class="qnum">163</span><span class="question-title">面试官问：请介绍违章停车多轮复核</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-98"><summary><span class="qnum">164</span><span class="question-title">面试官问：请介绍违章停车多轮复核</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 端侧拍照 → 云端识牌 → 相邻复现 → 新目标驱动 → 收敛/轮数上限</p>
 </blockquote>
 <blockquote>
@@ -2988,7 +2996,7 @@ NOT_CONFIRMED 收口时仍未复现，排除
 <li><strong>区域严管属性与判定策略</strong> ：严管/非严管是<strong>巡视区域的属性</strong> （每个区域带 manageType）。编排发起复核时判定策略：** 只要任一巡视区标记严管，整单复核即按严管策略执行——第一轮识别收口直接确认，跳过全部复飞轮次** ；全部区域非严管才走多轮复核。注意两个细节：一是代码注释写的是“全部为严管”但实现是 <code>anyMatch</code>（任一即真），以实现为准；二是混合区域（一个严管 + 一个普通）时，普通区识别到的车也会被单轮确认——当前判定粒度是整单而非区域，车辆记录上的 <code>manage_type</code> 字段为将来演进成“严管区单轮、普通区多轮”的区域级判定预留了数据基础。</li>
 </ol>
 
-<details class="question" id="q-99"><summary><span class="qnum">164</span><span class="question-title">面试官问：多轮怎么终止，永远有新车牌怎么办</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-99"><summary><span class="qnum">165</span><span class="question-title">面试官问：多轮怎么终止，永远有新车牌怎么办</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 收敛停 · 轮数护栏 · 明确失败停 · 等待截止另补</p>
 </blockquote>
 <blockquote>
@@ -2997,20 +3005,20 @@ NOT_CONFIRMED 收口时仍未复现，排除
 </blockquote>
 <a class="back-link" href="#q-99">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-100"><summary><span class="qnum">165</span><span class="question-title">面试官问：为什么用&quot;相邻轮复现&quot;而不是&quot;累计出现 N 轮&quot;</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-100"><summary><span class="qnum">166</span><span class="question-title">面试官问：为什么用&quot;相邻轮复现&quot;而不是&quot;累计出现 N 轮&quot;</span></summary><div class="answer"><blockquote>
 <p>相邻轮要求前一轮和当前轮都出现匹配目标；累计出现会把中间消失又返回的车辆算进来。连续观察仍不能证明物理车辆从未离开，算法只是业务判据。</p>
 <p>代码查询roundNo-1的候选。漏检一轮会打断相邻关系；例如第1、3轮出现但第2轮缺失，第3轮不能直接凭第1轮确认，第3、4轮连续出现后才可能确认。历史疑似保留与相邻轮可匹配是不同概念。</p>
 </blockquote>
 <a class="back-link" href="#q-100">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-101"><summary><span class="qnum">166</span><span class="question-title">面试官问：确认车辆后续轮次还在，会不会重复告警</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-101"><summary><span class="qnum">167</span><span class="question-title">面试官问：确认车辆后续轮次还在，会不会重复告警</span></summary><div class="answer"><blockquote>
 <p>正常后续轮次中，alreadyConfirmedBefore区分首次确认与持续出现，返回新增确认记录以减少重复告警。其他告警入口还需核对其业务身份与持久去重，不能将一次布尔判断或Redis去重键当跨系统恰好一次。</p>
 <p>两个并发识别处理都读到“未确认”、事件发送后本地写失败、去重状态过期等仍是应验证窗口。事件状态更新与告警发布的可靠衔接见3.9。</p>
 </blockquote>
 <a class="back-link" href="#q-101">↑ 回到本题</a></div></details>
 </section><section class="chapter" id="sec-3-ch-7"><h2>A.3 车牌匹配：忽略首字符</h2><p>匹配键规则：车牌去空白转大写后，去掉第一个字符（省份简称），剩余部分只保留字母数字。原因：大模型识别省份简称错误率高（冀/翼、苏/肃形近字），但同一辆车两轮后缀也可能识别错误，忽略首字符仅处理一种误差来源。判定、告警配对、取证报告共用同一条规则，保证三方口径一致。</p>
 
-<details class="question" id="q-102"><summary><span class="qnum">167</span><span class="question-title">面试官问：为什么不全文匹配或者编辑距离</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-102"><summary><span class="qnum">168</span><span class="question-title">面试官问：为什么不全文匹配或者编辑距离</span></summary><div class="answer"><blockquote>
 <p>全文匹配会把省份字符识别差异判成两辆车，复现判定永远失败。编辑距离能容错但会把&quot;差一个字符的不同车&quot;也匹配上（5/S、8/B 在真实车牌空间里是不同车），误确认的代价在违停场景不可接受。忽略首字符是在&quot;识别误差的分布&quot;（省份字符集中出错）和&quot;匹配的严格性&quot;（后缀必须完全一致）之间取的精确平衡，且规则极简可解释。</p>
 </blockquote>
 <p><strong>八股扩展：</strong> 字符串规范化、Unicode码点与匹配键碰撞。忽略省份字符降低某类误差，也增加跨省同尾号误匹配风险；匹配键不是车辆物理唯一身份。</p>
@@ -3067,7 +3075,7 @@ NOT_CONFIRMED 收口时仍未复现，排除
 </tbody>
 </table></div>
 
-<details class="question" id="q-103"><summary><span class="qnum">168</span><span class="question-title">面试官问：图片链路卡住了怎么办，是继续复核还是超时</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-103"><summary><span class="qnum">169</span><span class="question-title">面试官问：图片链路卡住了怎么办，是继续复核还是超时</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 上传等待与识别完成分开 · finally 非进程保障 · 计数非图片完整</p>
 </blockquote>
 <blockquote>
@@ -3081,7 +3089,7 @@ pending=0与图片完整、车辆不存在是三个不同判断。
 </blockquote>
 <a class="back-link" href="#q-103">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-104"><summary><span class="qnum">169</span><span class="question-title">面试官问：Redis 计数的键和过期怎么设计，计数减到负数怎么办</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-104"><summary><span class="qnum">170</span><span class="question-title">面试官问：Redis 计数的键和过期怎么设计，计数减到负数怎么办</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 轮次计数 · INCR原子非业务原子 · 缺失/异常返回0 · 不能当完整</p>
 </blockquote>
 <blockquote>
@@ -3101,7 +3109,7 @@ pending=0与图片完整、车辆不存在是三个不同判断。
 <li><strong>双端解耦发版</strong> ：工作流先升级、平台后升级的窗口期，detail 响应里没有 converged 字段——编排检测到字段缺失自动退回固定两轮行为。两端可以独立发版互不阻塞。</li>
 </ol>
 
-<details class="question" id="q-105"><summary><span class="qnum">170</span><span class="question-title">面试官问：为什么改编排必须加版本桩</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-105"><summary><span class="qnum">171</span><span class="question-title">面试官问：为什么改编排必须加版本桩</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 历史重放 · 确定性 · 版本分叉 · 旧历史旧路 · 新实例新路</p>
 </blockquote>
 <blockquote>
@@ -3109,12 +3117,12 @@ pending=0与图片完整、车辆不存在是三个不同判断。
 </blockquote>
 <a class="back-link" href="#q-105">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-106"><summary><span class="qnum">171</span><span class="question-title">面试官问：平台和工作流怎么协调发版</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-106"><summary><span class="qnum">172</span><span class="question-title">面试官问：平台和工作流怎么协调发版</span></summary><div class="answer"><blockquote>
 <p>靠响应字段缺失降级。多轮决策依赖平台 detail 接口的 converged/nextRoundNo 字段，编排检测到这两个字段为 null（旧版平台没有）就退回固定两轮。所以发版顺序无关紧要：平台先上、工作流后上，或反过来，行为都正确退化。这比“两个服务必须同时发版”的耦合方案运维成本低得多。</p>
 </blockquote>
 <a class="back-link" href="#q-106">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-107"><summary><span class="qnum">172</span><span class="question-title">面试官问：轮询等待和轮间 sleep 会不会占用工作线程</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-107"><summary><span class="qnum">173</span><span class="question-title">面试官问：轮询等待和轮间 sleep 会不会占用工作线程</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> Workflow.sleep 持久计时 · Activity 执行占资源 · SDK 上下文仍有成本</p>
 </blockquote>
 <blockquote>
@@ -3140,43 +3148,43 @@ pending=0与图片完整、车辆不存在是三个不同判断。
     PT--&gt;&gt;EM: illegalParkingEvidence
     Note over EM: 失败/无匹配 → null 降级，不阻塞详情</pre></details></figure><p>方案取舍：最初实现是 emergency 直查平台数据库（建 entity/dao），后来改为 Feign——核心理由是<strong>判定规则单一维护</strong> ：车牌匹配键、配对逻辑都在平台一处，平台改规则不会和 emergency 静默不一致；其次表归属清晰，平台改表结构不波及 emergency。代价是详情页多一次内网调用（低频场景可忽略）。</p>
 
-<details class="question" id="q-108"><summary><span class="qnum">173</span><span class="question-title">面试官问：为什么 Feign 而不是直查库</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-108"><summary><span class="qnum">174</span><span class="question-title">面试官问：为什么 Feign 而不是直查库</span></summary><div class="answer"><blockquote>
 <p>直查库要复制三样东西到另一个服务：表映射、车牌匹配规则、证据组装逻辑（图片回退、RSA 解密、坐标还原）。其中匹配规则是最危险的耦合——平台哪天调整规则，emergency 不会知道，事件详情展示的车和判定确认的车会静默对不上。Feign 把这些收敛在被数据所属的服务里，跨服务只剩一个 HTTP 契约。详情页低频，多一次内网调用的代价可以接受；调用失败降级 null，不阻塞详情主流程。</p>
 </blockquote>
 <p><strong>八股扩展：</strong> 服务契约、数据所有权、超时/降级与信息丢失。详情返回null保持主流程可用，但证据可能缺失，应监控失败并允许重查；不能称查询失败为完整取证成功。</p>
 <a class="back-link" href="#q-108">↑ 回到本题</a></div></details>
 </section><section class="chapter" id="sec-7-ch-7"><h2>A.7 我的贡献边界（诚实口径）</h2>
-<details class="question" id="q-109"><summary><span class="qnum">174</span><span class="question-title">面试官问：这个模块哪些是你做的</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-109"><summary><span class="qnum">175</span><span class="question-title">面试官问：这个模块哪些是你做的</span></summary><div class="answer"><blockquote>
 <p>两轮复核的基础是团队既有实现：判定框架、图片收口状态机、报告生成链路、车牌匹配规则。我做的是：多轮化的判定模型泛化（收敛语义定义、相邻轮判定、状态简化、告警跃迁控制）、Temporal 循环编排与版本桩、双端降级发版方案、跨服务取证链路、以及一批边界场景的方案设计（0 图误收敛防护、轮次等待超时）。既有机制我在改造时深入分析过，能讲清它的设计为什么是这样，但我不会说成从零实现。</p>
 </blockquote>
 <a class="back-link" href="#q-109">↑ 回到本题</a></div></details>
 </section><section class="chapter" id="sec-added-63-ch-7"><h2>A.8 Temporal 与异步计数的八股扩展</h2><p>专题平台固定 <code>illegal-parking-0928@ade75009e</code>；工作流补充核对 <code>9f755ae</code> 的 AbstractSceneWorkflow。它们是独立版本，不能拿 SELF 样板间锁解释 Temporal 的执行语义。</p>
 
-<details class="question" id="q-208"><summary><span class="qnum">175</span><span class="question-title">面试官问：Temporal 重放会再次调用设备吗</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-208"><summary><span class="qnum">176</span><span class="question-title">面试官问：Temporal 重放会再次调用设备吗</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> Workflow历史 · Activity结果 · 重试副作用</p>
 </blockquote>
 <p>Workflow按历史重放已记录的命令和结果，不等于每次重放重新执行已完成Activity。但Activity可能因超时、Worker退出或结果未被记录而再次执行，因此设备调用仍需稳定身份与幂等；“Temporal可靠”不等于外部动作exactly-once。<a href="https://docs.temporal.io/encyclopedia/retry-policies">Temporal重试策略</a>。</p>
 <a class="back-link" href="#q-208">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-209"><summary><span class="qnum">176</span><span class="question-title">面试官问：Workflow 代码为什么不能直接用当前时间和随机数</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-209"><summary><span class="qnum">177</span><span class="question-title">面试官问：Workflow 代码为什么不能直接用当前时间和随机数</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 确定性 · SDK API · 历史结果</p>
 </blockquote>
 <p>重放必须产生与历史兼容的命令序列。时间、随机和外部读取应走SDK支持的确定性API，外部I/O放Activity。sideEffect可把不确定值记录到历史，但不能代替Activity执行任意外部副作用；捕获异常也不能修复历史不一致。<a href="https://docs.temporal.io/develop/java/workflows/side-effects">Java sideEffect说明</a>。</p>
 <a class="back-link" href="#q-209">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-210"><summary><span class="qnum">177</span><span class="question-title">面试官问：getVersion、Worker升级、双端字段兼容是不是同一问题</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-210"><summary><span class="qnum">178</span><span class="question-title">面试官问：getVersion、Worker升级、双端字段兼容是不是同一问题</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 历史兼容 · 执行版本 · 接口契约</p>
 </blockquote>
 <p>getVersion管理同一Workflow历史中的代码分叉；Worker版本/部署策略管理哪个执行版本处理任务；字段缺失降级管理平台与工作流接口兼容。当前代码converged缺失回到固定两轮，不能推广为任意字段变化都兼容；要保留旧路径与历史重放测试。<a href="https://docs.temporal.io/develop/java/workflows/versioning">Java版本控制</a>。</p>
 <a class="back-link" href="#q-210">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-211"><summary><span class="qnum">178</span><span class="question-title">面试官问：pending=0 为什么不等于图片齐全</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-211"><summary><span class="qnum">179</span><span class="question-title">面试官问：pending=0 为什么不等于图片齐全</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 只数已受理 · 上游未到 · 成对不去重</p>
 </blockquote>
 <p>计数只表达已登记且未完成的识别量，没有证明预期图片都到达。重复完成可以多减，重复受理可以多加，key过期/异常又可能读成0。图片清单、任务身份和轮次收口是不同证据，不能把计数当分布式屏障。</p>
 <a class="back-link" href="#q-211">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-212"><summary><span class="qnum">179</span><span class="question-title">面试官问：一轮有多个 Mission 时 anyMatch 是什么边界</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-212"><summary><span class="qnum">180</span><span class="question-title">面试官问：一轮有多个 Mission 时 anyMatch 是什么边界</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 任一完成≠全量完成 · 业务假设需固定</p>
 </blockquote>
 <p>当前 latestRoundRecognitionCompleted 对该轮Mission用anyMatch。若业务保证每轮只有一个有效Mission可解释；若一轮实际包含多个必须完成的Mission，任一完成会提前满足轮次判断。应在手册明确这个假设，核对数据约束，不能把anyMatch讲成“所有Mission全部完成”。</p>
@@ -3259,51 +3267,51 @@ Temporal 改编排必加版本桩：历史重放走旧分支，新启走新分�
 <pre><code class="language-text">业务背景 → 核心问题 → 我的处理 → 最终能力 → 方案边界
 </code></pre>
 
-<details class="question" id="q-110"><summary><span class="qnum">180</span><span class="question-title">面试官问：自动建模项目最大的亮点是什么</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-110"><summary><span class="qnum">181</span><span class="question-title">面试官问：自动建模项目最大的亮点是什么</span></summary><div class="answer"><blockquote>
 <p>把准备阶段静态检查与真实派飞前动态碰撞准入分开，将安全规则和活跃航线生命周期收口到统一服务；调度、CAS、续飞和组级建模保持各自职责。JTS作为技术演进和v3旧提交对照，远端准入不替代命令幂等或fencing。个人参与范围须有实际提交或工作树改动佐证。</p>
 </blockquote>
 <a class="back-link" href="#q-110">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-111"><summary><span class="qnum">181</span><span class="question-title">面试官问：这个项目最难的地方是什么</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-111"><summary><span class="qnum">182</span><span class="question-title">面试官问：这个项目最难的地方是什么</span></summary><div class="answer"><blockquote>
 <p>最难的是服务端状态、设备真实状态和异步事件并不总是一致。一次下发调用超时，不代表设备一定没有收到；任务完成事件可能重复、延迟或丢失；暂停、取消和调度也可能同时发生。如果简单地把异常理解成失败并立即重试，就可能重复下发甚至重复飞行。</p>
 <p>我的处理思路是先划分批次、区域任务、下发状态和 Mission 真实状态的职责，再根据真实状态决定恢复动作。调度入口通过分布式锁收敛，单任务流转通过数据库条件更新防重，正常流程由事件推进，异常流程由定时任务对账补偿。这样即使某次事件缺失或服务重启，任务仍有恢复出口。</p>
 </blockquote>
 <a class="back-link" href="#q-111">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-112"><summary><span class="qnum">182</span><span class="question-title">面试官问：你个人在项目中做了什么</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-112"><summary><span class="qnum">183</span><span class="question-title">面试官问：你个人在项目中做了什么</span></summary><div class="answer"><blockquote>
 <p>按确实参与的区域拆分、机库分配、异步规划、统一碰撞接入、活跃生命周期、并发恢复或组级建模讲。当前v2.5改动还在工作树，不能用旧提交解释成未接入，也不能把全部平台能力归个人。</p>
 </blockquote>
 <a class="back-link" href="#q-112">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-113"><summary><span class="qnum">183</span><span class="question-title">面试官问：没有量化数据，怎么说明项目产生了价值</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-113"><summary><span class="qnum">184</span><span class="question-title">面试官问：没有量化数据，怎么说明项目产生了价值</span></summary><div class="answer"><blockquote>
 <p>我不会使用没有评测依据的百分比，但可以说明系统新增或稳定支持了哪些能力：多机库任务可以按照航迹安全约束并行执行；重复调度由锁和条件更新共同拦截；暂停、继续、取消、断点续飞和超时任务都有恢复路径；父子任务图片完成后可按组控制正常重复事件，跨系统严格一次仍需远端幂等契约与对账。</p>
 <p>这些属于可以结合代码、状态和业务流程验证的结果。如果面试官需要性能或效果数字，我会明确说明当前没有完整监控报表或正式评测记录，而不是临时估算。</p>
 </blockquote>
 <a class="back-link" href="#q-113">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-114"><summary><span class="qnum">184</span><span class="question-title">面试官问：你遇到过最棘手的问题，怎么定位和解决</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-114"><summary><span class="qnum">185</span><span class="question-title">面试官问：你遇到过最棘手的问题，怎么定位和解决</span></summary><div class="answer"><blockquote>
 <p>可以用一个确有证据的问题讲排查：按节点、任务、机库、状态更新时间串起规划、事件、补偿、CAS与IoT，而不是先猜“多线程”。当前多入口通过共同调度锁与状态更新协调；进一步分析能找到分段快照、长GC回退和旧结果窗口。没有线上事故证据时说“代码推演发现”，不要把推演编成亲历事故。</p>
 </blockquote>
 <a class="back-link" href="#q-114">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-115"><summary><span class="qnum">185</span><span class="question-title">面试官问：AI 工程化部分的难点和亮点是什么</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-115"><summary><span class="qnum">186</span><span class="question-title">面试官问：AI 工程化部分的难点和亮点是什么</span></summary><div class="answer"><blockquote>
 <p>难点是不同场景对准确率、速度和部署成本的要求不同，不能只依赖一种模型。规则清晰、目标明确的场景优先使用目标检测；需要精确区域时增加分割；语义复杂、误识别代价较高的场景再使用 VLM 二次确认。</p>
 <p>我的工作重点是把 YOLO、SAM、VLM 等能力组合成可落地的场景流程，并处理空间关系判断、结果过滤和误识别治理。Java 业务侧再把识别配置、设备能力、IoT 指令、结果落库和告警动作串联起来。亮点在于能够根据场景选择模型组合，并把模型输出转化为业务结果。</p>
 </blockquote>
 <a class="back-link" href="#q-115">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-116"><summary><span class="qnum">186</span><span class="question-title">面试官问：智能体部分的亮点是什么</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-116"><summary><span class="qnum">187</span><span class="question-title">面试官问：智能体部分的亮点是什么</span></summary><div class="answer"><blockquote>
 <p>一是把区域、点位和最佳视角等空间数据按用户和业务场景持久化，形成智能体可以查询和引用的位置业务上下文；二是使用统一指令结构和 messageId 串联指令接收、ack、执行回调和结果查询；三是使用 Redis Lua 原子维护异步状态，增加终态保护和状态转换防重，阻止不同状态覆盖终态；同状态回调仍可更新消息与TTL。</p>
 <p>这部分的价值是让智能体不只生成文本，还能查询真实业务数据并触发无人机平台能力，同时让异步执行过程可以跟踪和恢复。</p>
 </blockquote>
 <a class="back-link" href="#q-116">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-117"><summary><span class="qnum">187</span><span class="question-title">面试官问：如果重新设计一次，你会改进什么</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-117"><summary><span class="qnum">188</span><span class="question-title">面试官问：如果重新设计一次，你会改进什么</span></summary><div class="answer"><blockquote>
 <p>先补锁等待、远端检测/登记/查询耗时、登记失败及未知下发率，核对碰撞服务检测与登记的原子性、TTL和生命周期；再按IoT能力设计资源归属、尝试代际、命令幂等及fencing。v3是否迁移需要按外部调度归属与资源契约评估，不能只删除JTS方法。</p>
 </blockquote>
 <a class="back-link" href="#q-117">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-118"><summary><span class="qnum">188</span><span class="question-title">面试官问：你从这个项目中学到了什么</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-118"><summary><span class="qnum">189</span><span class="question-title">面试官问：你从这个项目中学到了什么</span></summary><div class="answer"><blockquote>
 <p>我最大的收获是，复杂业务的关键不只是让正常流程跑通，而是先识别哪些状态属于服务端、哪些属于设备真实状态，以及失败后从哪里恢复。技术方案也不能只看框架名称，要明确锁保护什么范围、条件更新防什么竞争、事件和定时补偿各自解决什么问题。这个项目让我从实现单个接口，逐渐转向理解完整链路和设计异常恢复。</p>
 </blockquote>
 <a class="back-link" href="#q-118">↑ 回到本题</a></div></details>
@@ -3387,12 +3395,12 @@ Temporal 改编排必加版本桩：历史重放走旧分支，新启走新分�
 </code></pre>
 <p>当出现问题时，先判断问题属于业务输入、平台调度、设备执行、数据回传还是建模服务，再进入代码排查。具备完整链路视角后，才能从“接口开发者”逐渐成长为能够负责业务模块的工程师。</p>
 
-<details class="question" id="q-119"><summary><span class="qnum">189</span><span class="question-title">面试官问：AI Coding 普及后，工程师最重要的能力是什么</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-119"><summary><span class="qnum">190</span><span class="question-title">面试官问：AI Coding 普及后，工程师最重要的能力是什么</span></summary><div class="answer"><blockquote>
 <p>AI 可以提高代码实现和信息检索效率，但需求理解、方案取舍、风险识别和结果验证仍然需要工程师负责。我使用 AI 辅助生成局部代码、梳理调用链和排查问题，但会检查业务语义、并发安全、事务边界、异常处理和既有代码规范，并通过编译、测试、日志或实际链路验证结果。我认为 AI Coding 时代更重要的是把问题定义清楚，并能够判断生成结果是否真正解决了业务问题。</p>
 </blockquote>
 <a class="back-link" href="#q-119">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-120"><summary><span class="qnum">190</span><span class="question-title">面试官问：需求不清楚时你怎么处理</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-120"><summary><span class="qnum">191</span><span class="question-title">面试官问：需求不清楚时你怎么处理</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 目标/验收 → 约束/异常 → 接口/状态 → 责任 → 阻塞项与默认项</p>
 </blockquote>
 <blockquote>
@@ -3400,7 +3408,7 @@ Temporal 改编排必加版本桩：历史重放走旧分支，新启走新分�
 </blockquote>
 <a class="back-link" href="#q-120">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-121"><summary><span class="qnum">191</span><span class="question-title">面试官问：你如何推动跨团队问题解决</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-121"><summary><span class="qnum">192</span><span class="question-title">面试官问：你如何推动跨团队问题解决</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 日志时间线 → 链路事实 → 影响/负责人 → 联合验证 → 防重与补偿</p>
 </blockquote>
 <blockquote>
@@ -3588,86 +3596,86 @@ AI 已经能写代码，所以技术不重要
 </blockquote>
 <h3>业务与产品方向</h3>
 
-<details class="question" id="q-213"><summary><span class="qnum">192</span><span class="question-title">反问：这个岗位未来半年最重要的目标是什么——扩新业务场景，还是把现有链路的稳定性做深？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-213"><summary><span class="qnum">193</span><span class="question-title">反问：这个岗位未来半年最重要的目标是什么——扩新业务场景，还是把现有链路的稳定性做深？</span></summary><div class="answer"><blockquote>
 <p>把个人贡献和团队目标对齐；从回答能判断岗位是增长型还是维护型，直接影响入职后做的事情有没有成长空间。如果对方答得含糊，本身就是信号。</p>
 </blockquote>
 <a class="back-link" href="#q-213">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-214"><summary><span class="qnum">193</span><span class="question-title">反问：这套系统目前的复杂度主要在哪一端——调度与规划算法、设备接入，还是现场环境的不确定性？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-214"><summary><span class="qnum">194</span><span class="question-title">反问：这套系统目前的复杂度主要在哪一端——调度与规划算法、设备接入，还是现场环境的不确定性？</span></summary><div class="answer"><blockquote>
 <p>展示你理解这类系统的难点分布；答案直接决定入职后打交道最多的代码在哪一层，也是判断面试官水平的窗口。</p>
 </blockquote>
 <a class="back-link" href="#q-214">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-215"><summary><span class="qnum">194</span><span class="question-title">反问：AI 识别的误报治理，目前是人审为主还是已经走自动化闭环？下一步的重点是什么？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-215"><summary><span class="qnum">195</span><span class="question-title">反问：AI 识别的误报治理，目前是人审为主还是已经走自动化闭环？下一步的重点是什么？</span></summary><div class="answer"><blockquote>
 <p>呼应本项目&quot;识别结果治理 + 告警闭环&quot;的经验，面试官会知道你做过同类的事；同时摸清 AI 在对方业务里是核心资产还是演示功能。</p>
 </blockquote>
 <a class="back-link" href="#q-215">↑ 回到本题</a></div></details>
 <h3>技术与架构</h3>
 
-<details class="question" id="q-216"><summary><span class="qnum">195</span><span class="question-title">反问：核心链路（如下发—飞行—回传）的一致性保障，事件驱动和定时补偿目前是怎么分工的？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-216"><summary><span class="qnum">196</span><span class="question-title">反问：核心链路（如下发—飞行—回传）的一致性保障，事件驱动和定时补偿目前是怎么分工的？</span></summary><div class="answer"><blockquote>
 <p>用自己踩过坑的语言体系提问，对方会立刻意识到你做过分布式系统；从回答能听出这套系统是被事故教育过的，还是纸面设计。</p>
 </blockquote>
 <a class="back-link" href="#q-216">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-217"><summary><span class="qnum">196</span><span class="question-title">反问：现在最想重做的模块或技术债最重的地方是哪里？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-217"><summary><span class="qnum">197</span><span class="question-title">反问：现在最想重做的模块或技术债最重的地方是哪里？</span></summary><div class="answer"><blockquote>
 <p>判断团队有没有清醒的技术判断力；入职后你很可能就被派去还这笔债，先知道是什么债。问&quot;重做什么&quot;比问&quot;有什么问题&quot;更积极。</p>
 </blockquote>
 <a class="back-link" href="#q-217">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-218"><summary><span class="qnum">197</span><span class="question-title">反问：目前的发布节奏和回滚预案是怎样的——固定周期发布还是按需发布？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-218"><summary><span class="qnum">198</span><span class="question-title">反问：目前的发布节奏和回滚预案是怎样的——固定周期发布还是按需发布？</span></summary><div class="answer"><blockquote>
 <p>判断工程成熟度：有回滚预案和灰度意识的团队，晚上睡得着觉；从回答也能估算入职后的值班压力。</p>
 </blockquote>
 <a class="back-link" href="#q-218">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-122"><summary><span class="qnum">198</span><span class="question-title">反问：团队怎么看 AI Coding 工具进入开发流程？有没有已经落地的实践？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-122"><summary><span class="qnum">199</span><span class="question-title">反问：团队怎么看 AI Coding 工具进入开发流程？有没有已经落地的实践？</span></summary><div class="answer"><blockquote>
 <p>展示技术敏感度；从回答判断团队文化是开放试错还是保守稳重，也预演了自己入职后能否继续用顺手的工作方式。</p>
 </blockquote>
 <a class="back-link" href="#q-122">↑ 回到本题</a></div></details>
 <h3>团队与协作</h3>
 
-<details class="question" id="q-123"><summary><span class="qnum">199</span><span class="question-title">反问：团队现在多少人和分工比例？我入职后协作最紧密的是谁？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-123"><summary><span class="qnum">200</span><span class="question-title">反问：团队现在多少人和分工比例？我入职后协作最紧密的是谁？</span></summary><div class="answer"><blockquote>
 <p>了解协作网络和自己的位置；如果后端只有一两个人支撑全业务，强度和成长都可想而论，提前心里有数。</p>
 </blockquote>
 <a class="back-link" href="#q-123">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-124"><summary><span class="qnum">200</span><span class="question-title">反问：一个需求从提出到上线，典型路径是什么样的？优先级由谁定？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-124"><summary><span class="qnum">201</span><span class="question-title">反问：一个需求从提出到上线，典型路径是什么样的？优先级由谁定？</span></summary><div class="answer"><blockquote>
 <p>判断流程是否规范、工程师在决策链里有没有话语权；回答里若出现&quot;全靠老板拍板&quot;，掂量一下执行噪音的比重。</p>
 </blockquote>
 <a class="back-link" href="#q-124">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-125"><summary><span class="qnum">201</span><span class="question-title">反问：线上值班的真实节奏是怎样的——有没有轮换机制，频率大概如何？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-125"><summary><span class="qnum">202</span><span class="question-title">反问：线上值班的真实节奏是怎样的——有没有轮换机制，频率大概如何？</span></summary><div class="answer"><blockquote>
 <p>用&quot;了解节奏&quot;的口吻问，不要用&quot;怕不怕加班&quot;的口吻问；分布式系统岗的值班频率直接决定生活质量，这是合理且专业的问题。</p>
 </blockquote>
 <a class="back-link" href="#q-125">↑ 回到本题</a></div></details>
 <h3>成长与评估</h3>
 
-<details class="question" id="q-126"><summary><span class="qnum">202</span><span class="question-title">反问：这个岗位做得好和做得一般，半年后分别是什么样子？评估标准是什么？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-126"><summary><span class="qnum">203</span><span class="question-title">反问：这个岗位做得好和做得一般，半年后分别是什么样子？评估标准是什么？</span></summary><div class="answer"><blockquote>
 <p>把&quot;转正/晋升&quot;翻译成具体画面；能清晰回答的团队说明有认真的绩效体系，答不出来的团队靠感觉打分。</p>
 </blockquote>
 <a class="back-link" href="#q-126">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-127"><summary><span class="qnum">203</span><span class="question-title">反问：团队里技术最强的工程师，您觉得强在哪里？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-127"><summary><span class="qnum">204</span><span class="question-title">反问：团队里技术最强的工程师，您觉得强在哪里？</span></summary><div class="answer"><blockquote>
 <p>从侧面看团队的天花板和团队欣赏什么样的人；面试官回答时的骄傲程度，也能看出这个团队是否真的尊重技术。</p>
 </blockquote>
 <a class="back-link" href="#q-127">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-128"><summary><span class="qnum">204</span><span class="question-title">反问：后续还有几轮面试？大概什么时间能有结果？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-128"><summary><span class="qnum">205</span><span class="question-title">反问：后续还有几轮面试？大概什么时间能有结果？</span></summary><div class="answer"><blockquote>
 <p>收尾必问，方便自己安排时间线和跟进节奏；显得有条理、有其他选择在推进，但语气是询问不是催促。</p>
 </blockquote>
 <a class="back-link" href="#q-128">↑ 回到本题</a></div></details>
 <h3>面向巡检 / 无人机 / 平台类公司的定制反问</h3>
 
-<details class="question" id="q-129"><summary><span class="qnum">205</span><span class="question-title">反问：机库和接入设备的量级现在是什么规模？并发调度的瓶颈最先出现在哪一层？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-129"><summary><span class="qnum">206</span><span class="question-title">反问：机库和接入设备的量级现在是什么规模？并发调度的瓶颈最先出现在哪一层？</span></summary><div class="answer"><blockquote>
 <p>展示对业务量级的敏感；答案能判断对方是在做真平台还是单点项目，也预判了自己经验里&quot;多机库调度&quot;的价值能发挥几成。</p>
 </blockquote>
 <a class="back-link" href="#q-129">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-130"><summary><span class="qnum">206</span><span class="question-title">反问：断点续飞、任务补偿这类能力，现场实际使用频率如何——是常态能力还是极端情况兜底？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-130"><summary><span class="qnum">207</span><span class="question-title">反问：断点续飞、任务补偿这类能力，现场实际使用频率如何——是常态能力还是极端情况兜底？</span></summary><div class="answer"><blockquote>
 <p>区分&quot;PPT 能力&quot;和&quot;生产能力&quot;；兜底型能力意味着系统整体可靠性已较好，常态型则说明现场环境比想象中恶劣，两种答案对应不同的工作重心。</p>
 </blockquote>
 <a class="back-link" href="#q-130">↑ 回到本题</a></div></details>
 
-<details class="question" id="q-131"><summary><span class="qnum">207</span><span class="question-title">反问：端侧识别和云侧工作流的算力边界现在划在哪里？往后有下沉或上移的计划吗？</span></summary><div class="answer"><blockquote>
+<details class="question" id="q-131"><summary><span class="qnum">208</span><span class="question-title">反问：端侧识别和云侧工作流的算力边界现在划在哪里？往后有下沉或上移的计划吗？</span></summary><div class="answer"><blockquote>
 <p>呼应本项目端云分流的经验；这类边界问题只有真正做过的人会问，是技术深度最自然的展示窗口。</p>
 </blockquote>
 <a class="back-link" href="#q-131">↑ 回到本题</a></div></details>
