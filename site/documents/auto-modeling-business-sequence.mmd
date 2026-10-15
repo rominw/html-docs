@@ -1,0 +1,124 @@
+sequenceDiagram
+    autonumber
+    actor U as 用户 / 前端
+    participant T as 平台任务服务
+    participant P as 机库分配 / 航线规划
+    participant DB as 数据库
+    participant Q as 样板间调度器
+    participant S as 统一碰撞服务
+    participant D as IoT / 飞机 / 机库
+    participant E as open-api / 平台事件处理
+    participant M as 三维建模服务
+
+    Note over U,M: 第一段：拆分区域、绑定机库、异步准备航线与 Mission
+    U->>T: 圈定父区域，拆分并保存子区域
+    T->>DB: 父区域拆分锁 + 本地事务保存子区域
+    U->>T: planAndDispatch，创建建模批次
+    T->>DB: 父区域创建锁内保存 task / taskArea
+    T->>P: assignPlanningDocks，逐区域建立候选集
+    P->>DB: 查询存量负载；评分优化后事务保存 dockSn
+    Note over P,DB: 绑定用于确定规划起止点；同库可绑定多个待执行区域，不代表执行占用
+    P-->>T: 返回已分配 / 未分配区域
+    T-)P: 提交规划与有限延迟分配重试链
+    T-->>U: 返回 taskId，前端可查询进度
+    par 已分配区域并行规划
+        P->>P: modelingRouteExecutor 执行航线规划
+        P->>DB: 保存航线与各区域规划结果
+    and 未分配区域有限重试
+        P->>DB: 间隔 6 秒重查，最多补尝试 2 次
+        Note over P,DB: 成功分配后加入规划；耗尽仍无机库的区域记失败
+    end
+    P-->>T: allOf 收口，重新查询持久化结果
+    loop 每条规划成功航线
+        T->>S: checkRouteBeforeMissionCreate，taskDispatch=false
+        S-->>T: 静态模型 / 障碍物 / 限高结果
+        Note over T,S: 确定阻飞不创建；技术异常可允许准备，真正派飞前仍要检查
+        opt 静态检查允许准备
+            T->>DB: 创建 Mission，保存 missionId
+        end
+    end
+    T->>Q: onTaskPrepared，刷新批次并调度全样板间
+
+    Note over U,M: 第二段：多入口汇入调度，逐条最终复检、领取和安全准入
+    Note over Q,E: 规划完成、Mission 完成、机库就绪、继续与定时补偿都可触发；任务不归创建节点独占
+    Q->>DB: 第一段样板间锁内恢复遗留状态、查询基础候选
+    DB-->>Q: 跨批次 PENDING 候选列表
+    Note over DB,Q: 释放第一段锁；列表只是快照，尚未整体 CAS 或占库
+    loop 按候选顺序逐条尝试
+        Q->>DB: 再拿样板间锁；重读区域、批次、同库执行链与 Mission
+        Q->>Q: 复检机库就绪与电池；不满足则等待 / 跳过
+        opt 最终复检通过
+        Q->>DB: UPDATE WHERE PENDING，改为 DISPATCHING
+        DB-->>Q: 影响行数；仅为 1 才继续下发流程
+        opt CAS 恰好影响 1 行
+        Q->>S: checkAndRegisterBeforeDispatch，查询活跃登记
+        Note over Q,S: 显式关闭安全检测有放行路径；活跃登记不等于命令幂等或 fencing
+        alt 已有 sourceEnv / droneSn / routeCode 登记
+            S-->>Q: 复用既有登记，返回允许
+        else 尚无登记
+            Q->>S: taskDispatch=true，检测并尝试登记
+            S-->>Q: 准入结果
+            opt 检测返回成功
+                Q->>S: activeRouteExists，再查询确认登记
+                S-->>Q: 已确认 / 未确认 / 查询失败
+            end
+        end
+        alt 临时活跃冲突 / 服务不可用 / 登记未确认
+            Q->>DB: 回 PENDING + waitReason，本次不派飞
+        else 模型 / 障碍物碰撞或超高
+            Q->>DB: 标记 FAILED，确定阻飞
+        else 准入允许
+            Q->>D: 设置传图模式，execMission 下发
+            alt IoT 明确成功
+                D-->>Q: 成功响应
+                Q->>DB: dispatchStatus=SUCCESS，仅代表下发成功
+            else IoT 明确拒绝
+                D-->>Q: 拒绝响应
+                Q->>S: 清理活跃登记
+                Q->>DB: 标记 FAILED
+            else 异常 / 超时 / 空响应
+                Note over Q,D: 设备可能已经受理，结果未知
+                Q->>DB: 保留 DISPATCHING 和活跃占用，等待查证 / 恢复
+            end
+        end
+        end
+        end
+        Note over DB,Q: 本条派飞判断结束后释放最终锁，再尝试下一条候选
+    end
+    Note over Q,D: 锁串行化派飞判断，不持有到降落；不同机库且航迹兼容时可并飞
+
+    Note over U,M: 第三段：飞行、续飞、状态回传与滚动补位
+    D->>D: 已受理任务执行飞行与拍照
+    Note over Q,D: 若产生续飞子 Mission，按父子执行链判断占用；父任务返航不等于整链完成
+    D-)E: 起飞 / Mission 完成 / 机库就绪等上报
+    E-)S: 平台活跃航线生命周期：起飞续签，完成尝试清理
+    E-)Q: 平台完成 / 就绪事件触发补位
+    Q->>DB: 重查执行链与资源，后续候选再走最终复检和准入
+    Note over Q,S: 完成时优先清理是进程内监听顺序；不代表跨节点原子释放或全局事件顺序
+
+    Note over U,M: 第四段：图片完成事件汇聚父子组，提交三维建模并查询进度
+    D-)E: 飞机 / 机库上报图片上传完成，经 open-api 内部投递
+    E-)T: MissionImageUploadedEvent → Handler → 异步 executeImageTask
+    Note over U,T: 自动入口校验任务类型、触发方式和全局开关；半自动等待用户手动 start-modeling
+    opt 自动条件满足，或用户手动触发
+    T->>DB: 归一父 Mission，收集父任务与续飞子任务组
+    Note over T,DB: 按 parentMissionId 尝试组级 Redisson 锁；与调度的样板间锁不是同一把锁
+    alt 未获组锁 / 已提交 / 全组图片未就绪 / 无原图
+        T->>T: EVENT 静默跳过；USER 反馈原因，等待后续事件或手动触发
+    else 获锁且全组可提交
+        T->>DB: 收集并解密全组已上传原图地址
+        T->>M: 提交原图，创建三维建模项目
+        alt 返回有效 projectId
+            M-->>T: projectId
+            T->>DB: 先更新组内 modeling_status=1，再保存区域 projectId
+        else 拒绝 / 超时 / 响应丢失
+            T->>DB: 记录失败原因；未确认成功不标已提交
+            Note over T,M: 远端可能已创建项目；响应未知先查证，不能保证盲重试严格一次
+        end
+    end
+    Note over T,DB: 已获组锁的路径 finally 释放；远端提交与本地状态 / projectId 不是原子事务
+    end
+    U->>T: 查询批次 / 区域及建模进度
+    T->>DB: 查询区域状态与 projectId
+    T->>M: 按已保存 projectId 查询建模进度
+    T-->>U: 返回飞行、图片与建模进度

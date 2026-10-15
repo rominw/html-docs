@@ -1,5 +1,17 @@
 [
   {
+    "title": "无人机巡检平台后端 · 六周直读复习手册",
+    "description": "自动建模面试精读：机库分配手算、真实源码、派飞时序与并发异常；对照v2.5工作树和v3，扩展Java/MySQL/Redis/AI/Agent原理追问。",
+    "date": "2026-10-15",
+    "url": "documents/uav-backend-review-handbook.html"
+  },
+  {
+    "title": "无人机巡检平台后端 · 六周直读复习手册（md 版）",
+    "description": "围绕一个真实无人机巡检平台的自动建模、多机库调度、分布式一致性、AI 工程化、智能体集成与违章停车多轮复核的六周面试复习手册，对照两个自动建模分支，含机库分配手算、真实源码精读和调度时序图，解释共享资源、锁范围、CAS、GC与恢复窗口，并扩展技术原理追问。",
+    "date": "2026-10-15",
+    "url": "viewer.html?src=documents/uav-backend-review-handbook.md"
+  },
+  {
     "title": "产品面试与实践速成手册（30 题 · 理解与实践）",
     "description": "产品面试与实践速成手册：30 题分基础必会、项目常用与进阶追问，按具体问题、原理、例子、边界和自测组织，连接常用实践与完整任务。",
     "date": "2026-10-14",
@@ -10,18 +22,6 @@
     "description": "前端八股速成手册：40 题分基础必会、项目常用与进阶追问，按具体问题、原理、例子、边界和自测组织，连接常用实践与完整任务。",
     "date": "2026-10-14",
     "url": "documents/frontend-interview-prep.html"
-  },
-  {
-    "title": "无人机巡检平台后端 · 六周直读复习手册",
-    "description": "自动建模面试精读：机库分配手算、真实源码、派飞时序与并发异常；对照v2.5工作树和v3，扩展Java/MySQL/Redis/AI/Agent原理追问。",
-    "date": "2026-10-14",
-    "url": "documents/uav-backend-review-handbook.html"
-  },
-  {
-    "title": "无人机巡检平台后端 · 六周直读复习手册（md 版）",
-    "description": "围绕一个真实无人机巡检平台的自动建模、多机库调度、分布式一致性、AI 工程化、智能体集成与违章停车多轮复核的六周面试复习手册，对照两个自动建模分支，含机库分配手算、真实源码精读和调度时序图，解释共享资源、锁范围、CAS、GC与恢复窗口，并扩展技术原理追问。",
-    "date": "2026-10-14",
-    "url": "viewer.html?src=documents/uav-backend-review-handbook.md"
   },
   {
     "title": "Java 后端八股速成手册（67 题 · 原理、Redisson 与排障）",
