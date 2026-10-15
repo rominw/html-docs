@@ -378,7 +378,7 @@ MissionImageUploadedEvent
 
 这里最重要的不是调用一次外部接口，而是处理“一个建模任务组会产生多个图片完成事件”的并发问题。
 
-这个并发不是理论假设，入口至少有四个：组内父 Mission 和每条续飞腿各自传图完成都会发一次事件，处理函数 `executeImageTask` 标注 `@Async("ikTaskExecutor")`，跑在线程池里；用户手动触发 `POST /tasks/{missionId}/start-modeling` 与自动事件进入同一个 `doModeling`，且传组内任意 missionId 都合法；上游设备状态走 Kafka 至少一次投递，同一事件可能重复消费；服务多实例部署，两个事件可能落到不同实例。这也是选 Redisson 分布式锁而不是 JVM 锁的原因。
+这个并发不是理论假设，入口至少有四个：组内父 Mission 和每条续飞腿各自传图完成都会发一次事件，处理函数 `executeImageTask` 标注 `@Async("ikTaskExecutor")`，跑在线程池里；用户手动触发 `POST /tasks/{missionId}/start-modeling` 与自动事件进入同一个 `doModeling`，且传组内任意 missionId 都合法；事件上游是飞机或机库主动上报图片上传完成，由 open-api 服务内部投递到平台，同一完成动作重复上报或重复投递时事件会重复到达；服务多实例部署，两个事件可能落到不同实例。这也是选 Redisson 分布式锁而不是 JVM 锁的原因。
 
 ```mermaid
 flowchart TD
@@ -440,7 +440,7 @@ flowchart TD
 
 > **记忆关键词：** 组内多事件 · 手动自动同路 · Kafka 重投 · 多实例
 
-> 会发生，而且来源有四个。第一，组内父 Mission 和每条续飞腿传图完成都会各发一个 `MissionImageUploadedEvent`，这些异步任务在线程池里并发跑，操作同一个组的去重标记。第二，自动事件和手动触发会撞车：前端手动按钮走 `triggerModeling`，与自动链路进同一个 `doModeling`，用户点按钮时自动事件可能正在提交中。第三，上游 Kafka 是至少一次投递，消息重投递可能造成同一事件重复消费。第四，服务多实例部署，两个事件可能落到不同实例上，JVM 内锁失效，所以必须用 Redisson 分布式锁。没有这把锁的后果是两个并发入口都通过 modeling_status 检查（置 1 只在提交成功后），双双提交山海经，同一组图片建出两个项目。
+> 会发生，而且来源有四个。第一，组内父 Mission 和每条续飞腿传图完成都会各发一个 `MissionImageUploadedEvent`，这些异步任务在线程池里并发跑，操作同一个组的去重标记。第二，自动事件和手动触发会撞车：前端手动按钮走 `triggerModeling`，与自动链路进同一个 `doModeling`，用户点按钮时自动事件可能正在提交中。第三，事件上游是飞机或机库主动上报图片上传完成，由 open-api 服务内部投递到平台（发布方不在平台仓库内，事件类来自公共包）；同一完成动作若被重复上报或重复投递，事件就会重复到达。第四，服务多实例部署，两个事件可能落到不同实例上，JVM 内锁失效，所以必须用 Redisson 分布式锁。没有这把锁的后果是两个并发入口都通过 modeling_status 检查（置 1 只在提交成功后），双双提交山海经，同一组图片建出两个项目。
 
 ### 面试官问：tryLock 拿不到组锁为什么直接跳过，有什么代价
 
