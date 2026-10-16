@@ -1,7 +1,7 @@
 ---
 title: 无人机巡检平台后端 · 六周直读复习手册（md 版）
-description: 围绕一个真实无人机巡检平台的自动建模、多机库调度、分布式一致性、AI 工程化、智能体集成与违章停车多轮复核的六周面试复习手册，对照两个自动建模分支，含机库分配手算、真实源码精读和调度时序图，解释共享资源、锁范围、CAS、GC与恢复窗口，并扩展技术原理追问。
-date: 2026-10-15
+description: 自动建模调度面试精读：结合源码详解五类触发、逐条派飞、父批次聚合、续飞父子状态、超时补偿与暂停继续取消，并用完整案例解释实现边界；保留六周后端、分布式、AI与智能体复习内容。
+date: 2026-10-16
 tags: 面试·分布式·AI 工程
 ---
 
@@ -11,7 +11,7 @@ tags: 面试·分布式·AI 工程
 
 | 代码口径 | 核对版本 | 航线校验与调度 |
 | --- | --- | --- |
-| **v2.5 当前工作树（未提交碰撞接入）** | 基于 `e19920ee3`，2026-10-14读取10个差异文件 | 已删除本地JTS冲突服务及组合搜索；创建做静态校验，真实下发前统一检测、登记并查询确认 |
+| **v2.5 当前工作树（未提交碰撞接入）** | 基于 `e19920ee3`，2026-10-16复核10个差异文件 | 已删除本地JTS冲突服务及组合搜索；创建做静态校验，真实下发前统一检测、登记并查询确认 |
 | v2.5 已提交旧版本 | `e19920ee3e17bf21eb186a2a3e05a1649d75be5b` | 创建Mission时已有统一检测/活跃记录检查；本地JTS仍参与调度，尚非新的延迟登记链路 |
 | v3 当前已提交版本 | `b94fa4203e1855dacf06b28c579612985837b5eb` | SELF创建建模Mission保留静态检测，本地JTS仍参与筛选；未见新增checkAndRegisterBeforeDispatch调用。另有EXTERNAL外部调度 |
 | 独立智能体、违停与工作流 | 见各节补充版本 | 平台Action/Lua/资产、独立Channel、Agent事件及Temporal分开解释 |
@@ -71,7 +71,7 @@ tags: 面试·分布式·AI 工程
 
 六周并不是要求你完成额外作业，而是帮你控制复习顺序：
 
-- 第 1 周：先读1.1–1.9建立主线，再精读1.10–1.15的机库分配手算、代码与调度图；这部分优先复述。
+- 第 1 周：先读1.1–1.9建立主线，再读1.10–1.16的机库分配、调度图与评估；重点精读1.17–1.23的触发、父子状态刷新、兜底和现场推演，按完整调用链复述。
 - 第 2 周：理解并发控制、任务预占和分布式一致性。
 - 第 3 周：理解状态机、事件补偿、暂停继续取消和断点续飞。
 - 第 4 周：结合项目复习 Java、MySQL、Redis、Spring。
@@ -1274,6 +1274,630 @@ sequenceDiagram
 
 ---
 
+## 1.16 生产落地评估：待优化点清单
+
+对v2.5工作树调度模块的整体评估：**已有滚动调度与异常恢复骨架，生产可用性仍需验证**——滚动调度无刚性批次屏障、样板间两段锁、区域级CAS、TTL活跃航线登记与续签、事件加定时补偿、下发结果未知保留占用、起飞超时有界重试、取消与续飞竞争的专门收敛，已有多类失败分支，可在此基础上继续演进；UNKNOWN重排、旧执行者、恢复覆盖与续飞多入口仍存在边界，不能据此推断已满足生产安全，详见1.17–1.23。下表按优先级列出待优化点，**全部是改进方案，未在当前分支实现**，与2.8节的fencing改进同属一类；只引方法名，不附工作树行号。
+
+### P0：正确性与安全，上线前处理
+
+| # | 问题 | 代码位置 | 现状与风险 | 建议 |
+| --- | --- | --- | --- | --- |
+| 1 | 锁内同步远程下发 | `doDispatchTaskAreaRoute`→`commonExecMission`，IoT下发在样板间调度锁内执行 | 锁内调用用于协调取消/暂停与派飞；接口慢或阻塞会拖延同样板间其他调度和控制，持续时间受客户端超时及锁持有情况影响 | 核对下发HTTP客户端读超时（10秒级）；若下发移出锁，需同时设计尝试代际、取消竞态与执行端幂等/fencing，仅加“下发中”标记不足以替代锁保护 |
+| 2 | 重试计数藏在文案 | `parseTakeoffTimeoutRetryCount`解析failReason中的“第X/2次” | 改一个字文案即静默失效；存量数据兜底按“已重试1次”，计数语义漂移 | 重试计数落独立字段，与展示文案解耦 |
+| 3 | 碰撞降级放行无告警 | CollisionWarningGateway异常路径返回allow | 通用检测有降级放行；当前专用派飞入口还查询登记确认，未确认会等待。显式关闭检测、已有登记复用等例外仍需核对，不能笼统说服务宕机就必然继续派飞 | 降级事件打指标加告警；多机库样板间可配置为fail-closed |
+| 4 | routeCode全局更新 | `updateDispatchFailed/Success`仅按routeCode条件更新 | routeCode一旦跨批次重复会互相污染状态 | routeCode加唯一约束，更新条件补taskId |
+
+### P1：与“效率优先”目标的差距
+
+| # | 问题 | 代码位置 | 现状与风险 | 建议 |
+| --- | --- | --- | --- | --- |
+| 5 | 负载按条数不按时长 | `computePlanningDockLoad`统计各机库未完成区域条数 | 子区域面积与精度档（3/6/9对应不同高度和航线密度）差异大时makespan失衡；1.11已论证“分钟数极差”才是目标 | 用面积×精度系数估时长，评分四元组的负载项从条数换成时长 |
+| 6 | 电池是门槛不是资源 | `isDockReadyForDispatch`只看最高电量是否达阈值 | 充电时长未进入调度预测；电量恢复后仍需其他事件或定时扫描再次推进，电量越线本身未必发就绪事件 | 引入“电量就绪预计时间”，把远处任务先派给就绪更早的机库 |
+| 7 | 缺调度指标 | 只有结构化日志 | 排队时长、下发成功率、机库利用率、起飞耗时分布缺失；效率优先无法证明也无法调参 | 先埋核心指标，再谈优化顺序 |
+
+### P2：规模化后再做
+
+| # | 问题 | 代码位置 | 现状与风险 | 建议 |
+| --- | --- | --- | --- | --- |
+| 8 | 每轮全量刷库 | `refreshEligibleTaskStatuses`逐任务刷新、`findBlockingIssuedAreas`多次全量查询 | 单样板间几十区域无压力；几十样板间并发需查询瘦身与索引核对 | 合并查询，按showroomId核对索引与执行计划 |
+| 9 | 队列按创建时间排序 | `findDispatchCandidatesForShowroom`按批次createTime与区域sort | 顺序不体现代价（如满电先飞远） | 属锦上添花，指标建好后再评估收益 |
+
+### 旧链路顺带确认的两处缺陷
+
+- `TdScanAreaServiceImpl.removeTdArea`软删条件写反：更新要求`deleted=DELETED`才匹配，而入口校验又把已删除记录挡掉——正常记录永远删不掉还返回成功。
+- 旧`saveTdScanMissionConfig`逻辑删除航线时用任务id当航线id（应为`getRouteId()`），删除目标错位。两处都属旧tdScan链路，与新调度模块无关；修复前不要依赖其删除语义。
+
+### 被问“这套调度能直接上生产吗”时的90秒回答
+
+> **记忆关键词：骨架可用 · P0安全 · P1效率 · 分阶段落地。**
+>
+> 现有骨架已包含：滚动调度、两段锁加区域级CAS、下发结果未知保留占用、起飞超时有界重试、取消与续飞竞争收敛，失败路径都有显式处理。直接上生产前先处理四个P0：锁内远程下发配激进读超时、重试计数从文案改独立字段、核对检测降级与登记确认的组合路径并加告警、routeCode更新加唯一约束。效率上的主要差距是负载按条数均衡而非预估时长、电池只有电量门槛没有充电资源建模——这两项决定大面积多机库场景是“能用”还是“好用”，放第二个迭代，配好排队时长与机库利用率指标后再谈算法升级。
+
+---
+
+## 1.17 调度触发精读：从创建请求到每一次重新扫描
+
+**阅读目标：不打开源码，也能回答“谁触发、何时触发、扫描谁、没有触发怎么办”。** 本节到1.23均以2026-10-16复核的v2.5工作树为准；仍基于`e19920ee3`，碰撞接入尚未提交。v3 SELF／EXTERNAL仍按1.9单列，不能把下面的统一碰撞准入套到v3旧提交。
+
+### 先画清对象：两层父子，不是一张任务表
+
+```text
+父标绘 draw（用户圈的大区域）
+  └─ 多个子标绘 draw（待规划的子区域）
+建模批次 task（taskId，批次整体状态、paused）
+  └─ 区域明细 taskArea（taskId关联批次，dockSn、routeCode、missionId）
+       └─ 父 Mission M0（区域明细持有的missionId）
+            ├─ 续飞 Mission S1（parentId=M0.id）
+            ├─ 续飞 Mission S2（parentId仍是M0.id）
+            └─ 首段补录 Mission（TASK_CREATED，不是待飞腿）
+```
+
+S2通常不是挂在S1下面的树孙子，而是仍挂根Mission。区域明细不随续飞把missionId换成最新子腿；查询续飞链、完成事件反查及图片组聚合都要回到根Mission。批次状态、区域创建状态、Mission飞行状态和建模项目进度分别表达不同事实。
+
+```mermaid
+flowchart TD
+  P[规划收口 PLAN_READY] --> Q[调度整个样板间]
+  F[完成事件 MISSION_FINISHED] --> Q
+  D[机库就绪 DOCK_READY] --> Q
+  R[继续 RESUME] --> Q
+  T[低频补偿 RECONCILE] --> Q
+  Q --> C[锁内恢复遗留状态并筛候选]
+  C --> L[每条重新加锁 复检 CAS 准入 IoT]
+  L --> S[回写区域并刷新父批次]
+  S -. 明确失败且未满32轮 .-> C
+```
+
+### 请求阶段的事务为什么在异步启动之前结束
+
+`planAndDispatch → executeWithParentTaskLock → doPlanAndDispatch → createPlanDispatchTask`：先校验登录、父标绘与子标绘；在创建锁内检查同父区域没有PLANNING／READY／EXECUTING批次，再用TransactionTemplate把主批次和全部区域明细作为一个数据库事务保存。区域保存或主键回填校验失败，主批次也回滚。
+
+返回PlanTaskContext后才调用startAsyncRoutePlanning。当前入口没有外层事务，因此模板执行结束、事务提交之后，异步线程才有机会读取已落库的任务。这里事务保护的是数据库写入，PlanTaskContext只是内存中的结果载体。
+
+不能直接把注解贴在private的createPlanDispatchTask上：它是同类内部调用，当前代理模式不会拦截。若把注解贴在整个公开入口上，提交会推迟到异步启动之后，而且创建锁的finally先执行、外层事务随后才提交。使用另一个Spring Bean的公开事务方法也能保持正确边界；当前模板省去这个拆分。模板默认REQUIRED，未来若调用者增加外层事务，必须重新检查提交时点。
+
+### 规划收口是门槛，不是每生成一条航线立刻派飞
+
+已绑定机库的区域进入并行规划；未分到的区域每隔6秒追加一次分配尝试，最多2次追加尝试。新分到机库的区域继续规划；最后仍未分到的，写routeStatus=FAILED。初次规划和重试链都结束，才进入completeAsyncRoutePlanning。
+
+收口重新读库：异步链整体异常时，补标仍为routeStatus=PENDING的区域失败；随后finalizeDispatchStatus仅为航线成功的routeCode逐条准备Mission。单条Mission创建有按routeCode的Redisson锁；已创建成功且有missionId就复用，异常则标该区域missionStatus=FAILED，继续其他区域。没有任何成功航线则只刷新批次，不进入首轮队列。
+
+准备完后先refreshTaskStatus，再onTaskPrepared。后者读未删除批次、生成scheduleMessage、再次刷新状态，最后调度整个showroom。**允许部分区域失败后调度其余成功区域，但首轮要等本批规划链收口。** 这与“调度时不要求前一批次全部飞完”的跨批次滚动是两个层面。
+
+### 五个入口到底携带什么信息
+
+| 入口及source | 触发条件与前置动作 | 调度范围、限制 |
+| --- | --- | --- |
+| onTaskPrepared／PLAN_READY | 规划收口、Mission准备结束；更新摘要并刷新批次 | 传taskId是为找到showroom，不是只派该批次；终态批次不会成为候选 |
+| onMissionFinished／MISSION_FINISHED | 用事件missionId找区域；续飞腿先用parentId反查父区域；确认父区域下发成功并刷新所属批次 | 再扫描同showroom所有可推进批次；收到“本腿完成”仍需重查续飞链，不能直接释放整条链 |
+| onDockReady／DOCK_READY | 根据dockSn查设备与showroom；第一轮额外尝试恢复该库SUCCESS且Mission仍WAITING的区域 | 最终仍扫描整个showroom；DISPATCHING未知结果不走这条快速回退 |
+| resumeTask／RESUME | 在样板间锁内恢复续飞开关、处理待发子腿，最后解除paused | 释放控制锁后再调度普通区域；子腿恢复与普通区域调度是两条路径 |
+| reconcileActiveShowrooms／RECONCILE | fixedDelay默认120000毫秒；查未删除、未暂停、READY／EXECUTING批次，按showroom去重 | 每实例都可能运行，无集群选主；单showroom异常被catch，继续其他showroom |
+
+### “机库就绪”不是每一条电量消息都发事件
+
+DockStatusEventHandler默认每5秒处理机库状态。它把ONLINE和EMERGENCY看作ready；仅在`!oldReady && newReady`时发布DockReadyEvent。首次上报就就绪，oldStatus为空，也会触发；ONLINE切换到EMERGENCY则前后都ready，不触发。
+
+电池85%是最终派飞的独立门槛。比如机库一直ONLINE，电池从84%升到85%，ready布尔值没变，**单靠这次电量变化不会触发DockReadyEvent**。最新电量仍会被后续扫描读取，所以依靠其他入口或定时补偿再推进。不能把“5秒状态处理”讲成“每5秒必调度一次建模”。
+
+### 面试官问：服务重启后，队列和规划都会自动恢复吗
+
+> **记忆关键词：持久候选 · 首次就绪 · 扫描范围 · 规划缺口。**
+>
+> 待派飞区域存在数据库里，重启后的首次机库就绪和定时扫描都有机会重新推进。补偿只枚举未暂停的READY／EXECUTING批次，不自动重建中断的CompletableFuture规划链，也不扫描所有PLANNING和终态批次。因此“重启后所有阶段都会自动恢复”超出代码保证；卡在PLANNING要另查规划收口及人工恢复。
+
+## 1.18 一次调度逐步展开：候选快照、领取与派飞结果
+
+**先记住三个范围：调度组织按showroom，领取只改一条taskArea，空域准入落到sourceEnv／droneSn／routeCode。** 这三者分别解决本地共享资源协调、同行竞争和远端占用识别。
+
+### 外层循环为什么最多32轮
+
+scheduleShowroom每轮先在样板间锁内按固定顺序做四件事：收敛取消后晚生续飞腿、释放取消批次的特定陈旧占用、首轮若有readyDockSn则尝试机库恢复回退、处理普通／续飞超时，随后刷新活跃批次并筛候选。候选收集完释放锁，逐条派飞时重新拿同一把锁。
+
+**源码摘录 · `ModelingQueueManager.java` 第635–656行（v2.5工作树）：**
+
+```java
+boolean hasExplicitFailure = false;
+for (ModelingTaskAreaEntity taskArea : reserved) {
+    String failure = dispatchTaskAreaRoute(taskArea, roundSource, showroomId);
+    ModelingTaskAreaEntity latest = modelingTaskAreaDao.selectById(taskArea.getId());
+    if (latest != null && Objects.equals(
+            latest.getDispatchStatus(), ModelingDispatchStatusEnum.FAILED.getCode())) {
+        hasExplicitFailure = true;
+    }
+    if (failure != null) {
+        log.warn("建模任务滚动调度下发失败 source={}, showroomId={}, scheduleRound={}, taskId={}, taskAreaId={}, routeCode={}, failure={}",
+                roundSource, showroomId, scheduleRound, taskArea.getTaskId(),
+                taskArea.getId(), taskArea.getRouteCode(), failure);
+    }
+}
+reserved.stream()
+        .map(ModelingTaskAreaEntity::getTaskId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .forEach(taskStatusService::refreshTaskStatus);
+if (!hasExplicitFailure) {
+    return;
+}
+```
+
+每条返回后，外层重查该区域；只有观察到**本轮候选列表中的区域变为FAILED**，hasExplicitFailure才置true，才再扫下一轮。无候选或没看到这种明确失败就返回。预筛阶段已经剔除的失败不直接置这个变量，临时碰撞、设备等待和UNKNOWN也不让外层无休止同步重扫。32轮是一次调用的失败补位上限，不是每条任务重试32次。
+
+### 候选查询与优先级，逐条件解释
+
+| 层次 | 真正读取的条件 | 用意与边界 |
+| --- | --- | --- |
+| 批次 | 同showroom、isDeleted=0、paused=0、status为READY／EXECUTING | PLANNING和终态不作为普通待发批次 |
+| 区域 | missionStatus=SUCCESS、dispatchStatus=PENDING，dockSn／missionId／routeCode非null | missionStatus是“创建成功”，不是Mission正在飞；SQL没有单独再加routeStatus=SUCCESS，随后排除区域失败／已完成 |
+| 排序 | 批次createTime／id → 区域createTime → sort → id；时间／sort空值后置 | 偏向先创建批次，区域创建时间优先于sort；不保证严格FIFO或无饥饿 |
+| 同库优先 | 同库存在起飞超时重试候选时，普通候选写等待并跳过 | 优先完成既有任务，不是允许它忽略设备或空域条件 |
+| 执行链 | 已DISPATCHING／SUCCESS且整链没结束的同库区域 | 可以跨批次、包括暂停批次残留；占用查询也纳入CANCELLED批次 |
+| Mission与设备 | Mission存在、仍允许下发，机库状态和电池满足要求 | Mission非可下发状态时，当前实现按“已下发”修复区域SUCCESS；这只是本地状态修复，不是新发命令 |
+
+没有冲突的同库多条区域可以一起进入候选列表。reserveDispatchCandidates没有批量写DISPATCHING；只有逐条最终复检看到前一条仍占库，才挡住后面同库候选。候选不是预约凭证。
+
+### 最终持锁的决策表：每一行都可能让本条结束
+
+| 顺序 | 检查／动作 | 不通过时怎么处理 |
+| --- | --- | --- |
+| 1 | 按routeCode重查区域最新状态 | SUCCESS或非PENDING直接跳过，不复发 |
+| 2 | 查批次仍未删除、未暂停且READY／EXECUTING | 保持／释放到PENDING，写等待恢复原因 |
+| 3 | 查同库其他未结束执行链 | PENDING等待；不发送第二条同库任务 |
+| 4 | Mission存在、可下发 | 缺失写FAILED；状态已越过可下发则修复SUCCESS并跳过 |
+| 5 | 最终重查机库状态与电池 | PENDING等待，候选阶段通过不算数 |
+| 6 | UPDATE id且dispatchStatus=PENDING → DISPATCHING | 必须影响1行，否则跳过；没有尝试代际，也不锁其他区域行 |
+| 7 | checkAndRegisterBeforeDispatch，STANDARD_CHECK | 永久模型／障碍物碰撞或超高写FAILED；临时冲突或技术问题释放到PENDING等待 |
+| 8 | 图片上传模式更新设备和Mission快照为mode=3 | 尚未尝试IoT时的异常走下发前失败处理 |
+| 9 | dispatchAttempted=true，然后execMission | 异常或空响应保留未知；明确非成功和成功分别处理 |
+| 10 | 回写区域，再由外层刷新相关批次 | 回写异常不等于设备未执行，要按已尝试副作用查证 |
+
+普通Mission只允许WAITING下发；ALREADY_RECEIVED只有带起飞超时重试标记的区域才是例外。预筛和最终复检都用这个规则。当前“非可下发→修复SUCCESS”条件较宽，并非只匹配RUNNING；面试时应说代码实际判断，再说明依赖上游状态合法性。
+
+### 准入的两个提前返回与四种IoT结局
+
+安全方法先验证Mission，再查disableSafetyDetection样板间配置。命中关闭检测配置可以直接成功；否则检查sourceEnv、航线、飞机SN和openRouteDetect。按三元组查询：查询失败／空值挡住；已有登记直接成功；没有才检测并登记，随后再次查询确认。因此不是每次都完整重检，也不是检测网关降级成功就必然派飞。
+
+| 观察结果 | 区域状态／原因 | 活跃登记及下一步 |
+| --- | --- | --- |
+| IoT明确成功 | SUCCESS；清waitReason；普通成功清failReason，起飞重试成功保留计数文案 | 保留登记，等起飞事件续签、完成事件清理；SUCCESS不等于起飞或飞完 |
+| IoT明确非成功 | 清理活跃登记，写FAILED和下发失败原因 | 外层可以触发有限失败补位 |
+| IoT抛异常或返回null | 保留当前DISPATCHING，记录待确认原因 | 保留登记，不立即释放给下一条；随后仍可能被超时恢复处理 |
+| IoT之后写库等步骤异常 | dispatchAttempted已为true，只补记录未知原因 | 不用本地写库失败推断远端失败；若成功状态已写入，记录未知原因的方法也不会强制再改回DISPATCHING |
+
+dispatchAttempted=false时外层catch会尝试清理登记并写FAILED；已进入IoT调用后，catch采用保守的未知处理。临时安全检查以正常错误结果返回时走PENDING等待，而抛到普通派飞外层catch的异常可能写FAILED，两条路径不能笼统说成“碰撞服务异常都自动等下次”。
+
+### 面试官问：为什么用样板间锁了还要CAS
+
+> **记忆关键词：跨行资源协调 · 同行数据库裁决 · 不含代际。**
+>
+> 样板间锁让同库及跨区域的正常竞争按顺序检查；CAS要求该区域仍是PENDING才领取，防候选快照过期后重复领取同行。两者分工不同。CAS没有attempt，Redis锁又可能丢失，所以不能据此承诺长暂停、回退重排后的旧执行者绝不再发送；完整时序见2.7。
+
+## 1.19 父批次状态怎么刷新：把聚合算法真正算一遍
+
+这里的“父”指ModelingTaskEntity，“子”指taskArea。它不直接把所有Mission.status求最大值，而是先计算每个区域是否完成、是否失败，再按固定优先级生成一个目标状态。
+
+### 区域的两个布尔值和三个计数
+
+| 变量 | 精确定义 | 容易答错的地方 |
+| --- | --- | --- |
+| completed | missionLifecycleService.isTaskAreaFlightCompleted(area) | 会查父Mission及续飞链，dispatch=SUCCESS不算飞完 |
+| failed | routeStatus=FAILED，或missionStatus=FAILED，或dispatchStatus为FAILED／CANCELLED | 某条区域取消也算失败明细；不是只看下发失败 |
+| completedCount | completed且非failed的区域数 | 一个区域既观测完成又有失败标记，只算失败，不算成功完成 |
+| failedCount | failed的区域数 | 有1条失败不等于父批次马上FAILED |
+| terminalCount | completed或failed的区域数，每区域只加一次 | 达到区域总数，才走全部终态分支 |
+
+**源码摘录 · `ModelingTaskStatusService.java` 第76–88行（v2.5工作树）：**
+
+```java
+ModelingTaskStatusEnum target;
+if (allTerminal) {
+    target = failedCount == 0 ? ModelingTaskStatusEnum.COMPLETED
+            : completedCount > 0 ? ModelingTaskStatusEnum.PARTIAL_FAILED
+            : ModelingTaskStatusEnum.FAILED;
+} else if (hasExecutionActivity(taskAreas)) {
+    target = ModelingTaskStatusEnum.EXECUTING;
+} else if (areAllRoutesTerminal(taskAreas)) {
+    target = ModelingTaskStatusEnum.READY;
+} else {
+    target = ModelingTaskStatusEnum.PLANNING;
+}
+
+```
+
+这段是真实分支顺序。allTerminal优先；其后hasExecutionActivity只检查是否存在非null且非PENDING的dispatchStatus，连FAILED／CANCELLED也算“已有处理活动”，并不表示真的有飞机正在飞。areAllRoutesTerminal只看全部航线SUCCESS／FAILED，不检查全部Mission创建成功。因此READY表达可进入准备后调度阶段，实际候选仍由missionStatus等条件过滤。
+
+```mermaid
+flowchart TD
+  A[读取全部区域并计算完成 失败 终结计数] --> B{全部终结?}
+  B -->|是| C[无失败 COMPLETED / 有成有败 PARTIAL_FAILED / 全失败 FAILED]
+  B -->|否| D{有非PENDING下发状态?}
+  D -->|是| E[请求 EXECUTING]
+  D -->|否| F{全部航线已终结?}
+  F -->|是| G[请求 READY]
+  F -->|否| H[请求 PLANNING]
+  C --> U[updateForward 终态粘滞 单向推进 旧状态条件更新]
+  E --> U
+  G --> U
+  H --> U
+```
+
+### 六组明细，现场手算父状态
+
+| 当前区域事实（假设父状态尚允许推进） | 计数／命中条件 | 本次请求写入的目标 |
+| --- | --- | --- |
+| A已飞完整链，B等待机库 | completed=1，terminal=1/2；A下发SUCCESS | EXECUTING，继续等B |
+| A航线失败，B航线成功但尚未下发；两者dispatch均PENDING | terminal=1/2，无下发活动，航线均终结 | READY，并携带A失败原因 |
+| A明确下发失败，B仍待发 | terminal=1/2；A的dispatch=FAILED也命中活动 | EXECUTING；不保证此时有飞机在飞 |
+| A成功完成，B永久失败 | terminal=2/2，completed=1，failed=1 | PARTIAL_FAILED |
+| A、B都失败 | terminal=2/2，completed=0，failed=2 | FAILED |
+| A、B完成且无失败标记 | terminal=2/2，failed=0 | COMPLETED，并清父failReason |
+
+空区域列表不是COMPLETED，而是markFailed“建模任务区域记录为空”。正常聚合也不会产生父CANCELLED，取消由显式markCancelled写入。另一个细节：Mission.status=CANCEL在生命周期函数里直接算完成；若区域自身没有失败／取消标记，聚合可能把它计入completedCount。因此不能把“业务成功”无条件等同于completedCount。
+
+### 目标状态不一定成为数据库最终状态
+
+refreshTaskStatus算出target后调用updateForward。它最多3次读批次并更新：不存在或非法状态则退出；当前已终态且目标是另一状态则保持不变；非终态仅允许PLANNING(10)→READY(20)→EXECUTING(30)同级或向前，以及推进任一终态。UPDATE同时带id和读取时的旧status。
+
+**源码摘录 · `ModelingTaskStatusService.java` 第146–163行（v2.5工作树）：**
+
+```java
+if (currentStatus.isTerminal() && currentStatus != requestedStatus) {
+    log.info("建模任务终态保持不变 taskId={}, currentStatus={}, requestedStatus={}",
+            taskId, currentStatus.getCode(), requestedStatus.getCode());
+    return false;
+}
+
+ModelingTaskStatusEnum targetStatus = currentStatus.canAdvanceTo(requestedStatus)
+        ? requestedStatus : currentStatus;
+String targetFailReason = replaceFailReason ? failReason : task.getFailReason();
+if (targetStatus == ModelingTaskStatusEnum.COMPLETED) {
+    targetFailReason = null;
+}
+int updated = modelingTaskDao.update(null, new LambdaUpdateWrapper<ModelingTaskEntity>()
+        .eq(ModelingTaskEntity::getId, task.getId())
+        .eq(ModelingTaskEntity::getStatus, task.getStatus())
+        .set(ModelingTaskEntity::getStatus, targetStatus.getCode())
+        .set(ModelingTaskEntity::getFailReason, targetFailReason)
+        .set(ModelingTaskEntity::getUpdateTime, new Date()));
+```
+
+如果当前EXECUTING而重算target=READY，仍保留EXECUTING；终态允许同态更新原因，不能改为另一终态。父CANCELLED后晚到的完成刷新不会把它变COMPLETED。条件更新冲突只重读父状态，不重新计算整组区域；而且WHERE只有旧status，相同status下的并发原因更新仍可能相互覆盖。这是有限并发保护，不是完整版本号快照或强一致聚合。
+
+failReason从失败区域取非空原因，补区域名／ID、去重、拼接并截断；COMPLETED清空，FAILED但没有细节时补默认文案。等待原因、普通起飞重试说明不一定进入父失败聚合，因为只有failed区域参与原因收集。
+
+### 谁刷新父批次，页面查询会不会顺便修好
+
+| 刷新点 | 解决什么时机 |
+| --- | --- |
+| 规划无成功航线／准备Mission结束 | 让规划结果和创建失败进入父状态 |
+| onTaskPrepared | 首轮扫描前刷新；生成调度摘要不是另一个权威状态字段 |
+| reserveDispatchCandidates的第一步 | 每轮对该showroom的READY／EXECUTING批次刷新；此查询未按paused过滤，暂停批次也可更新进度 |
+| 普通派飞候选循环结束 | 对本轮候选涉及的taskId去重刷新 |
+| 父／子Mission完成事件 | 找回父区域、确认下发成功，再刷新所属批次 |
+| 续飞永久阻飞、普通起飞／续飞重试耗尽 | 明确失败后立即刷新 |
+| markExecuting／markFailed／markCancelled | 显式推进仍走updateForward，不要求先经过refreshTaskStatus |
+
+pageProgress读取持久状态、父子Mission和建模进度组装响应，没有顺便调用refreshTaskStatus。刷新页面不能替代后台补偿。批次COMPLETED按飞行链聚合，模型生成进度另查projectId；飞行完成、图片完成、模型完成是不同时间点。
+
+### 面试官问：一个区域失败了，为什么批次还显示EXECUTING
+
+> **记忆关键词：还有未终结区域 · 先等全部收口 · 活动不是在飞。**
+>
+> 父批次先判断全部区域是否终结。没全部终结且有任意非PENDING下发状态，就计算EXECUTING，其中失败本身也命中活动；所以它表示批次处理阶段。其余区域完成后，有成功有失败才收敛PARTIAL_FAILED，全失败才FAILED。父状态还受单向推进规则约束，不会因为一次重算退回READY。
+
+## 1.20 续飞父子状态刷新：返航、完成上报与最新执行腿
+
+这里的父子指Mission链，不是建模批次。理解这条链，要分清四个字段：`status`是某一腿飞行观测，`hasSubMission`表示根任务存在续飞记录，`resumeTaskStatus=1`表示这条续飞腿已经结束，`overallStatus`是根任务整体完成标记。后两个字段都不等于task.status。
+
+### 设备上报finishStatus之后，代码写哪条记录
+
+MissionResumeFlyHandler收到MissionResumeFlyEvent，解析上报：
+
+**源码摘录 · `MissionResumeFlyHandler.java` 第31–39行（v2.5工作树）：**
+
+```java
+if (1 == resumeFlyHandleRequestParam.getFinishStatus()) {
+    log.info("当前任务id为{}整体已执行完毕,不生成续飞任务", resumeFlyHandleRequestParam.getMissionId());
+    //修改当前任务的父任务整体完成状态用于前端逻辑
+    missionResumeFlyService.updateMissionOverallStatus(resumeFlyHandleRequestParam);
+    //更新当前任务续飞完成状态为已完成
+    missionResumeFlyService.updateMissionResumeTaskStatus(resumeFlyHandleRequestParam);
+    return;
+}
+Result<Object> submission = missionResumeFlyService.createSubmission(resumeFlyHandleRequestParam);
+```
+
+finishStatus=1时，不再生成下一腿。updateMissionOverallStatus读取当前Mission：parentId=0就更新自己，否则更新根parentId的overallStatus；updateMissionResumeTaskStatus则只把**这次上报missionId**的resumeTaskStatus置1。这里没有顺手把建模task.status写完成，也没有在这个分支显式调用queueManager。
+
+finishStatus非1则createSubmission：保存中断记录、裁剪已飞段、为剩余航段加去程并创建航线与新Mission。新执行腿status=WAITING、resumeTaskStatus=0，parentId指根任务。首次中断会把根任务hasSubMission设1；后续中断在裁剪前将当前旧子腿resumeTaskStatus置1，然后生成新子腿。因此**S1的resumeTaskStatus=1可能只是S1这腿结束，后面还有S2**。
+
+首次飞行还会有TASK_CREATED(8)的补录记录，它用于保留实际已飞航段，不是待下发执行腿。不要把这类记录卡住当“还有一架飞机未飞”。字段更新的设备消息入口和上游Mission.status同步属于不同链路，本仓库没有证明二者与完成事件一定按同一事务、同一时序到达。
+
+### 新生子腿、继续子腿、超时重试子腿：三个发送入口
+
+| 路径 | 核对到的调用链 | 保证范围 |
+| --- | --- | --- |
+| 设备中断后自动续飞（机库路径） | createSubmission → 父resumeFlightEnabled=1 → executeTask → execMissionV4 | 独立线程池轮询机库nestStatus为900／6；每轮检查根续飞开关；睡眠间隔1分钟、名义等待预算30分钟，接口耗时额外计算；不是普通区域PENDING→DISPATCHING入口 |
+| 暂停后继续 | doResumeTask → retriggerWaitingResumeSubMission → commonExecMission | 仅最新WAITING子腿；检查机库电池和统一准入；在批次控制的样板间锁内调用 |
+| 队列补偿续飞超时 | handleStaleResumeSubMission → retryStaleResumeSubMission → commonExecMission | 针对最新未结束子腿；机库和准入通过后才计本条子腿重试次数，最多2次 |
+
+新生子腿创建仍调用通用createOrUpdateMission，不是初始建模Mission使用的createOrUpdateModelingMission；其创建安全检查和等待执行路径不能与1.18逐项等同。队列恢复路径有专门准入，不代表所有续飞调用者自动共享同一把锁、同一套CAS和预算。这是必须如实区分的现状，统一入口是后续改进方向。
+
+### 区域整条链完成的精确判断顺序
+
+1. taskArea／missionId／Mission缺失：false，不能凭空算完成。
+2. 根Mission.status=CANCEL：直接true，这是当前产品规则；不会继续检查子腿。
+3. 根状态必须是FINISH(2)、DRONE_BACK(4)、DOCK_RESET(5)、IMAGE_UPLOAD_COMPLETED(6)、TASK_CREATED(8)之一，否则false。ALREADY_RECEIVED(7)、RUNNING(1)、TAKEOFF(21)、LAND(29)不是完成。
+4. 根hasSubMission不为1：true。
+5. 标记有子任务却查不到子任务：false，保守等待数据收敛。
+6. 过滤子任务status=TASK_CREATED的归档记录；过滤后为空：true。
+7. 剩余任意子任务为ALREADY_RECEIVED／RUNNING／TAKEOFF／LAND：false，先保留执行链。
+8. 按createdAt最大、再id最大找最新可执行子腿（null排最前）。最新status=CANCEL或resumeTaskStatus=1：true；否则false。
+
+**源码摘录 · `ModelingMissionLifecycleService.java` 第125–143行（v2.5工作树）：**
+
+```java
+boolean hasActiveSubMission = executableSubMissions.stream().anyMatch(this::isMissionInFlight);
+if (hasActiveSubMission) {
+    log.info("建模任务队列暂停，续飞链仍有已接收或飞行中的子任务 parentMissionId={}, routeCode={}, subMissions={}",
+            parentMissionId, taskArea.getRouteCode(), subMissionDetails);
+    return false;
+}
+if (latestSubMission != null
+        && Objects.equals(latestSubMission.getStatus(), MissionStatusEnum.CANCEL.getType())) {
+    log.info("建模任务队列续飞校验通过，最新续飞子任务已取消 parentMissionId={}, routeCode={}, latestSubMissionId={}, subMissions={}",
+            parentMissionId, taskArea.getRouteCode(), latestSubMission.getId(), subMissionDetails);
+    return true;
+}
+if (latestSubMission != null
+        && Objects.equals(latestSubMission.getResumeTaskStatus(), RESUME_TASK_FINISHED)) {
+    log.info("建模任务队列续飞校验通过，最新续飞子任务已结束 parentMissionId={}, routeCode={}, latestSubMissionId={}, latestSubMissionStatus={}, subMissions={}",
+            parentMissionId, taskArea.getRouteCode(), latestSubMission.getId(),
+            latestSubMission.getStatus(), subMissionDetails);
+    return true;
+}
+```
+
+因此“根返航就算结束”“任意子腿resumeTaskStatus=1就算结束”“要求每个历史子腿status都变成某个终态”都不是当前算法。它依赖根hasSubMission、子记录排序及上游状态正确性；多次查询没有全链事务快照，晚生子腿和乱序回调要结合证据排查。根CANCEL的提前返回也不能解释成已验证所有子腿都停飞。
+
+### 一张表走完M0、S1、S2
+
+| 时点 | 已持久化的事实 | 生命周期返回及影响 |
+| --- | --- | --- |
+| M0运行中 | M0=RUNNING | false，同库后续区域等待 |
+| M0返航，已标有子任务但记录尚未可见 | M0=DRONE_BACK，hasSubMission=1，查询子列表空 | false，挡住这段生成窗口 |
+| S1已生成尚未执行 | M0已返航；S1=WAITING、resumeTaskStatus=0 | false，机库仍留给这条链 |
+| S1中断后生成S2 | S1.resumeTaskStatus=1；S2=WAITING、resumeTaskStatus=0 | 最新是S2，仍false；不重发M0 |
+| S2已收到／在飞 | S2=ALREADY_RECEIVED／RUNNING | false，即使其他旧腿已结束 |
+| S2整条任务完成上报已到，尚未落库状态回调 | S2.resumeTaskStatus=1，但S2.status仍RUNNING | 活跃子腿检查优先，仍false |
+| S2返航且完成标记已到，无其他活跃子腿 | 最新S2.resumeTaskStatus=1、status不再活跃 | true；后续刷新父批次并重新调度，同库仍需设备／电池就绪 |
+
+### 子腿完成事件如何回到父区域
+
+queueManager先按事件missionId查taskArea.missionId。找不到就读取该子Mission，取parentId，再查指向根Mission的区域。找到后用**区域的父routeCode**确认dispatch=SUCCESS、刷新区域所属taskId，再根据批次showroom调度。没有创建新的taskArea，也不是把event中的子routeCode直接写成批次主键。
+
+ActiveRouteProcessService则按**事件当前missionId**清理该腿的活跃航线，且@Order最高优先级；清理失败被捕获，仍有TTL。二者分别处理“这一腿的远端占用”和“父区域整链的调度投影”。一次事件不会自动证明整个区域完成，仍要运行上面的生命周期判断；若最终完成字段比事件晚到，后续扫描才有机会收敛。
+
+### 面试官问：overallStatus已经是1，为什么队列还挡着
+
+> **记忆关键词：展示标记 · 整链判定 · 活跃腿优先。**
+>
+> 队列生命周期函数不直接读overallStatus，而是先看根Mission是否处于完成集合，再看有无子记录、是否还有活跃子腿以及最新可执行腿的resumeTaskStatus。overallStatus用于整体展示，不能覆盖“设备仍显示在飞”或“新子腿未结束”的事实。需要排查具体字段和事件先后，不要只手改整体完成标记。
+
+## 1.21 兜底逻辑总账：什么会重试、什么会等待、什么没人自动修
+
+**每个兜底都要能回答：扫描对象、时间基准、写哪个状态、重试谁、预算多少、由谁再唤醒。** 默认值是源码默认，不代表线上配置。下表把创建、调度、续飞和资源登记放在一处，避免把不同“2次／2分钟”混背。
+
+### 恢复分支与预算对照
+
+| 情况 | 判断／时间基准 | 动作与预算 | 再推进的入口 |
+| --- | --- | --- | --- |
+| 规划阶段无可用机库 | 仍route=PENDING且dockSn为空的原区域 | 每隔6秒追加分配，最多2次；耗尽route=FAILED并清dockSn | CompletableFuture延迟重试链；不是调度fixedDelay |
+| 异步规划链异常 | 收口重查仍route=PENDING的区域 | 补标route=FAILED；已成功的不整体抹掉 | 完成回调；宕机丢失整条回调不由此自动修复 |
+| 部分Mission准备失败 | 每条routeCode准备catch | 仅该区域mission=FAILED；其余继续准备 | 正常进入父状态聚合；没有通用“失败Mission无限重建” |
+| 机库恢复但原区域没实际起飞 | 同库未结束区域dispatch=SUCCESS，Mission=WAITING | 立即SUCCESS→PENDING；DISPATCHING不走此快捷恢复；无2次预算 | DOCK_READY首轮 |
+| 普通下发未确认接收 | 活跃未暂停批次；区域DISPATCHING／SUCCESS；Mission=WAITING；area.updateTime早于默认2分钟阈值 | 回PENDING，重发同一父Mission；这个分支没有独立有限次数计数 | 每次调度前requeueStaleDispatching |
+| 普通任务已接收未起飞 | Mission=ALREADY_RECEIVED；area.updateTime早于默认5分钟阈值 | 回PENDING，写第N/2次；同库优先重发当前Mission；预算耗尽区域FAILED | 每次调度前恢复，再正常候选派飞 |
+| 续飞子腿未接收／未起飞 | 最新未结束子Mission分别WAITING／ALREADY_RECEIVED；看子updatedAt与createdAt较新值 | 默认2／5分钟；匹配当前subMissionId重试文案时再纳入area.updateTime；重试该子Mission，最多2次 | 同一恢复扫描，禁止顺带重排根Mission |
+| 续飞等待电池、设备或临时空域 | 机库未就绪或准入未通过 | 写waitReason，保持原DISPATCHING／SUCCESS；不消耗发送次数；永久阻飞则失败并关续飞 | 其他事件／低频扫描 |
+| 明确下发失败后的补位 | 本轮候选派飞后观察到FAILED | 一次scheduleShowroom最多32轮；继续寻找后面的可用区域 | 同步本次调用，预算后等下一次触发 |
+| IoT结果未知 | 异常／空响应／调用后写回异常 | 保留占用和待确认原因；不立即当失败放行，但后续本地超时策略仍可能重排 | 设备状态对账、后续事件／恢复扫描；安全边界见2.7 |
+| 取消后又生成WAITING续飞腿 | 每次showroom调度先查CANCELLED批次及其根Mission | 将后来出现的WAITING子腿条件改CANCEL，不处理已在飞子腿 | 后续该showroom有调度机会才收敛 |
+| 取消批次残留ALREADY_RECEIVED占用 | 区域DISPATCHING／SUCCESS；area.updateTime早于默认5分钟；Mission=7；机库isDockReady | 条件改Mission为CANCEL并标区域CANCELLED；这里只检查就绪，不要求派飞电池阈值 | 每次showroom调度前 |
+| 活跃登记未正常删除 | 完成监听删除失败／未收到完成事件 | 远端TTL兜底；不是修改区域状态，也不是自动终止飞机 | 碰撞服务过期机制，具体服务端实现未验证 |
+| 父批次并发写冲突 | UPDATE旧status匹配失败 | 最多3次重读父状态再写；耗尽打日志 | 后续刷新机会；不是同一轮无限自旋 |
+
+### 为什么普通父任务超时前必须先处理续飞
+
+requeueStaleDispatching对每个已下发区域，**先调用handleStaleResumeSubMission，再判断父区域的2分钟时间门槛**。有子任务标记但列表为空，返回true，父回退不得继续；最新子腿未结束，优先按子状态处理。这样不会因为M0早已返航、area时间很老，就从头重发整条根航线。
+
+**源码摘录 · `ModelingQueueManager.java` 第950–969行（v2.5工作树）：**
+
+```java
+    // 有未结束续飞链时，只处理最新续飞子任务，绝不能把父区域退回 PENDING 后重发父 mission。
+    if (handleStaleResumeSubMission(showroomId, area, mission)) {
+        continue;
+    }
+    // 普通父 mission 仍以区域最近调度时间为超时基准；续飞子任务不受这个门槛限制。
+    if (area.getUpdateTime() == null || !area.getUpdateTime().before(dispatchStaleBefore)) {
+        continue;
+    }
+    Integer status = mission.getStatus();
+    // WAITING(0)：指令尚未送达飞机，超2分钟即回退重发
+    if (Objects.equals(status, MissionStatusEnum.WAITING.getType())) {
+        requeueStaleAreaToPending(showroomId, area, mission, "下发超时未送达飞机，自动回退重排");
+        continue;
+    }
+    if (Objects.equals(status, MissionStatusEnum.ALREADY_RECEIVED.getType())
+            && takeoffStaleTimeoutMs > 0
+            && area.getUpdateTime().before(takeoffStaleBefore)) {
+        requeueTakeoffTimeoutArea(showroomId, area, mission);
+    }
+}
+```
+
+恢复函数找“最新”时使用原始子任务列表，没有复用生命周期里过滤TASK_CREATED的步骤。最新resumeTaskStatus=1则返回false允许继续检查根；最新是其他非WAITING／非ALREADY_RECEIVED状态时返回true但不重发；子列表缺失也只等待。这意味着**完成判定和恢复选择不是同一个函数，不能把两者所有细节视为一致**。
+
+### 计时起点和“最多2次”怎么维护
+
+普通父任务以区域updateTime计时，不是只用Mission.createdAt，也不是第一次发送的独立时间戳。成功下发、记录UNKNOWN及某些等待更新会刷新这个字段，可能推迟下次达到超时条件。判断是严格早于阈值；恰好等于边界要等后续扫描。dispatch-stale-timeout-ms≤0会提前跳过整段恢复，连后面的起飞／续飞处理也不执行；takeoff阈值≤0则不执行对应已接收重试。
+
+父起飞次数保存在failReason的“起飞超时，重新下发当前任务（第N/2次）”里，字符串解析还原；下发成功专门保留这个计数，避免成功响应清空后无限重试。子腿计数前缀还包含subMissionId，切到新的子腿从其自身前缀重新计数；续飞发送前更新原因和时间，但不把父区域改PENDING。普通父任务在回退PENDING并写“第N/2次”时就占用一轮预算，之后即使候选因设备或空域等待而未发送，这轮计数也已存在；子腿则先通过机库与安全检查，随后写计数再直接发送，所以子腿条件等待不计次。两者在后续调用抛异常时都不会自动退还已占预算。
+
+这套文本计数不是独立重试表。改文案、截断或其他路径覆盖failReason可能影响预算；普通WAITING回退、机库恢复回退也没有共享这套次数，不能回答“全系统所有任务最多重试两次”。
+
+### 四个时钟必须分开讲
+
+| 时钟 | 默认值与含义 | 不能推出什么 |
+| --- | --- | --- |
+| 机库状态处理 | fixedRate 5秒，计算ready变化 | 不保证每5秒派飞；电量越线不一定触发事件 |
+| 调度补偿 | fixedDelay 120秒，上轮运行结束后再等 | 不保证故障发生后精确120秒恢复，锁和接口耗时会延后 |
+| 本地未接收／未起飞恢复 | 默认2分钟／5分钟，按各自更新时间判断 | 不证明远端没收到命令，也不是Redis锁租约 |
+| 远端登记TTL | 普通登记6分钟；起飞事件续签到60分钟；队列续飞准入35分钟；另有直接IoT类型65分钟 | 不代表每60分钟自动续签；当前监听在起飞事件调用续签，TTL到期不代表物理飞行已经结束 |
+
+### 补偿覆盖不到的地方要主动说明
+
+定时任务先枚举未暂停READY／EXECUTING批次的showroom。若一个showroom只剩CANCELLED或PLANNING批次，它不会仅凭这些记录被这段定时任务选中；取消晚生子腿清理仍需其他事件、新批次或其他调度机会。所有父批次终态粘滞也意味着普通刷新不会自动纠正错误终态。
+
+图片齐全后的组级建模提交用另一把父Mission锁，详见1.8；撞锁跳过及远端成功、本地保存projectId失败的窗口，不由普通飞行调度扫描自动填补。模型进度查询失败可以展示UNAVAILABLE，不能因此重新派飞或重新提交建模项目。
+
+### 面试官问：有事件加定时补偿，为什么还不能承诺绝不漏执行
+
+> **记忆关键词：扫描入口有范围 · 每个故障有条件 · 终态粘滞 · 外部事实。**
+>
+> 定时补偿给满足范围的持久任务再检查一次，解决很多漏触发，但它不恢复全部阶段。PLANNING、仅取消批次的样板间、人工暂停、错误终态及图片提交窗口各有边界。设备消息缺失、远端结果未知也不能只靠本地时间推断。应讲清每项兜底依赖什么状态、由哪个入口再触发，而不是一句“定时扫一下就好了”。
+
+## 1.22 暂停、继续和取消怎样插入调度：逐行理解控制语义
+
+SELF的三种控制都使用`modeling:airspace:dispatch:{showroomId}`，与普通派飞最终锁相同。正常持锁期间，取消不能插入最终复检和IoT发送之间；代价是慢接口会延迟控制请求。这不等于撤销已被设备受理的命令，也不涵盖所有独立自动续飞线程的副作用。
+
+### 暂停：先停止准入，再关下一腿
+
+doPauseTask只接受READY／EXECUTING批次，条件把paused从0设1；查询各区域根Mission，首次暂停把原resumeFlightEnabled存进pausedResumeEnabled（原值null按1）；重复暂停不覆盖已有快照；再把根开关关为0。当前飞行不主动中止。paused是独立标志，不是新增一个PAUSED批次状态，也不会强行把task.status退回READY。
+
+### 继续：快照是恢复清单，不代表必须恢复到原开关值
+
+doResumeTask只在paused=1时推进。有暂停快照的根Mission一律直接写resumeFlightEnabled=1；**原快照为0也会开为1**，因为“继续批次”按自动推进处理。它不调用可能立即执行最新子腿的resumeFlightEnabled(...,1)，避免与专门重触发入口叠加发送。
+
+随后逐区域找最新WAITING子腿，检查设备电池和统一准入；用`id + status=WAITING`更新子Mission.updatedAt后调用commonExecMission。该条件更新没有把WAITING改成另一种领取状态，所以它是观测条件校验，不是跨所有调用者的独占领取令牌。
+
+**源码摘录 · `ModelingQueueManager.java` 第355–368行（v2.5工作树）：**
+
+```java
+// paused 仍为 1 时逐条恢复续飞；成功一条清一条快照。中途失败可重复调用继续补偿，
+// 已成功任务因快照已清除不会再次触发，未成功任务仍保留原快照。
+for (ModelingTaskAreaEntity area : resumeCandidates) {
+    retriggerWaitingResumeSubMission(area);
+    clearPausedResumeSnapshot(area.getId());
+}
+// 所有 mission 和待发续飞任务均恢复成功后，才允许普通区域重新进入调度。
+int resumed = modelingTaskDao.update(null, new LambdaUpdateWrapper<ModelingTaskEntity>()
+        .eq(ModelingTaskEntity::getTaskId, taskId)
+        .eq(ModelingTaskEntity::getPaused, 1)
+        .in(ModelingTaskEntity::getStatus, ModelingTaskStatusEnum.queueEligibleCodes())
+        .set(ModelingTaskEntity::getPaused, 0)
+        .set(ModelingTaskEntity::getUpdateTime, new Date()));
+Assert.isTrue(resumed > 0, "解除建模批次暂停状态失败，taskId=" + taskId);
+```
+
+关键细节：retriggerWaitingResumeSubMission在无子腿、最新非WAITING、机库／电池未就绪或临时空域等待时可以正常return；调用者随后**仍清该区域暂停快照**，最后把paused改0。因此“快照已清、批次已继续”表示本轮恢复步骤未抛异常，不证明每条子腿都已经发送成功。未就绪子腿依靠后续恢复扫描再次推进；永久阻飞则会标区域失败并关链。
+
+若某条抛异常，之后的快照和最终解除暂停没有执行；已清部分跳过，未清部分可再次调用继续。但远端已受理、清快照前抛异常的窗口仍可能重复尝试，不能把逐条清快照说成跨系统严格一次。
+
+### 取消：批次马上终态，飞机可能还在飞
+
+| 被取消时的区域事实 | 当前实现动作 |
+| --- | --- |
+| 区域已失败／取消／整链完成 | 保持，不重新覆盖结果 |
+| 区域PENDING | 有父Mission则尽力写CANCEL；区域dispatch=CANCELLED |
+| 区域DISPATCHING／SUCCESS，父Mission仍WAITING | 尽力改父CANCEL并标区域CANCELLED |
+| 父Mission已ALREADY_RECEIVED或在飞 | 不在这次操作中强制改成未飞；等待当前飞行结束 |
+| 所有相关根Mission | 关闭自动续飞，条件取消仍WAITING子腿 |
+| 父批次 | 清paused，显式markCancelled；晚到聚合不会把它改回其他终态 |
+
+cancelPreTakeoffMission是数据库更新，源码注释明确“仅改库状态，是否真阻止起飞取决于设备”。它在调用者读状态后按id更新，父Mission更新本身未再带旧status；普通取消不等于设备确认撤销，也没有在这一步统一删除全部活跃登记。
+
+同库占用查询纳入CANCELLED批次的DISPATCHING／SUCCESS未结束链，避免只因父批次取消就立刻把该库给下一条。晚生WAITING子腿由调度入口补取消，陈旧ALREADY_RECEIVED还需超时加机库就绪才释放。生命周期对根CANCEL直接true的规则及其他外部发送入口仍是需要核对的边界，不能承诺取消后所有物理占用都被完美追踪。
+
+### 面试官问：暂停和取消都关续飞，区别在哪里
+
+> **记忆关键词：可恢复意图 · 独立paused · 取消终态 · 保留在飞事实。**
+>
+> 暂停保留批次可执行状态和恢复快照，用paused挡普通区域、关根开关挡后续自动腿；继续可以重新开放。取消则把未执行区域及待发子腿取消，并把父批次写入不可回退的CANCELLED，后续不通过继续入口恢复。两者都不靠改数据库去强制停止已在飞设备，取消后的残余占用还要单独收敛。
+
+## 1.23 面试现场推演与源码索引：从一条日志讲完整闭环
+
+### 推演：一个批次三块区域，中间经历续飞、失败和丢事件
+
+下面是教学输入，不是生产运行记录。T含A→D1、B→D2、C→D1。三条航线规划成功，B在准备Mission时静态安全检查永久失败；A、C准备成功。规划都结束后才准备Mission。假设A／C暂不冲突且机库达到85%电量。
+
+| 步骤 | 发生什么 | 区域／Mission变化 | 父批次与下一步 |
+| --- | --- | --- | --- |
+| 1 创建 | 短事务保存T及A／B／C，事务提交 | T=PLANNING；区域阶段PENDING | 异步规划从已提交记录开始 |
+| 2 收口 | B准备Mission失败；A／C已可派飞 | B.missionStatus=FAILED；A／C missionStatus=SUCCESS、dispatch=PENDING | 全部航线已收口，无下发活动，目标READY；有失败原因但未全部终结 |
+| 3 首轮 | A最终领取、准入、IoT成功；C最终复检被同库A挡住 | A.dispatch=SUCCESS、A的M0=WAITING；C保持PENDING | EXECUTING，由A.dispatch=SUCCESS触发；B的Mission创建失败参与失败计数 |
+| 4 飞行中断 | A的M0返航，生成S1 | M0.hasSubMission=1；S1=WAITING、resumeTaskStatus=0 | A整链未完，C不能因M0返航而接管D1 |
+| 5 续飞异常 | S1迟迟WAITING，根区域更新时间即使很老也先走子腿超时 | 以S1更新时间检查2分钟；电池不足只写等待、不计次 | 不把A回PENDING重发M0；等设备或补偿 |
+| 6 子腿补偿 | 条件满足后，统一准入通过，记录S1第1/2次再发 | 发送S1，父区域仍DISPATCHING／SUCCESS | 等S1状态与整链完成事实 |
+| 7 完成乱序 | finishStatus=1先到，但S1.status仍RUNNING | 根overallStatus=1；S1.resumeTaskStatus=1，仍是活跃腿 | 生命周期仍false，不因整体标记提前交库 |
+| 8 状态补齐，完成事件丢失 | S1已返航，无活跃子腿，最新腿结束 | 生命周期现在true，但没人刚好立即触发聚合 | 下次有范围内READY／EXECUTING批次的扫描可刷新T并尝试C；旧登记还要完成清理或TTL |
+| 9 C派飞并完成 | C按最新设备、空域再准入，不直接沿用A结论 | A、C完成，B失败，terminal=3/3 | T=PARTIAL_FAILED；图片齐全与模型生成继续走另外的组级链路 |
+
+步骤8不能承诺“120秒内一定发出C”：fixedDelay从上次执行结束计时，持锁／接口时延、机库电池、活跃登记残留都会延迟。扫描只能提供再次检查机会。
+
+### 面试官问：如何判断是“没触发”还是“触发了但不能派”
+
+> 先用taskId／showroomId找source与scheduleRound，确认PLAN_READY、MISSION_FINISHED、DOCK_READY、RESUME或RECONCILE是否出现；再看候选数、筛选数、最终复检、CAS影响行数、安全准入和IoT结果。PENDING不是“没调度”的证据，waitReason可能明确写着同库、电池或活跃冲突；DISPATCHING加待确认原因是未知结果，要查设备受理，不直接改状态释放。
+
+### 面试官问：区域SUCCESS了但批次一直不完成，排查顺序是什么
+
+> 先确认是dispatchStatus=SUCCESS还是飞行完成：依次查根Mission.status、hasSubMission、子腿列表是否缺失、剔除归档后有没有活跃腿、最新可执行腿的resumeTaskStatus；再看其他区域是否仍未终结，以及refreshTaskStatus是否发生、updateForward有无条件更新冲突或终态保护。最后区分task完成和模型进度，不用projectId进度反推飞行状态。
+
+### 面试官问：为什么飞完了，后面的区域仍然排队
+
+> 本腿结束不一定整链结束；整链结束也不一定设备已就绪或电量达标；设备就绪后还要与其他机库当前活跃航迹重新准入。完成清理失败会留登记等TTL，完成字段晚到要等下一次刷新，电量越线未必有ready事件。这些分别是续飞链等待、设备等待、空域等待和触发延迟，不能统一归因于调度算法。
+
+### 面试官问：最值得补强哪几处，不要只回答“加重试”
+
+> **记忆关键词：尝试代际 · 资源归属 · 执行端幂等 · 恢复覆盖 · 显式计数。**
+>
+> 第一，UNKNOWN回退要结合设备查询或可靠撤销，补attempt／epoch和执行端fencing／commandId，防旧执行者与重发重叠。第二，把不同续飞发送入口的准入、锁、结果处理统一到可验证的契约。第三，将重试次数和发送时间从failReason／通用updateTime中独立出来。第四，对PLANNING卡住、仅取消批次的样板间和图片提交窗口分别设计恢复入口。它们是改进方向，当前文档不能把它们写成已实现。
+
+### 证据索引：只为核对，不要求复习时跳回代码
+
+以下路径相对`D:\Project\hushi-services-platform-fix_auto_modeling_v2.5`；行号为2026-10-16工作树。本节的源码片段由这些实际文件截取，省略处使用独立片段而不伪装成完整方法。`web`表示`hushi-web/src/main/java/com/ikingtec/hushi/web/`，`service`表示`hushi-shared/hushi-shared-service/src/main/java/com/ikingtec/hushi/service/`。
+
+| 文件／入口 | 当前行号 | 对照内容 |
+| --- | --- | --- |
+| `web/service/modeling/impl/ModelingTaskServiceImpl.java` | 120 | 创建事务、异步启动及首轮规划 |
+| `web/service/modeling/impl/ModelingTaskServiceImpl.java` | 383 | 规划收口、逐条准备Mission |
+| `web/service/modeling/impl/ModelingQueueManager.java` | 93 | 五入口：首轮准备 |
+| `web/service/modeling/impl/ModelingQueueManager.java` | 110 | 扫描范围与fixedDelay |
+| `web/service/modeling/impl/ModelingQueueManager.java` | 131 | 完成事件关联根区域 |
+| `web/service/modeling/impl/ModelingQueueManager.java` | 155 | 机库事件查showroom |
+| `web/service/modeling/impl/ModelingQueueManager.java` | 607 | 两段锁、32轮失败补位 |
+| `web/service/modeling/impl/ModelingQueueManager.java` | 740 | 候选条件与排序 |
+| `web/service/modeling/impl/ModelingQueueManager.java` | 1224 | 最终复检、CAS、准入及IoT分类 |
+| `web/service/modeling/impl/ModelingTaskStatusService.java` | 48 | 父批次三个计数和目标状态 |
+| `web/service/modeling/impl/ModelingTaskStatusService.java` | 129 | 单向推进、终态保持、3次重试 |
+| `web/service/modeling/impl/ModelingMissionLifecycleService.java` | 91 | 根与最新可执行子腿的结束判定 |
+| `web/handler/MissionResumeFlyHandler.java` | 27 | finishStatus分流 |
+| `service/service/impl/mission/MissionResumeFlyServiceImpl.java` | 331 | 根overallStatus更新 |
+| `service/service/impl/mission/MissionServiceImpl.java` | 1209 | 当前腿resumeTaskStatus更新 |
+| `service/service/impl/mission/MissionResumeFlyServiceImpl.java` | 582 | 自动续飞独立轮询执行入口 |
+| `web/service/modeling/impl/ModelingQueueManager.java` | 927 | 先子后父的超时恢复 |
+| `web/service/modeling/impl/ModelingQueueManager.java` | 1029 | 子腿重试计数与失败收口 |
+| `web/service/modeling/impl/ModelingQueueManager.java` | 327 | 等待返回、清快照与解除paused |
+| `web/handler/DockStatusEventHandler.java` | 176 | ready跃迁发事件，非电量越线事件 |
+| `web/service/modeling/impl/ModelingDockAvailabilityServiceImpl.java` | 46 | 设备加电池双门槛 |
+| `service/service/impl/collision/MissionRouteSafetyServiceImpl.java` | 100 | 放行例外与登记查证 |
+| `service/service/impl/collision/ActiveRouteProcessService.java` | 30 | 最高优先级清理；起飞续签 |
+| `service/enums/ActiveRouteTtlType.java` | 18 | 登记TTL各类型及分钟数 |
+
+**复述路线：** 请求短事务 → 规划／Mission收口 → 五入口扫样板间 → 两段锁与最终领取 → 准入／IoT结果分类 → 按父子链判断区域完成 → 聚合父批次 → 有条件补偿。先说正常链，再选一个WAITING、续飞或UNKNOWN分支展开，最后主动说明源码保证的边界。
+
+
+---
+
 ## 第 1 周速记
 
 ```text
@@ -1287,6 +1911,7 @@ sequenceDiagram
 统一碰撞登记不等于命令幂等或fencing，GC/ABA边界仍要理解
 历史JTS：米制折线距离、冲突矩阵、分组搜索；版本对照而非当前主线
 下游：父子图片组→组锁→就绪/去重→远端项目→状态→projectId
+待优化：P0锁内IO超时/重试计数字段化/碰撞降级告警/routeCode约束；P1时长加权与电池建模；见1.16
 ```
 
 # 第 2 周：并发控制、任务预占与分布式一致性
@@ -1657,7 +2282,7 @@ stateDiagram-v2
     CANCELLED --> [*]
 ```
 
-其中下发 SUCCESS 只表示设备下发链路成功，不表示飞行完成。真实飞行进度仍以 `Mission.status` 及续飞子 Mission 为准。
+其中下发 SUCCESS 是本地下发成功投影，可来自IoT明确成功，或依据Mission状态修复；修复路径没有再次发送命令。它不表示飞行完成。真实飞行进度仍以 `Mission.status` 及续飞子 Mission 为准。
 
 ### 面试官问：为什么不能只使用一个任务状态
 
@@ -1784,11 +2409,11 @@ WAITING表示当前持久化记录尚未确认设备接收，不证明设备一�
 
 > **记忆关键词：** 父子链 · 资源仍占用 · 只恢复最新子任务 · 不重发父任务
 
-> 必须区分父 Mission 和续飞子 Mission。存在未结束续飞链时，父区域仍然占用机库和空域；恢复时只能重试最新待执行的子 Mission，不能把父 Mission 退回 PENDING 再从头下发。
+> 必须区分父 Mission 和续飞子 Mission。存在未结束续飞链时，本地同库调度仍保留整链阻塞；远端空域按当前执行腿的登记、清理和TTL管理。恢复时只能重试最新待执行的子 Mission，不能把父 Mission 退回 PENDING 再从头下发。
 
 ### 面试官问：为什么机库、电池或航迹冲突等待不应消耗续飞重试次数
 
-> 外部条件等待与真正再次尝试发送是两种动作。当前v2.5的续飞也调用统一碰撞准入；旧提交/v3 SELF使用本地航迹判断；等待不烧起飞重试预算，符合条件后仍有有限发送重试。重试预算不能提供幂等保证。
+> 外部条件等待与真正再次尝试发送是两种动作。当前v2.5的队列补偿及继续子腿路径调用统一碰撞准入；新生自动续飞另走入口，见1.20。这里的资源等待不消耗子腿恢复发送预算；普通父任务的ALREADY_RECEIVED起飞超时回退在写PENDING时已计次，见1.21，符合条件后仍有有限发送重试。重试预算不能提供幂等保证。
 
 **八股扩展：** 父子任务聚合、资源占用生命周期与当前执行腿身份。只重试最新子Mission需要正确的排序和归属；父任务返航不是整条链完成。v3 EXTERNAL关闭本地续飞，不能套这段SELF解释。
 
@@ -1822,15 +2447,15 @@ flowchart LR
 
 1. 恢复父 Mission 的自动续飞能力。
 2. 对仍为 WAITING 的最新续飞子任务重新触发。
-3. 每成功恢复一个区域，就清理对应暂停快照。
-4. 所有续飞链处理成功后，最后把批次 paused 从 1 更新为 0。
+3. 每个区域的恢复调用未抛异常返回后，就清理对应暂停快照；正常等待返回也包含在内。
+4. 所有恢复调用未抛异常后，最后把批次 paused 从 1 更新为 0；设备／空域等待可以正常返回，不代表每条子腿已经发出。详见1.22。
 5. 重新触发样板间调度，推进普通 PENDING 区域。
 
-逐条清理快照的设计使继续操作可以重试：已经恢复成功的不会再次触发，失败的仍保留快照作为补偿依据。
+逐条清理快照使异常中断后的继续操作可以重入：已清部分跳过，未清部分可补偿。但资源等待正常返回也会清快照，远端已受理、清快照前异常也可能再次尝试；后续恢复与副作用防重不能仅靠快照保证，详见1.22。
 
 ### 面试官问：继续执行到一半失败怎么办
 
-> 继续操作不是一次性把所有快照清空。每个续飞链恢复成功后才清理自己的快照，失败区域仍保留原快照；批次 paused 也要等所有恢复成功后才解除。因此再次调用继续时，可以跳过已完成部分，补偿未完成部分。
+> 继续操作逐区域调用恢复并清快照；某条抛异常时，未清快照和最终解除paused步骤会保留供再次处理。正常等待返回也会清快照，所以已清不等于设备已受理。远端成功而本地清理前异常仍有重试窗口；具体顺序和边界见1.22。
 
 **八股扩展：** 部分成功可重入、逐项持久化与补偿。外部恢复成功、快照清理前宕机仍可能再次恢复；每项效果仍须依赖执行身份，不能从逐项清理推出严格一次。
 

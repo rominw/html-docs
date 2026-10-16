@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="description" content="自动建模面试精读：机库分配手算、真实源码、派飞时序与并发异常；对照v2.5工作树和v3，扩展Java/MySQL/Redis/AI/Agent原理追问。"><meta name="date" content="2026-10-15"><title>无人机巡检平台后端 · 六周直读复习手册</title>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="description" content="自动建模调度面试精读：结合源码详解五类触发、逐条派飞、父批次聚合、续飞父子状态、超时补偿与暂停继续取消，并用完整案例解释实现边界。"><meta name="date" content="2026-10-16"><title>无人机巡检平台后端 · 六周直读复习手册</title>
 <style>
 :root{color-scheme:light;--bg:#f4f6f8;--paper:#fff;--ink:#202e40;--muted:#526479;--line:#d7e0e8;--accent:#08786d;--tint:#e6f4f0;--warn:#fff2d8;--red:#b33e3e;--code:#eef2f6;--shadow:0 8px 26px #1e34440a}
 html[data-theme=dark]{color-scheme:dark;--bg:#101923;--paper:#172431;--ink:#dce7f0;--muted:#a5b7c8;--line:#35495a;--accent:#67d3bd;--tint:#1d3d3a;--warn:#463b25;--red:#f89b91;--code:#20313f;--shadow:none}
@@ -17,7 +17,7 @@ main.searching>:not(.chapter):not(.empty){display:none}main.searching .chapter>:
 </style>
 <style>
 .mmd-fig{padding:14px}.mmd-fig svg{background:var(--paper);border-radius:6px;display:block;margin:0 auto;width:auto!important;max-width:none!important;height:auto!important}.mmd-fig .svg-scroll{overflow-x:auto}html[data-theme=dark] .mmd-fig svg{background:#f7f9fa}.mm-src{margin-top:8px;font-size:12px}.mm-src summary{cursor:pointer;color:var(--muted)}.mm-src pre{background:var(--code);padding:12px;border-radius:6px;overflow:auto}h4.sub-h{margin:26px 0 6px;color:var(--accent)}blockquote.note{margin:14px 0;padding:10px 16px;border-left:3px solid var(--accent);background:var(--tint);border-radius:0 6px 6px 0}blockquote.note p{margin:6px 0}
-</style><style>.node.warn{stroke:var(--accent)}.diagram svg{overflow:visible}.diagram svg[role="img"]{min-width:960px}.table{max-width:100%;overflow:auto}.evidence-note{color:var(--muted)}@media(max-width:820px){.figure-label:after{content:" · 可横滑查看";font-weight:400}}@media print{.dock{display:none!important}.diagram svg[role="img"]{min-width:0}}</style><style>.business-sequence svg{min-width:1900px!important;max-width:none!important;width:1900px!important;height:auto!important}.business-sequence .sequenceNumber{fill:var(--paper)!important}@media print{.business-sequence svg{width:100%!important;min-width:0!important}.business-sequence{break-inside:auto}}</style></head><body><a class="skip" href="#content">跳到正文</a><aside class="sidebar" aria-label="章节目录"><div class="brand">巡检平台后端<small>六周直读复习手册</small></div><nav><div class="nav-label">导读</div><a href="#sec-added-1-ch-0">代码定位与核对范围</a><a href="#sec-1-ch-0">使用说明</a><div class="nav-label">第 1 周：自动建模链路、机库分配与统一碰撞准入</div><a href="#sec-1-ch-2">1.1 先理解整个业务</a><a href="#sec-2-ch-2">1.2 为什么要拆分区域</a><a href="#sec-3-ch-2">1.3 为什么航线规划使用线程池</a><a href="#sec-4-ch-2">1.4 机库分配逻辑</a><a href="#sec-5-ch-2">1.5 统一碰撞检测接在哪里：当前链路与历史JTS</a><a href="#sec-6-ch-2">1.6 两阶段检查与活跃航线登记确认</a><a href="#sec-7-ch-2">1.7 下发结果分类与同步补位</a><a href="#sec-8-ch-2">1.8 图片回传后的自动建模闭环</a><a href="#sec-added-11-ch-2">1.9 v3 外部调度：谁拥有派飞权</a><a href="#sec-added-12-ch-2">1.10 机库分配精读：先分清“规划绑定”和“执行占用”</a><a href="#sec-added-13-ch-2">1.11 机库分配手算：三个机库、五个区域、四级评分</a><a href="#sec-added-14-ch-2">1.12 机库分配源码逐步读：输入、试放、优化和事务</a><a href="#sec-added-15-ch-2">1.13 调度源码精读：从触发入口走到真实派飞</a><a href="#sec-added-16-ch-2">1.14 用一轮调度讲透：同库串行、跨库并飞、等待与补偿</a><a href="#sec-added-17-ch-2">1.15 面试复述与八股扩展：能讲机制，也能指出边界</a><a href="#sec-9-ch-2">第 1 周速记</a><div class="nav-label">第 2 周：并发控制、任务预占与分布式一致性</div><a href="#sec-1-ch-3">2.1 任务从哪里来：没有第二个用户请求也会竞争</a><a href="#sec-2-ch-3">2.2 共享资源是什么：机库、空域和占用事实</a><a href="#sec-3-ch-3">2.3 实际锁范围：选择和最终下发并非一个连续临界区</a><a href="#sec-4-ch-3">2.4 数据库条件更新：只裁决这一行这一次</a><a href="#sec-5-ch-3">2.5 Redisson：等待时间、租约、看门狗与线程归属</a><a href="#sec-6-ch-3">2.6 重复触发和结果未知：防重的保证范围</a><a href="#sec-added-19-ch-3">2.7 长 GC 场景：逐行说明旧调用为什么还能继续</a><a href="#sec-added-20-ch-3">2.8 怎么解决：数据代际、资源归属和执行端防护</a><a href="#sec-added-21-ch-3">2.9 队头阻塞、公平性与粗锁吞吐</a><a href="#sec-7-ch-3">第 2 周速记</a><div class="nav-label">第 3 周：状态机、事件补偿与断点续飞</div><a href="#sec-1-ch-4">3.1 为什么状态要分层</a><a href="#sec-2-ch-4">3.2 为什么不引入状态机框架</a><a href="#sec-3-ch-4">3.3 事件驱动加定时补偿</a><a href="#sec-4-ch-4">3.4 下发超时和起飞超时</a><a href="#sec-5-ch-4">3.5 断点续飞</a><a href="#sec-6-ch-4">3.6 暂停</a><a href="#sec-7-ch-4">3.7 继续</a><a href="#sec-8-ch-4">3.8 取消</a><a href="#sec-added-31-ch-4">3.9 八股扩展：状态机、重试与可靠消息</a><a href="#sec-9-ch-4">第 3 周速记</a><div class="nav-label">第 4 周：结合项目复习 Java、MySQL、Redis 与 Spring</div><a href="#sec-1-ch-5">4.1 Java 线程池</a><a href="#sec-2-ch-5">4.2 CAS、锁与 volatile</a><a href="#sec-3-ch-5">4.3 MySQL 事务</a><a href="#sec-4-ch-5">4.4 MySQL 索引</a><a href="#sec-5-ch-5">4.5 Redis Lua</a><a href="#sec-6-ch-5">4.6 Spring 事务和异步</a><a href="#sec-added-39-ch-5">4.7 JVM 与 GC：为什么暂停会影响分布式协议</a><a href="#sec-added-40-ch-5">4.8 Spring 代理、异步与事务边界</a><a href="#sec-added-41-ch-5">4.9 一个可运行的并发边界推演</a><a href="#sec-7-ch-5">第 4 周速记</a><div class="nav-label">第 5 周：AI 工程化与智能体业务侧集成</div><a href="#sec-1-ch-6">5.1 AI 工程化项目介绍</a><a href="#sec-2-ch-6">5.2 航线 AI 配置</a><a href="#sec-3-ch-6">5.3 端侧识别与云侧工作流</a><a href="#sec-4-ch-6">5.4 AI 结果治理和告警闭环</a><a href="#sec-5-ch-6">5.5 智能体介绍（独立项目，与平台侧代码分开）</a><a href="#sec-6-ch-6">5.6 智能体位置资产数据模型</a><a href="#sec-7-ch-6">5.7 用户隔离</a><a href="#sec-8-ch-6">5.8 SSE 和 Redis 状态</a><a href="#sec-9-ch-6">5.9 智能体独立项目：架构分层与两套调用体系</a><a href="#sec-10-ch-6">5.10 Channel 完整解析（agent-ws-channel，会话与工具上下文）</a><a href="#sec-added-53-ch-6">5.11 AI 工程八股：输入、指标、后处理与失败</a><a href="#sec-added-54-ch-6">5.12 Agent 工程八股：工具、权限与异步协议</a><a href="#sec-11-ch-6">第 5 周速记</a><div class="nav-label">专题：违章停车多轮复核</div><a href="#sec-1-ch-7">A.1 业务全链路</a><a href="#sec-2-ch-7">A.2 判定模型：从固定两轮到收敛驱动</a><a href="#sec-3-ch-7">A.3 车牌匹配：忽略首字符</a><a href="#sec-4-ch-7">A.4 图片识别收口：事件不可信的三种形态</a><a href="#sec-5-ch-7">A.5 Temporal 编排：版本桩与双端解耦</a><a href="#sec-6-ch-7">A.6 跨服务取证：缺陷事件详情反查</a><a href="#sec-7-ch-7">A.7 我的贡献边界（诚实口径）</a><a href="#sec-added-63-ch-7">A.8 Temporal 与异步计数的八股扩展</a><a href="#sec-8-ch-7">专题速记</a><div class="nav-label">第 6 周：完整面试表达与高频答案</div><a href="#sec-1-ch-8">6.1 30 秒核心业务介绍</a><a href="#sec-2-ch-8">6.2 自动建模 3 分钟完整回答</a><a href="#sec-3-ch-8">6.3 自动建模模块最难的地方</a><a href="#sec-4-ch-8">6.4 你在平台中负责什么</a><a href="#sec-5-ch-8">6.5 为什么锁按样板间而不是机库</a><a href="#sec-6-ch-8">6.6 为什么 Redisson 锁和数据库条件更新都要用</a><a href="#sec-7-ch-8">6.7 服务在 DISPATCHING 后宕机怎么办</a><a href="#sec-8-ch-8">6.8 当前顺序准入与历史安全组合能保证最优吗</a><a href="#sec-9-ch-8">6.9 为什么暂停不终止飞机</a><a href="#sec-10-ch-8">6.10 为什么事件和定时补偿要并存</a><a href="#sec-11-ch-8">6.11 AI 工程化 2 分钟回答</a><a href="#sec-12-ch-8">6.12 智能体 2 分钟回答</a><a href="#sec-13-ch-8">6.13 你的方案还有哪些不足</a><a href="#sec-14-ch-8">6.14 为什么简历不写量化提升</a><a href="#sec-15-ch-8">6.15 项目难点、亮点与个人贡献</a><a href="#sec-16-ch-8">6.16 AI Coding 时代的软技能与项目表达</a><a href="#sec-17-ch-8">6.17 HR 初筛电话与求职动机</a><a href="#sec-tech-review-ch-8">6.18 简历技术追问：从代码到原理的复述路线</a><a href="#sec-18-ch-8">6.19 反问面试官：常见问题与问法</a><a href="#sec-19-ch-8">6.20 最终速记卡</a></nav></aside><div class="shell"><details class="mobile-nav"><summary>章节目录</summary><nav><div class="nav-label">导读</div><a href="#sec-added-1-ch-0">代码定位与核对范围</a><a href="#sec-1-ch-0">使用说明</a><div class="nav-label">第 1 周：自动建模链路、机库分配与统一碰撞准入</div><a href="#sec-1-ch-2">1.1 先理解整个业务</a><a href="#sec-2-ch-2">1.2 为什么要拆分区域</a><a href="#sec-3-ch-2">1.3 为什么航线规划使用线程池</a><a href="#sec-4-ch-2">1.4 机库分配逻辑</a><a href="#sec-5-ch-2">1.5 统一碰撞检测接在哪里：当前链路与历史JTS</a><a href="#sec-6-ch-2">1.6 两阶段检查与活跃航线登记确认</a><a href="#sec-7-ch-2">1.7 下发结果分类与同步补位</a><a href="#sec-8-ch-2">1.8 图片回传后的自动建模闭环</a><a href="#sec-added-11-ch-2">1.9 v3 外部调度：谁拥有派飞权</a><a href="#sec-added-12-ch-2">1.10 机库分配精读：先分清“规划绑定”和“执行占用”</a><a href="#sec-added-13-ch-2">1.11 机库分配手算：三个机库、五个区域、四级评分</a><a href="#sec-added-14-ch-2">1.12 机库分配源码逐步读：输入、试放、优化和事务</a><a href="#sec-added-15-ch-2">1.13 调度源码精读：从触发入口走到真实派飞</a><a href="#sec-added-16-ch-2">1.14 用一轮调度讲透：同库串行、跨库并飞、等待与补偿</a><a href="#sec-added-17-ch-2">1.15 面试复述与八股扩展：能讲机制，也能指出边界</a><a href="#sec-9-ch-2">第 1 周速记</a><div class="nav-label">第 2 周：并发控制、任务预占与分布式一致性</div><a href="#sec-1-ch-3">2.1 任务从哪里来：没有第二个用户请求也会竞争</a><a href="#sec-2-ch-3">2.2 共享资源是什么：机库、空域和占用事实</a><a href="#sec-3-ch-3">2.3 实际锁范围：选择和最终下发并非一个连续临界区</a><a href="#sec-4-ch-3">2.4 数据库条件更新：只裁决这一行这一次</a><a href="#sec-5-ch-3">2.5 Redisson：等待时间、租约、看门狗与线程归属</a><a href="#sec-6-ch-3">2.6 重复触发和结果未知：防重的保证范围</a><a href="#sec-added-19-ch-3">2.7 长 GC 场景：逐行说明旧调用为什么还能继续</a><a href="#sec-added-20-ch-3">2.8 怎么解决：数据代际、资源归属和执行端防护</a><a href="#sec-added-21-ch-3">2.9 队头阻塞、公平性与粗锁吞吐</a><a href="#sec-7-ch-3">第 2 周速记</a><div class="nav-label">第 3 周：状态机、事件补偿与断点续飞</div><a href="#sec-1-ch-4">3.1 为什么状态要分层</a><a href="#sec-2-ch-4">3.2 为什么不引入状态机框架</a><a href="#sec-3-ch-4">3.3 事件驱动加定时补偿</a><a href="#sec-4-ch-4">3.4 下发超时和起飞超时</a><a href="#sec-5-ch-4">3.5 断点续飞</a><a href="#sec-6-ch-4">3.6 暂停</a><a href="#sec-7-ch-4">3.7 继续</a><a href="#sec-8-ch-4">3.8 取消</a><a href="#sec-added-31-ch-4">3.9 八股扩展：状态机、重试与可靠消息</a><a href="#sec-9-ch-4">第 3 周速记</a><div class="nav-label">第 4 周：结合项目复习 Java、MySQL、Redis 与 Spring</div><a href="#sec-1-ch-5">4.1 Java 线程池</a><a href="#sec-2-ch-5">4.2 CAS、锁与 volatile</a><a href="#sec-3-ch-5">4.3 MySQL 事务</a><a href="#sec-4-ch-5">4.4 MySQL 索引</a><a href="#sec-5-ch-5">4.5 Redis Lua</a><a href="#sec-6-ch-5">4.6 Spring 事务和异步</a><a href="#sec-added-39-ch-5">4.7 JVM 与 GC：为什么暂停会影响分布式协议</a><a href="#sec-added-40-ch-5">4.8 Spring 代理、异步与事务边界</a><a href="#sec-added-41-ch-5">4.9 一个可运行的并发边界推演</a><a href="#sec-7-ch-5">第 4 周速记</a><div class="nav-label">第 5 周：AI 工程化与智能体业务侧集成</div><a href="#sec-1-ch-6">5.1 AI 工程化项目介绍</a><a href="#sec-2-ch-6">5.2 航线 AI 配置</a><a href="#sec-3-ch-6">5.3 端侧识别与云侧工作流</a><a href="#sec-4-ch-6">5.4 AI 结果治理和告警闭环</a><a href="#sec-5-ch-6">5.5 智能体介绍（独立项目，与平台侧代码分开）</a><a href="#sec-6-ch-6">5.6 智能体位置资产数据模型</a><a href="#sec-7-ch-6">5.7 用户隔离</a><a href="#sec-8-ch-6">5.8 SSE 和 Redis 状态</a><a href="#sec-9-ch-6">5.9 智能体独立项目：架构分层与两套调用体系</a><a href="#sec-10-ch-6">5.10 Channel 完整解析（agent-ws-channel，会话与工具上下文）</a><a href="#sec-added-53-ch-6">5.11 AI 工程八股：输入、指标、后处理与失败</a><a href="#sec-added-54-ch-6">5.12 Agent 工程八股：工具、权限与异步协议</a><a href="#sec-11-ch-6">第 5 周速记</a><div class="nav-label">专题：违章停车多轮复核</div><a href="#sec-1-ch-7">A.1 业务全链路</a><a href="#sec-2-ch-7">A.2 判定模型：从固定两轮到收敛驱动</a><a href="#sec-3-ch-7">A.3 车牌匹配：忽略首字符</a><a href="#sec-4-ch-7">A.4 图片识别收口：事件不可信的三种形态</a><a href="#sec-5-ch-7">A.5 Temporal 编排：版本桩与双端解耦</a><a href="#sec-6-ch-7">A.6 跨服务取证：缺陷事件详情反查</a><a href="#sec-7-ch-7">A.7 我的贡献边界（诚实口径）</a><a href="#sec-added-63-ch-7">A.8 Temporal 与异步计数的八股扩展</a><a href="#sec-8-ch-7">专题速记</a><div class="nav-label">第 6 周：完整面试表达与高频答案</div><a href="#sec-1-ch-8">6.1 30 秒核心业务介绍</a><a href="#sec-2-ch-8">6.2 自动建模 3 分钟完整回答</a><a href="#sec-3-ch-8">6.3 自动建模模块最难的地方</a><a href="#sec-4-ch-8">6.4 你在平台中负责什么</a><a href="#sec-5-ch-8">6.5 为什么锁按样板间而不是机库</a><a href="#sec-6-ch-8">6.6 为什么 Redisson 锁和数据库条件更新都要用</a><a href="#sec-7-ch-8">6.7 服务在 DISPATCHING 后宕机怎么办</a><a href="#sec-8-ch-8">6.8 当前顺序准入与历史安全组合能保证最优吗</a><a href="#sec-9-ch-8">6.9 为什么暂停不终止飞机</a><a href="#sec-10-ch-8">6.10 为什么事件和定时补偿要并存</a><a href="#sec-11-ch-8">6.11 AI 工程化 2 分钟回答</a><a href="#sec-12-ch-8">6.12 智能体 2 分钟回答</a><a href="#sec-13-ch-8">6.13 你的方案还有哪些不足</a><a href="#sec-14-ch-8">6.14 为什么简历不写量化提升</a><a href="#sec-15-ch-8">6.15 项目难点、亮点与个人贡献</a><a href="#sec-16-ch-8">6.16 AI Coding 时代的软技能与项目表达</a><a href="#sec-17-ch-8">6.17 HR 初筛电话与求职动机</a><a href="#sec-tech-review-ch-8">6.18 简历技术追问：从代码到原理的复述路线</a><a href="#sec-18-ch-8">6.19 反问面试官：常见问题与问法</a><a href="#sec-19-ch-8">6.20 最终速记卡</a></nav></details><header class="toolbar"><div class="search"><label class="search-label" for="search">搜索题目与正文</label><input id="search" type="search" placeholder="搜索：共享资源 / GC / fencing / MVCC" autocomplete="off"></div><button id="expand" type="button">展开全部</button><button id="collapse" type="button">收起全部</button><button id="theme" type="button" aria-label="切换明暗主题">深色</button><span class="status" id="status" aria-live="polite">210 道追问</span></header><main id="content"><div class="eyebrow">UAV BACKEND / CODE / CONCURRENCY / PRINCIPLES</div><h1>无人机巡检平台后端<small>六周直读复习手册 · 代码与原理</small></h1><p class="intro">结合两个自动建模分支，从真实入口、共享资源与裁决代码讲到异常恢复和基础原理；先熟悉简历项目，再准备追问。</p><div class="meta"><span>6 周 + 违停专题</span><span>90 个小节</span><span>210 道追问</span><span>24 幅图</span><span>核对于 <time datetime="2026-10-15">2026-10-15</time></span></div><section class="chapter" id="ch-0"><h2>导读</h2><p>本文核对分支的提交及对应工作树，不能只以HEAD当最新实现。<strong>自动建模主线采用v2.5当前工作树的统一碰撞接入</strong> ，并将旧提交、v3 SELF与EXTERNAL分别说明。工作树改动尚未提交，不代表已经部署；本次仅修订手册，未改动或提交业务仓库。</p>
+</style><style>.node.warn{stroke:var(--accent)}.diagram svg{overflow:visible}.diagram svg[role="img"]{min-width:960px}.table{max-width:100%;overflow:auto}.evidence-note{color:var(--muted)}@media(max-width:820px){.figure-label:after{content:" · 可横滑查看";font-weight:400}}@media print{.dock{display:none!important}.diagram svg[role="img"]{min-width:0}}</style><style>.business-sequence svg{min-width:1900px!important;max-width:none!important;width:1900px!important;height:auto!important}.business-sequence .sequenceNumber{fill:var(--paper)!important}@media print{.business-sequence svg{width:100%!important;min-width:0!important}.business-sequence{break-inside:auto}}</style></head><body><a class="skip" href="#content">跳到正文</a><aside class="sidebar" aria-label="章节目录"><div class="brand">巡检平台后端<small>六周直读复习手册</small></div><nav><div class="nav-label">导读</div><a href="#sec-added-1-ch-0">代码定位与核对范围</a><a href="#sec-1-ch-0">使用说明</a><div class="nav-label">第 1 周：自动建模链路、机库分配与统一碰撞准入</div><a href="#sec-1-ch-2">1.1 先理解整个业务</a><a href="#sec-2-ch-2">1.2 为什么要拆分区域</a><a href="#sec-3-ch-2">1.3 为什么航线规划使用线程池</a><a href="#sec-4-ch-2">1.4 机库分配逻辑</a><a href="#sec-5-ch-2">1.5 统一碰撞检测接在哪里：当前链路与历史JTS</a><a href="#sec-6-ch-2">1.6 两阶段检查与活跃航线登记确认</a><a href="#sec-7-ch-2">1.7 下发结果分类与同步补位</a><a href="#sec-8-ch-2">1.8 图片回传后的自动建模闭环</a><a href="#sec-added-11-ch-2">1.9 v3 外部调度：谁拥有派飞权</a><a href="#sec-added-12-ch-2">1.10 机库分配精读：先分清“规划绑定”和“执行占用”</a><a href="#sec-added-13-ch-2">1.11 机库分配手算：三个机库、五个区域、四级评分</a><a href="#sec-added-14-ch-2">1.12 机库分配源码逐步读：输入、试放、优化和事务</a><a href="#sec-added-15-ch-2">1.13 调度源码精读：从触发入口走到真实派飞</a><a href="#sec-added-16-ch-2">1.14 用一轮调度讲透：同库串行、跨库并飞、等待与补偿</a><a href="#sec-added-17-ch-2">1.15 面试复述与八股扩展：能讲机制，也能指出边界</a><a href="#sec-added-18-ch-2">1.16 生产落地评估：待优化点清单</a><a href="#sec-scheduling-17-ch-2">1.17 调度触发精读：从创建请求到每一次重新扫描</a><a href="#sec-scheduling-18-ch-2">1.18 一次调度逐步展开：候选快照、领取与派飞结果</a><a href="#sec-scheduling-19-ch-2">1.19 父批次状态怎么刷新：把聚合算法真正算一遍</a><a href="#sec-scheduling-20-ch-2">1.20 续飞父子状态刷新：返航、完成上报与最新执行腿</a><a href="#sec-scheduling-21-ch-2">1.21 兜底逻辑总账：什么会重试、什么会等待、什么没人自动修</a><a href="#sec-scheduling-22-ch-2">1.22 暂停、继续和取消怎样插入调度：逐行理解控制语义</a><a href="#sec-scheduling-23-ch-2">1.23 面试现场推演与源码索引：从一条日志讲完整闭环</a><a href="#sec-9-ch-2">第 1 周速记</a><div class="nav-label">第 2 周：并发控制、任务预占与分布式一致性</div><a href="#sec-1-ch-3">2.1 任务从哪里来：没有第二个用户请求也会竞争</a><a href="#sec-2-ch-3">2.2 共享资源是什么：机库、空域和占用事实</a><a href="#sec-3-ch-3">2.3 实际锁范围：选择和最终下发并非一个连续临界区</a><a href="#sec-4-ch-3">2.4 数据库条件更新：只裁决这一行这一次</a><a href="#sec-5-ch-3">2.5 Redisson：等待时间、租约、看门狗与线程归属</a><a href="#sec-6-ch-3">2.6 重复触发和结果未知：防重的保证范围</a><a href="#sec-added-19-ch-3">2.7 长 GC 场景：逐行说明旧调用为什么还能继续</a><a href="#sec-added-20-ch-3">2.8 怎么解决：数据代际、资源归属和执行端防护</a><a href="#sec-added-21-ch-3">2.9 队头阻塞、公平性与粗锁吞吐</a><a href="#sec-7-ch-3">第 2 周速记</a><div class="nav-label">第 3 周：状态机、事件补偿与断点续飞</div><a href="#sec-1-ch-4">3.1 为什么状态要分层</a><a href="#sec-2-ch-4">3.2 为什么不引入状态机框架</a><a href="#sec-3-ch-4">3.3 事件驱动加定时补偿</a><a href="#sec-4-ch-4">3.4 下发超时和起飞超时</a><a href="#sec-5-ch-4">3.5 断点续飞</a><a href="#sec-6-ch-4">3.6 暂停</a><a href="#sec-7-ch-4">3.7 继续</a><a href="#sec-8-ch-4">3.8 取消</a><a href="#sec-added-31-ch-4">3.9 八股扩展：状态机、重试与可靠消息</a><a href="#sec-9-ch-4">第 3 周速记</a><div class="nav-label">第 4 周：结合项目复习 Java、MySQL、Redis 与 Spring</div><a href="#sec-1-ch-5">4.1 Java 线程池</a><a href="#sec-2-ch-5">4.2 CAS、锁与 volatile</a><a href="#sec-3-ch-5">4.3 MySQL 事务</a><a href="#sec-4-ch-5">4.4 MySQL 索引</a><a href="#sec-5-ch-5">4.5 Redis Lua</a><a href="#sec-6-ch-5">4.6 Spring 事务和异步</a><a href="#sec-added-39-ch-5">4.7 JVM 与 GC：为什么暂停会影响分布式协议</a><a href="#sec-added-40-ch-5">4.8 Spring 代理、异步与事务边界</a><a href="#sec-added-41-ch-5">4.9 一个可运行的并发边界推演</a><a href="#sec-7-ch-5">第 4 周速记</a><div class="nav-label">第 5 周：AI 工程化与智能体业务侧集成</div><a href="#sec-1-ch-6">5.1 AI 工程化项目介绍</a><a href="#sec-2-ch-6">5.2 航线 AI 配置</a><a href="#sec-3-ch-6">5.3 端侧识别与云侧工作流</a><a href="#sec-4-ch-6">5.4 AI 结果治理和告警闭环</a><a href="#sec-5-ch-6">5.5 智能体介绍（独立项目，与平台侧代码分开）</a><a href="#sec-6-ch-6">5.6 智能体位置资产数据模型</a><a href="#sec-7-ch-6">5.7 用户隔离</a><a href="#sec-8-ch-6">5.8 SSE 和 Redis 状态</a><a href="#sec-9-ch-6">5.9 智能体独立项目：架构分层与两套调用体系</a><a href="#sec-10-ch-6">5.10 Channel 完整解析（agent-ws-channel，会话与工具上下文）</a><a href="#sec-added-53-ch-6">5.11 AI 工程八股：输入、指标、后处理与失败</a><a href="#sec-added-54-ch-6">5.12 Agent 工程八股：工具、权限与异步协议</a><a href="#sec-11-ch-6">第 5 周速记</a><div class="nav-label">专题：违章停车多轮复核</div><a href="#sec-1-ch-7">A.1 业务全链路</a><a href="#sec-2-ch-7">A.2 判定模型：从固定两轮到收敛驱动</a><a href="#sec-3-ch-7">A.3 车牌匹配：忽略首字符</a><a href="#sec-4-ch-7">A.4 图片识别收口：事件不可信的三种形态</a><a href="#sec-5-ch-7">A.5 Temporal 编排：版本桩与双端解耦</a><a href="#sec-6-ch-7">A.6 跨服务取证：缺陷事件详情反查</a><a href="#sec-7-ch-7">A.7 我的贡献边界（诚实口径）</a><a href="#sec-added-63-ch-7">A.8 Temporal 与异步计数的八股扩展</a><a href="#sec-8-ch-7">专题速记</a><div class="nav-label">第 6 周：完整面试表达与高频答案</div><a href="#sec-1-ch-8">6.1 30 秒核心业务介绍</a><a href="#sec-2-ch-8">6.2 自动建模 3 分钟完整回答</a><a href="#sec-3-ch-8">6.3 自动建模模块最难的地方</a><a href="#sec-4-ch-8">6.4 你在平台中负责什么</a><a href="#sec-5-ch-8">6.5 为什么锁按样板间而不是机库</a><a href="#sec-6-ch-8">6.6 为什么 Redisson 锁和数据库条件更新都要用</a><a href="#sec-7-ch-8">6.7 服务在 DISPATCHING 后宕机怎么办</a><a href="#sec-8-ch-8">6.8 当前顺序准入与历史安全组合能保证最优吗</a><a href="#sec-9-ch-8">6.9 为什么暂停不终止飞机</a><a href="#sec-10-ch-8">6.10 为什么事件和定时补偿要并存</a><a href="#sec-11-ch-8">6.11 AI 工程化 2 分钟回答</a><a href="#sec-12-ch-8">6.12 智能体 2 分钟回答</a><a href="#sec-13-ch-8">6.13 你的方案还有哪些不足</a><a href="#sec-14-ch-8">6.14 为什么简历不写量化提升</a><a href="#sec-15-ch-8">6.15 项目难点、亮点与个人贡献</a><a href="#sec-16-ch-8">6.16 AI Coding 时代的软技能与项目表达</a><a href="#sec-17-ch-8">6.17 HR 初筛电话与求职动机</a><a href="#sec-tech-review-ch-8">6.18 简历技术追问：从代码到原理的复述路线</a><a href="#sec-18-ch-8">6.19 反问面试官：常见问题与问法</a><a href="#sec-19-ch-8">6.20 最终速记卡</a></nav></aside><div class="shell"><details class="mobile-nav"><summary>章节目录</summary><nav><div class="nav-label">导读</div><a href="#sec-added-1-ch-0">代码定位与核对范围</a><a href="#sec-1-ch-0">使用说明</a><div class="nav-label">第 1 周：自动建模链路、机库分配与统一碰撞准入</div><a href="#sec-1-ch-2">1.1 先理解整个业务</a><a href="#sec-2-ch-2">1.2 为什么要拆分区域</a><a href="#sec-3-ch-2">1.3 为什么航线规划使用线程池</a><a href="#sec-4-ch-2">1.4 机库分配逻辑</a><a href="#sec-5-ch-2">1.5 统一碰撞检测接在哪里：当前链路与历史JTS</a><a href="#sec-6-ch-2">1.6 两阶段检查与活跃航线登记确认</a><a href="#sec-7-ch-2">1.7 下发结果分类与同步补位</a><a href="#sec-8-ch-2">1.8 图片回传后的自动建模闭环</a><a href="#sec-added-11-ch-2">1.9 v3 外部调度：谁拥有派飞权</a><a href="#sec-added-12-ch-2">1.10 机库分配精读：先分清“规划绑定”和“执行占用”</a><a href="#sec-added-13-ch-2">1.11 机库分配手算：三个机库、五个区域、四级评分</a><a href="#sec-added-14-ch-2">1.12 机库分配源码逐步读：输入、试放、优化和事务</a><a href="#sec-added-15-ch-2">1.13 调度源码精读：从触发入口走到真实派飞</a><a href="#sec-added-16-ch-2">1.14 用一轮调度讲透：同库串行、跨库并飞、等待与补偿</a><a href="#sec-added-17-ch-2">1.15 面试复述与八股扩展：能讲机制，也能指出边界</a><a href="#sec-added-18-ch-2">1.16 生产落地评估：待优化点清单</a><a href="#sec-scheduling-17-ch-2">1.17 调度触发精读：从创建请求到每一次重新扫描</a><a href="#sec-scheduling-18-ch-2">1.18 一次调度逐步展开：候选快照、领取与派飞结果</a><a href="#sec-scheduling-19-ch-2">1.19 父批次状态怎么刷新：把聚合算法真正算一遍</a><a href="#sec-scheduling-20-ch-2">1.20 续飞父子状态刷新：返航、完成上报与最新执行腿</a><a href="#sec-scheduling-21-ch-2">1.21 兜底逻辑总账：什么会重试、什么会等待、什么没人自动修</a><a href="#sec-scheduling-22-ch-2">1.22 暂停、继续和取消怎样插入调度：逐行理解控制语义</a><a href="#sec-scheduling-23-ch-2">1.23 面试现场推演与源码索引：从一条日志讲完整闭环</a><a href="#sec-9-ch-2">第 1 周速记</a><div class="nav-label">第 2 周：并发控制、任务预占与分布式一致性</div><a href="#sec-1-ch-3">2.1 任务从哪里来：没有第二个用户请求也会竞争</a><a href="#sec-2-ch-3">2.2 共享资源是什么：机库、空域和占用事实</a><a href="#sec-3-ch-3">2.3 实际锁范围：选择和最终下发并非一个连续临界区</a><a href="#sec-4-ch-3">2.4 数据库条件更新：只裁决这一行这一次</a><a href="#sec-5-ch-3">2.5 Redisson：等待时间、租约、看门狗与线程归属</a><a href="#sec-6-ch-3">2.6 重复触发和结果未知：防重的保证范围</a><a href="#sec-added-19-ch-3">2.7 长 GC 场景：逐行说明旧调用为什么还能继续</a><a href="#sec-added-20-ch-3">2.8 怎么解决：数据代际、资源归属和执行端防护</a><a href="#sec-added-21-ch-3">2.9 队头阻塞、公平性与粗锁吞吐</a><a href="#sec-7-ch-3">第 2 周速记</a><div class="nav-label">第 3 周：状态机、事件补偿与断点续飞</div><a href="#sec-1-ch-4">3.1 为什么状态要分层</a><a href="#sec-2-ch-4">3.2 为什么不引入状态机框架</a><a href="#sec-3-ch-4">3.3 事件驱动加定时补偿</a><a href="#sec-4-ch-4">3.4 下发超时和起飞超时</a><a href="#sec-5-ch-4">3.5 断点续飞</a><a href="#sec-6-ch-4">3.6 暂停</a><a href="#sec-7-ch-4">3.7 继续</a><a href="#sec-8-ch-4">3.8 取消</a><a href="#sec-added-31-ch-4">3.9 八股扩展：状态机、重试与可靠消息</a><a href="#sec-9-ch-4">第 3 周速记</a><div class="nav-label">第 4 周：结合项目复习 Java、MySQL、Redis 与 Spring</div><a href="#sec-1-ch-5">4.1 Java 线程池</a><a href="#sec-2-ch-5">4.2 CAS、锁与 volatile</a><a href="#sec-3-ch-5">4.3 MySQL 事务</a><a href="#sec-4-ch-5">4.4 MySQL 索引</a><a href="#sec-5-ch-5">4.5 Redis Lua</a><a href="#sec-6-ch-5">4.6 Spring 事务和异步</a><a href="#sec-added-39-ch-5">4.7 JVM 与 GC：为什么暂停会影响分布式协议</a><a href="#sec-added-40-ch-5">4.8 Spring 代理、异步与事务边界</a><a href="#sec-added-41-ch-5">4.9 一个可运行的并发边界推演</a><a href="#sec-7-ch-5">第 4 周速记</a><div class="nav-label">第 5 周：AI 工程化与智能体业务侧集成</div><a href="#sec-1-ch-6">5.1 AI 工程化项目介绍</a><a href="#sec-2-ch-6">5.2 航线 AI 配置</a><a href="#sec-3-ch-6">5.3 端侧识别与云侧工作流</a><a href="#sec-4-ch-6">5.4 AI 结果治理和告警闭环</a><a href="#sec-5-ch-6">5.5 智能体介绍（独立项目，与平台侧代码分开）</a><a href="#sec-6-ch-6">5.6 智能体位置资产数据模型</a><a href="#sec-7-ch-6">5.7 用户隔离</a><a href="#sec-8-ch-6">5.8 SSE 和 Redis 状态</a><a href="#sec-9-ch-6">5.9 智能体独立项目：架构分层与两套调用体系</a><a href="#sec-10-ch-6">5.10 Channel 完整解析（agent-ws-channel，会话与工具上下文）</a><a href="#sec-added-53-ch-6">5.11 AI 工程八股：输入、指标、后处理与失败</a><a href="#sec-added-54-ch-6">5.12 Agent 工程八股：工具、权限与异步协议</a><a href="#sec-11-ch-6">第 5 周速记</a><div class="nav-label">专题：违章停车多轮复核</div><a href="#sec-1-ch-7">A.1 业务全链路</a><a href="#sec-2-ch-7">A.2 判定模型：从固定两轮到收敛驱动</a><a href="#sec-3-ch-7">A.3 车牌匹配：忽略首字符</a><a href="#sec-4-ch-7">A.4 图片识别收口：事件不可信的三种形态</a><a href="#sec-5-ch-7">A.5 Temporal 编排：版本桩与双端解耦</a><a href="#sec-6-ch-7">A.6 跨服务取证：缺陷事件详情反查</a><a href="#sec-7-ch-7">A.7 我的贡献边界（诚实口径）</a><a href="#sec-added-63-ch-7">A.8 Temporal 与异步计数的八股扩展</a><a href="#sec-8-ch-7">专题速记</a><div class="nav-label">第 6 周：完整面试表达与高频答案</div><a href="#sec-1-ch-8">6.1 30 秒核心业务介绍</a><a href="#sec-2-ch-8">6.2 自动建模 3 分钟完整回答</a><a href="#sec-3-ch-8">6.3 自动建模模块最难的地方</a><a href="#sec-4-ch-8">6.4 你在平台中负责什么</a><a href="#sec-5-ch-8">6.5 为什么锁按样板间而不是机库</a><a href="#sec-6-ch-8">6.6 为什么 Redisson 锁和数据库条件更新都要用</a><a href="#sec-7-ch-8">6.7 服务在 DISPATCHING 后宕机怎么办</a><a href="#sec-8-ch-8">6.8 当前顺序准入与历史安全组合能保证最优吗</a><a href="#sec-9-ch-8">6.9 为什么暂停不终止飞机</a><a href="#sec-10-ch-8">6.10 为什么事件和定时补偿要并存</a><a href="#sec-11-ch-8">6.11 AI 工程化 2 分钟回答</a><a href="#sec-12-ch-8">6.12 智能体 2 分钟回答</a><a href="#sec-13-ch-8">6.13 你的方案还有哪些不足</a><a href="#sec-14-ch-8">6.14 为什么简历不写量化提升</a><a href="#sec-15-ch-8">6.15 项目难点、亮点与个人贡献</a><a href="#sec-16-ch-8">6.16 AI Coding 时代的软技能与项目表达</a><a href="#sec-17-ch-8">6.17 HR 初筛电话与求职动机</a><a href="#sec-tech-review-ch-8">6.18 简历技术追问：从代码到原理的复述路线</a><a href="#sec-18-ch-8">6.19 反问面试官：常见问题与问法</a><a href="#sec-19-ch-8">6.20 最终速记卡</a></nav></details><header class="toolbar"><div class="search"><label class="search-label" for="search">搜索题目与正文</label><input id="search" type="search" placeholder="搜索：调度触发 / 父子状态 / 续飞 / 超时补偿" autocomplete="off"></div><button id="expand" type="button">展开全部</button><button id="collapse" type="button">收起全部</button><button id="theme" type="button" aria-label="切换明暗主题">深色</button><span class="status" id="status" aria-live="polite">220 道追问</span></header><main id="content"><div class="eyebrow">UAV BACKEND / CODE / CONCURRENCY / PRINCIPLES</div><h1>无人机巡检平台后端<small>六周直读复习手册 · 代码与原理</small></h1><p class="intro">结合两个自动建模分支，从真实入口、共享资源与裁决代码讲到异常恢复和基础原理；先熟悉简历项目，再准备追问。</p><div class="meta"><span>6 周 + 违停专题</span><span>106 个小节</span><span>220 道追问</span><span>26 幅图</span><span>核对于 <time datetime="2026-10-16">2026-10-16</time></span></div><section class="chapter" id="ch-0"><h2>导读</h2><p>本文核对分支的提交及对应工作树，不能只以HEAD当最新实现。<strong>自动建模主线采用v2.5当前工作树的统一碰撞接入</strong> ，并将旧提交、v3 SELF与EXTERNAL分别说明。工作树改动尚未提交，不代表已经部署；本次仅修订手册，未改动或提交业务仓库。</p>
 <div class="table"><table>
 <thead>
 <tr>
@@ -29,7 +29,7 @@ main.searching>:not(.chapter):not(.empty){display:none}main.searching .chapter>:
 <tbody>
 <tr>
 <td><strong>v2.5 当前工作树（未提交碰撞接入）</strong></td>
-<td>基于 <code>e19920ee3</code>，2026-10-14读取10个差异文件</td>
+<td>基于 <code>e19920ee3</code>，2026-10-16复核10个差异文件</td>
 <td>已删除本地JTS冲突服务及组合搜索；创建做静态校验，真实下发前统一检测、登记并查询确认</td>
 </tr>
 <tr>
@@ -259,7 +259,7 @@ main.searching>:not(.chapter):not(.empty){display:none}main.searching .chapter>:
 </section><section class="chapter" id="sec-1-ch-0"><h2>使用说明</h2><p>部分长答题附有“记忆关键词”。先顺着关键词复述，再补机制、例子和边界；它是回答提纲，不是完整答案。HTML 可用“展开全部”扫关键词，再“收起全部”看题自测。</p>
 <p>六周并不是要求你完成额外作业，而是帮你控制复习顺序：</p>
 <ul>
-<li>第 1 周：先读1.1–1.9建立主线，再精读1.10–1.15的机库分配手算、代码与调度图；这部分优先复述。</li>
+<li>第 1 周：先读1.1–1.9建立主线，再读1.10–1.16的机库分配、调度图与评估；重点精读1.17–1.23的触发、父子状态刷新、兜底和现场推演，按完整调用链复述。</li>
 <li>第 2 周：理解并发控制、任务预占和分布式一致性。</li>
 <li>第 3 周：理解状态机、事件补偿、暂停继续取消和断点续飞。</li>
 <li>第 4 周：结合项目复习 Java、MySQL、Redis、Spring。</li>
@@ -1655,6 +1655,1078 @@ return checkResult;
 </blockquote>
 <hr />
 <a class="back-link" href="#q-233">↑ 回到本题</a></div></details>
+</section><section class="chapter" id="sec-added-18-ch-2"><h2>1.16 生产落地评估：待优化点清单</h2><p>对v2.5工作树调度模块的整体评估：<strong>已有滚动调度与异常恢复骨架，生产可用性仍需验证</strong>——滚动调度无刚性批次屏障、样板间两段锁、区域级CAS、TTL活跃航线登记与续签、事件加定时补偿、下发结果未知保留占用、起飞超时有界重试、取消与续飞竞争的专门收敛，已有多类失败分支，可在此基础上继续演进；UNKNOWN重排、旧执行者、恢复覆盖与续飞多入口仍存在边界，不能据此推断已满足生产安全，详见1.17–1.23。下表按优先级列出待优化点，全部是<strong>改进方案，未在当前分支实现</strong>，与2.8节的fencing改进同属一类；只引方法名，不附工作树行号。</p>
+<h3>P0：正确性与安全，上线前处理</h3>
+<div class="table"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>问题</th>
+<th>代码位置</th>
+<th>现状与风险</th>
+<th>建议</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>锁内同步远程下发</td><td><code>doDispatchTaskAreaRoute</code>→<code>commonExecMission</code>，IoT下发在样板间调度锁内执行</td><td>锁内调用用于协调取消/暂停与派飞；接口慢或阻塞会拖延同样板间其他调度和控制，持续时间受客户端超时及锁持有情况影响</td><td>核对下发HTTP客户端读超时（10秒级）；若下发移出锁，需同时设计尝试代际、取消竞态与执行端幂等/fencing，仅加“下发中”标记不足以替代锁保护</td></tr>
+<tr><td>2</td><td>重试计数藏在文案</td><td><code>parseTakeoffTimeoutRetryCount</code>解析failReason中的“第X/2次”</td><td>改一个字文案即静默失效；存量数据兜底按“已重试1次”，计数语义漂移</td><td>重试计数落独立字段，与展示文案解耦</td></tr>
+<tr><td>3</td><td>碰撞降级放行无告警</td><td>CollisionWarningGateway异常路径返回allow</td><td>通用检测有降级放行；当前专用派飞入口还查询登记确认，未确认会等待。显式关闭检测、已有登记复用等例外仍需核对，不能笼统说服务宕机就必然继续派飞</td><td>降级事件打指标加告警；多机库样板间可配置为fail-closed</td></tr>
+<tr><td>4</td><td>routeCode全局更新</td><td><code>updateDispatchFailed/Success</code>仅按routeCode条件更新</td><td>routeCode一旦跨批次重复会互相污染状态</td><td>routeCode加唯一约束，更新条件补taskId</td></tr>
+</tbody>
+</table></div>
+<h3>P1：与“效率优先”目标的差距</h3>
+<div class="table"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>问题</th>
+<th>代码位置</th>
+<th>现状与风险</th>
+<th>建议</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>5</td><td>负载按条数不按时长</td><td><code>computePlanningDockLoad</code>统计各机库未完成区域条数</td><td>子区域面积与精度档（3/6/9对应不同高度和航线密度）差异大时makespan失衡；1.11已论证“分钟数极差”才是目标</td><td>用面积×精度系数估时长，评分四元组的负载项从条数换成时长</td></tr>
+<tr><td>6</td><td>电池是门槛不是资源</td><td><code>isDockReadyForDispatch</code>只看最高电量是否达阈值</td><td>充电时长未进入调度预测；电量恢复后仍需其他事件或定时扫描再次推进，电量越线本身未必发就绪事件</td><td>引入“电量就绪预计时间”，把远处任务先派给就绪更早的机库</td></tr>
+<tr><td>7</td><td>缺调度指标</td><td>只有结构化日志</td><td>排队时长、下发成功率、机库利用率、起飞耗时分布缺失；效率优先无法证明也无法调参</td><td>先埋核心指标，再谈优化顺序</td></tr>
+</tbody>
+</table></div>
+<h3>P2：规模化后再做</h3>
+<div class="table"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>问题</th>
+<th>代码位置</th>
+<th>现状与风险</th>
+<th>建议</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>8</td><td>每轮全量刷库</td><td><code>refreshEligibleTaskStatuses</code>逐任务刷新、<code>findBlockingIssuedAreas</code>多次全量查询</td><td>单样板间几十区域无压力；几十样板间并发需查询瘦身与索引核对</td><td>合并查询，按showroomId核对索引与执行计划</td></tr>
+<tr><td>9</td><td>队列按创建时间排序</td><td><code>findDispatchCandidatesForShowroom</code>按批次createTime与区域sort</td><td>顺序不体现代价（如满电先飞远）</td><td>属锦上添花，指标建好后再评估收益</td></tr>
+</tbody>
+</table></div>
+<h3>旧链路顺带确认的两处缺陷</h3>
+<ul>
+<li><code>TdScanAreaServiceImpl.removeTdArea</code>软删条件写反：更新要求<code>deleted=DELETED</code>才匹配，而入口校验又把已删除记录挡掉——正常记录永远删不掉还返回成功。</li>
+<li>旧<code>saveTdScanMissionConfig</code>逻辑删除航线时用任务id当航线id（应为<code>getRouteId()</code>），删除目标错位。两处都属旧tdScan链路，与新调度模块无关；修复前不要依赖其删除语义。</li>
+</ul>
+<h3>被问“这套调度能直接上生产吗”时的90秒回答</h3>
+<blockquote>
+<p><strong>记忆关键词：骨架可用 · P0安全 · P1效率 · 分阶段落地。</strong></p>
+<p>现有骨架已包含：滚动调度、两段锁加区域级CAS、下发结果未知保留占用、起飞超时有界重试、取消与续飞竞争收敛，失败路径都有显式处理。直接上生产前先处理四个P0：锁内远程下发配激进读超时、重试计数从文案改独立字段、核对检测降级与登记确认的组合路径并加告警、routeCode更新加唯一约束。效率上的主要差距是负载按条数均衡而非预估时长、电池只有电量门槛没有充电资源建模——这两项决定大面积多机库场景是“能用”还是“好用”，放第二个迭代，配好排队时长与机库利用率指标后再谈算法升级。</p>
+</blockquote>
+</section><section class="chapter" id="sec-scheduling-17-ch-2"><h2>1.17 调度触发精读：从创建请求到每一次重新扫描</h2>
+<p><strong>阅读目标：不打开源码，也能回答“谁触发、何时触发、扫描谁、没有触发怎么办”。</strong> 本节到1.23均以2026-10-16复核的v2.5工作树为准；仍基于<code>e19920ee3</code>，碰撞接入尚未提交。v3 SELF／EXTERNAL仍按1.9单列，不能把下面的统一碰撞准入套到v3旧提交。</p>
+
+<h3>先画清对象：两层父子，不是一张任务表</h3><pre><code class="language-text">父标绘 draw（用户圈的大区域）
+  └─ 多个子标绘 draw（待规划的子区域）
+建模批次 task（taskId，批次整体状态、paused）
+  └─ 区域明细 taskArea（taskId关联批次，dockSn、routeCode、missionId）
+       └─ 父 Mission M0（区域明细持有的missionId）
+            ├─ 续飞 Mission S1（parentId=M0.id）
+            ├─ 续飞 Mission S2（parentId仍是M0.id）
+            └─ 首段补录 Mission（TASK_CREATED，不是待飞腿）
+</code></pre>
+<p>S2通常不是挂在S1下面的树孙子，而是仍挂根Mission。区域明细不随续飞把missionId换成最新子腿；查询续飞链、完成事件反查及图片组聚合都要回到根Mission。批次状态、区域创建状态、Mission飞行状态和建模项目进度分别表达不同事实。</p>
+<figure class="diagram" id="schedule-trigger-figure"><div class="figure-label">五入口汇入同一样板间调度</div><div class="svg-scroll"><svg viewBox="0 0 1040 480" role="img" aria-labelledby="schedule-trigger-title schedule-trigger-desc"><title id="schedule-trigger-title">五入口汇入同一样板间调度</title><desc id="schedule-trigger-desc">五种触发先合并到同一样板间，锁内恢复筛候选后逐条重新加锁派飞，再聚合批次。明确失败才驱动最多32轮补位。</desc><defs><marker id="schedule-trigger-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/></marker></defs><rect class="node" x="15" y="20" width="186" height="65" rx="8"/><text x="108.0" y="46.0" text-anchor="middle">规划收口</text><text x="108.0" y="69.0" text-anchor="middle">PLAN_READY</text><path d="M 108 85 V 112 H 520 V 140" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-trigger-arrow)"/><rect class="node" x="221" y="20" width="186" height="65" rx="8"/><text x="314.0" y="46.0" text-anchor="middle">完成事件</text><text x="314.0" y="69.0" text-anchor="middle">MISSION_FINISHED</text><path d="M 314 85 V 112 H 520 V 140" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-trigger-arrow)"/><rect class="node" x="427" y="20" width="186" height="65" rx="8"/><text x="520.0" y="46.0" text-anchor="middle">机库就绪</text><text x="520.0" y="69.0" text-anchor="middle">DOCK_READY</text><path d="M 520 85 V 112 H 520 V 140" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-trigger-arrow)"/><rect class="node" x="633" y="20" width="186" height="65" rx="8"/><text x="726.0" y="46.0" text-anchor="middle">继续执行</text><text x="726.0" y="69.0" text-anchor="middle">RESUME</text><path d="M 726 85 V 112 H 520 V 140" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-trigger-arrow)"/><rect class="node" x="839" y="20" width="186" height="65" rx="8"/><text x="932.0" y="46.0" text-anchor="middle">低频补偿</text><text x="932.0" y="69.0" text-anchor="middle">RECONCILE</text><path d="M 932 85 V 112 H 520 V 140" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-trigger-arrow)"/><rect class="node accent" x="300" y="140" width="440" height="65" rx="8"/><text x="520.0" y="166.0" text-anchor="middle">第一段样板间锁</text><text x="520.0" y="189.0" text-anchor="middle">恢复遗留状态 → 刷父状态 → 收集候选</text><path d="M 520 205 V 250" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-trigger-arrow)"/><rect class="node accent" x="245" y="250" width="550" height="75" rx="8"/><text x="520.0" y="281.0" text-anchor="middle">每条重新获取同一样板间锁</text><text x="520.0" y="304.0" text-anchor="middle">最新复检 → CAS → 动态准入／登记 → IoT</text><path d="M 520 325 V 370" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-trigger-arrow)"/><rect class="node" x="310" y="370" width="420" height="65" rx="8"/><text x="520.0" y="396.0" text-anchor="middle">区域按真实结果回写</text><text x="520.0" y="419.0" text-anchor="middle">刷新本轮涉及的父批次</text><path d="M 730 402 H 930 V 172 H 740" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-trigger-arrow)" stroke-dasharray="6 5"/><text class="small" x="795" y="455" text-anchor="middle">仅明确失败触发同步补位，最多32轮</text></svg></div><figcaption>五种触发先合并到同一样板间，锁内恢复筛候选后逐条重新加锁派飞，再聚合批次。明确失败才驱动最多32轮补位。</figcaption></figure>
+<h3>请求阶段的事务为什么在异步启动之前结束</h3><p><code>planAndDispatch → executeWithParentTaskLock → doPlanAndDispatch → createPlanDispatchTask</code>：先校验登录、父标绘与子标绘；在创建锁内检查同父区域没有PLANNING／READY／EXECUTING批次，再用TransactionTemplate把主批次和全部区域明细作为一个数据库事务保存。区域保存或主键回填校验失败，主批次也回滚。</p>
+<p>返回PlanTaskContext后才调用startAsyncRoutePlanning。当前入口没有外层事务，因此模板执行结束、事务提交之后，异步线程才有机会读取已落库的任务。这里事务保护的是数据库写入，PlanTaskContext只是内存中的结果载体。</p>
+<p>不能直接把注解贴在private的createPlanDispatchTask上：它是同类内部调用，当前代理模式不会拦截。若把注解贴在整个公开入口上，提交会推迟到异步启动之后，而且创建锁的finally先执行、外层事务随后才提交。使用另一个Spring Bean的公开事务方法也能保持正确边界；当前模板省去这个拆分。模板默认REQUIRED，未来若调用者增加外层事务，必须重新检查提交时点。</p>
+
+<h3>规划收口是门槛，不是每生成一条航线立刻派飞</h3><p>已绑定机库的区域进入并行规划；未分到的区域每隔6秒追加一次分配尝试，最多2次追加尝试。新分到机库的区域继续规划；最后仍未分到的，写routeStatus=FAILED。初次规划和重试链都结束，才进入completeAsyncRoutePlanning。</p>
+<p>收口重新读库：异步链整体异常时，补标仍为routeStatus=PENDING的区域失败；随后finalizeDispatchStatus仅为航线成功的routeCode逐条准备Mission。单条Mission创建有按routeCode的Redisson锁；已创建成功且有missionId就复用，异常则标该区域missionStatus=FAILED，继续其他区域。没有任何成功航线则只刷新批次，不进入首轮队列。</p>
+<p>准备完后先refreshTaskStatus，再onTaskPrepared。后者读未删除批次、生成scheduleMessage、再次刷新状态，最后调度整个showroom。<strong>允许部分区域失败后调度其余成功区域，但首轮要等本批规划链收口。</strong> 这与“调度时不要求前一批次全部飞完”的跨批次滚动是两个层面。</p>
+
+<h3>五个入口到底携带什么信息</h3><div class="table"><table>
+<thead>
+<tr>
+<th>入口及source</th>
+<th>触发条件与前置动作</th>
+<th>调度范围、限制</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>onTaskPrepared／PLAN_READY</td>
+<td>规划收口、Mission准备结束；更新摘要并刷新批次</td>
+<td>传taskId是为找到showroom，不是只派该批次；终态批次不会成为候选</td>
+</tr>
+<tr>
+<td>onMissionFinished／MISSION_FINISHED</td>
+<td>用事件missionId找区域；续飞腿先用parentId反查父区域；确认父区域下发成功并刷新所属批次</td>
+<td>再扫描同showroom所有可推进批次；收到“本腿完成”仍需重查续飞链，不能直接释放整条链</td>
+</tr>
+<tr>
+<td>onDockReady／DOCK_READY</td>
+<td>根据dockSn查设备与showroom；第一轮额外尝试恢复该库SUCCESS且Mission仍WAITING的区域</td>
+<td>最终仍扫描整个showroom；DISPATCHING未知结果不走这条快速回退</td>
+</tr>
+<tr>
+<td>resumeTask／RESUME</td>
+<td>在样板间锁内恢复续飞开关、处理待发子腿，最后解除paused</td>
+<td>释放控制锁后再调度普通区域；子腿恢复与普通区域调度是两条路径</td>
+</tr>
+<tr>
+<td>reconcileActiveShowrooms／RECONCILE</td>
+<td>fixedDelay默认120000毫秒；查未删除、未暂停、READY／EXECUTING批次，按showroom去重</td>
+<td>每实例都可能运行，无集群选主；单showroom异常被catch，继续其他showroom</td>
+</tr>
+</tbody>
+</table></div>
+
+<h3>“机库就绪”不是每一条电量消息都发事件</h3><p>DockStatusEventHandler默认每5秒处理机库状态。它把ONLINE和EMERGENCY看作ready；仅在<code>!oldReady &amp;&amp; newReady</code>时发布DockReadyEvent。首次上报就就绪，oldStatus为空，也会触发；ONLINE切换到EMERGENCY则前后都ready，不触发。</p>
+<p>电池85%是最终派飞的独立门槛。比如机库一直ONLINE，电池从84%升到85%，ready布尔值没变，<strong>单靠这次电量变化不会触发DockReadyEvent</strong>。最新电量仍会被后续扫描读取，所以依靠其他入口或定时补偿再推进。不能把“5秒状态处理”讲成“每5秒必调度一次建模”。</p>
+
+<details class="question" id="q-scheduling-237"><summary><span class="qnum">237</span><span class="question-title">面试官问：服务重启后，队列和规划都会自动恢复吗</span></summary><div class="answer"><blockquote>
+<p class="memory-cue"><strong>记忆关键词：持久候选 · 首次就绪 · 扫描范围 · 规划缺口。</strong></p>
+<p>待派飞区域存在数据库里，重启后的首次机库就绪和定时扫描都有机会重新推进。补偿只枚举未暂停的READY／EXECUTING批次，不自动重建中断的CompletableFuture规划链，也不扫描所有PLANNING和终态批次。因此“重启后所有阶段都会自动恢复”超出代码保证；卡在PLANNING要另查规划收口及人工恢复。</p>
+</blockquote>
+<a class="back-link" href="#q-scheduling-237">↑ 回到本题</a></div></details>
+</section>
+<section class="chapter" id="sec-scheduling-18-ch-2"><h2>1.18 一次调度逐步展开：候选快照、领取与派飞结果</h2>
+<p><strong>先记住三个范围：调度组织按showroom，领取只改一条taskArea，空域准入落到sourceEnv／droneSn／routeCode。</strong> 这三者分别解决本地共享资源协调、同行竞争和远端占用识别。</p>
+
+<h3>外层循环为什么最多32轮</h3><p>scheduleShowroom每轮先在样板间锁内按固定顺序做四件事：收敛取消后晚生续飞腿、释放取消批次的特定陈旧占用、首轮若有readyDockSn则尝试机库恢复回退、处理普通／续飞超时，随后刷新活跃批次并筛候选。候选收集完释放锁，逐条派飞时重新拿同一把锁。</p>
+<p><strong>源码摘录 · <code>ModelingQueueManager.java</code> 第635–656行（v2.5工作树）：</strong></p>
+<pre><code class="language-java">boolean hasExplicitFailure = false;
+for (ModelingTaskAreaEntity taskArea : reserved) {
+    String failure = dispatchTaskAreaRoute(taskArea, roundSource, showroomId);
+    ModelingTaskAreaEntity latest = modelingTaskAreaDao.selectById(taskArea.getId());
+    if (latest != null &amp;&amp; Objects.equals(
+            latest.getDispatchStatus(), ModelingDispatchStatusEnum.FAILED.getCode())) {
+        hasExplicitFailure = true;
+    }
+    if (failure != null) {
+        log.warn("建模任务滚动调度下发失败 source={}, showroomId={}, scheduleRound={}, taskId={}, taskAreaId={}, routeCode={}, failure={}",
+                roundSource, showroomId, scheduleRound, taskArea.getTaskId(),
+                taskArea.getId(), taskArea.getRouteCode(), failure);
+    }
+}
+reserved.stream()
+        .map(ModelingTaskAreaEntity::getTaskId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .forEach(taskStatusService::refreshTaskStatus);
+if (!hasExplicitFailure) {
+    return;
+}
+</code></pre>
+<p>每条返回后，外层重查该区域；只有观察到<strong>本轮候选列表中的区域变为FAILED</strong>，hasExplicitFailure才置true，才再扫下一轮。无候选或没看到这种明确失败就返回。预筛阶段已经剔除的失败不直接置这个变量，临时碰撞、设备等待和UNKNOWN也不让外层无休止同步重扫。32轮是一次调用的失败补位上限，不是每条任务重试32次。</p>
+
+<h3>候选查询与优先级，逐条件解释</h3><div class="table"><table>
+<thead>
+<tr>
+<th>层次</th>
+<th>真正读取的条件</th>
+<th>用意与边界</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>批次</td>
+<td>同showroom、isDeleted=0、paused=0、status为READY／EXECUTING</td>
+<td>PLANNING和终态不作为普通待发批次</td>
+</tr>
+<tr>
+<td>区域</td>
+<td>missionStatus=SUCCESS、dispatchStatus=PENDING，dockSn／missionId／routeCode非null</td>
+<td>missionStatus是“创建成功”，不是Mission正在飞；SQL没有单独再加routeStatus=SUCCESS，随后排除区域失败／已完成</td>
+</tr>
+<tr>
+<td>排序</td>
+<td>批次createTime／id → 区域createTime → sort → id；时间／sort空值后置</td>
+<td>偏向先创建批次，区域创建时间优先于sort；不保证严格FIFO或无饥饿</td>
+</tr>
+<tr>
+<td>同库优先</td>
+<td>同库存在起飞超时重试候选时，普通候选写等待并跳过</td>
+<td>优先完成既有任务，不是允许它忽略设备或空域条件</td>
+</tr>
+<tr>
+<td>执行链</td>
+<td>已DISPATCHING／SUCCESS且整链没结束的同库区域</td>
+<td>可以跨批次、包括暂停批次残留；占用查询也纳入CANCELLED批次</td>
+</tr>
+<tr>
+<td>Mission与设备</td>
+<td>Mission存在、仍允许下发，机库状态和电池满足要求</td>
+<td>Mission非可下发状态时，当前实现按“已下发”修复区域SUCCESS；这只是本地状态修复，不是新发命令</td>
+</tr>
+</tbody>
+</table></div>
+<p>没有冲突的同库多条区域可以一起进入候选列表。reserveDispatchCandidates没有批量写DISPATCHING；只有逐条最终复检看到前一条仍占库，才挡住后面同库候选。候选不是预约凭证。</p>
+
+<h3>最终持锁的决策表：每一行都可能让本条结束</h3><div class="table"><table>
+<thead>
+<tr>
+<th>顺序</th>
+<th>检查／动作</th>
+<th>不通过时怎么处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>按routeCode重查区域最新状态</td>
+<td>SUCCESS或非PENDING直接跳过，不复发</td>
+</tr>
+<tr>
+<td>2</td>
+<td>查批次仍未删除、未暂停且READY／EXECUTING</td>
+<td>保持／释放到PENDING，写等待恢复原因</td>
+</tr>
+<tr>
+<td>3</td>
+<td>查同库其他未结束执行链</td>
+<td>PENDING等待；不发送第二条同库任务</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Mission存在、可下发</td>
+<td>缺失写FAILED；状态已越过可下发则修复SUCCESS并跳过</td>
+</tr>
+<tr>
+<td>5</td>
+<td>最终重查机库状态与电池</td>
+<td>PENDING等待，候选阶段通过不算数</td>
+</tr>
+<tr>
+<td>6</td>
+<td>UPDATE id且dispatchStatus=PENDING → DISPATCHING</td>
+<td>必须影响1行，否则跳过；没有尝试代际，也不锁其他区域行</td>
+</tr>
+<tr>
+<td>7</td>
+<td>checkAndRegisterBeforeDispatch，STANDARD_CHECK</td>
+<td>永久模型／障碍物碰撞或超高写FAILED；临时冲突或技术问题释放到PENDING等待</td>
+</tr>
+<tr>
+<td>8</td>
+<td>图片上传模式更新设备和Mission快照为mode=3</td>
+<td>尚未尝试IoT时的异常走下发前失败处理</td>
+</tr>
+<tr>
+<td>9</td>
+<td>dispatchAttempted=true，然后execMission</td>
+<td>异常或空响应保留未知；明确非成功和成功分别处理</td>
+</tr>
+<tr>
+<td>10</td>
+<td>回写区域，再由外层刷新相关批次</td>
+<td>回写异常不等于设备未执行，要按已尝试副作用查证</td>
+</tr>
+</tbody>
+</table></div>
+<p>普通Mission只允许WAITING下发；ALREADY_RECEIVED只有带起飞超时重试标记的区域才是例外。预筛和最终复检都用这个规则。当前“非可下发→修复SUCCESS”条件较宽，并非只匹配RUNNING；面试时应说代码实际判断，再说明依赖上游状态合法性。</p>
+
+<h3>准入的两个提前返回与四种IoT结局</h3><p>安全方法先验证Mission，再查disableSafetyDetection样板间配置。命中关闭检测配置可以直接成功；否则检查sourceEnv、航线、飞机SN和openRouteDetect。按三元组查询：查询失败／空值挡住；已有登记直接成功；没有才检测并登记，随后再次查询确认。因此不是每次都完整重检，也不是检测网关降级成功就必然派飞。</p>
+<div class="table"><table>
+<thead>
+<tr>
+<th>观察结果</th>
+<th>区域状态／原因</th>
+<th>活跃登记及下一步</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IoT明确成功</td>
+<td>SUCCESS；清waitReason；普通成功清failReason，起飞重试成功保留计数文案</td>
+<td>保留登记，等起飞事件续签、完成事件清理；SUCCESS不等于起飞或飞完</td>
+</tr>
+<tr>
+<td>IoT明确非成功</td>
+<td>清理活跃登记，写FAILED和下发失败原因</td>
+<td>外层可以触发有限失败补位</td>
+</tr>
+<tr>
+<td>IoT抛异常或返回null</td>
+<td>保留当前DISPATCHING，记录待确认原因</td>
+<td>保留登记，不立即释放给下一条；随后仍可能被超时恢复处理</td>
+</tr>
+<tr>
+<td>IoT之后写库等步骤异常</td>
+<td>dispatchAttempted已为true，只补记录未知原因</td>
+<td>不用本地写库失败推断远端失败；若成功状态已写入，记录未知原因的方法也不会强制再改回DISPATCHING</td>
+</tr>
+</tbody>
+</table></div>
+<p>dispatchAttempted=false时外层catch会尝试清理登记并写FAILED；已进入IoT调用后，catch采用保守的未知处理。临时安全检查以正常错误结果返回时走PENDING等待，而抛到普通派飞外层catch的异常可能写FAILED，两条路径不能笼统说成“碰撞服务异常都自动等下次”。</p>
+
+<details class="question" id="q-scheduling-238"><summary><span class="qnum">238</span><span class="question-title">面试官问：为什么用样板间锁了还要CAS</span></summary><div class="answer"><blockquote>
+<p class="memory-cue"><strong>记忆关键词：跨行资源协调 · 同行数据库裁决 · 不含代际。</strong></p>
+<p>样板间锁让同库及跨区域的正常竞争按顺序检查；CAS要求该区域仍是PENDING才领取，防候选快照过期后重复领取同行。两者分工不同。CAS没有attempt，Redis锁又可能丢失，所以不能据此承诺长暂停、回退重排后的旧执行者绝不再发送；完整时序见2.7。</p>
+</blockquote>
+<a class="back-link" href="#q-scheduling-238">↑ 回到本题</a></div></details>
+</section>
+<section class="chapter" id="sec-scheduling-19-ch-2"><h2>1.19 父批次状态怎么刷新：把聚合算法真正算一遍</h2>
+<p>这里的“父”指ModelingTaskEntity，“子”指taskArea。它不直接把所有Mission.status求最大值，而是先计算每个区域是否完成、是否失败，再按固定优先级生成一个目标状态。</p>
+
+<h3>区域的两个布尔值和三个计数</h3><div class="table"><table>
+<thead>
+<tr>
+<th>变量</th>
+<th>精确定义</th>
+<th>容易答错的地方</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>completed</td>
+<td>missionLifecycleService.isTaskAreaFlightCompleted(area)</td>
+<td>会查父Mission及续飞链，dispatch=SUCCESS不算飞完</td>
+</tr>
+<tr>
+<td>failed</td>
+<td>routeStatus=FAILED，或missionStatus=FAILED，或dispatchStatus为FAILED／CANCELLED</td>
+<td>某条区域取消也算失败明细；不是只看下发失败</td>
+</tr>
+<tr>
+<td>completedCount</td>
+<td>completed且非failed的区域数</td>
+<td>一个区域既观测完成又有失败标记，只算失败，不算成功完成</td>
+</tr>
+<tr>
+<td>failedCount</td>
+<td>failed的区域数</td>
+<td>有1条失败不等于父批次马上FAILED</td>
+</tr>
+<tr>
+<td>terminalCount</td>
+<td>completed或failed的区域数，每区域只加一次</td>
+<td>达到区域总数，才走全部终态分支</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>源码摘录 · <code>ModelingTaskStatusService.java</code> 第76–88行（v2.5工作树）：</strong></p>
+<pre><code class="language-java">ModelingTaskStatusEnum target;
+if (allTerminal) {
+    target = failedCount == 0 ? ModelingTaskStatusEnum.COMPLETED
+            : completedCount &gt; 0 ? ModelingTaskStatusEnum.PARTIAL_FAILED
+            : ModelingTaskStatusEnum.FAILED;
+} else if (hasExecutionActivity(taskAreas)) {
+    target = ModelingTaskStatusEnum.EXECUTING;
+} else if (areAllRoutesTerminal(taskAreas)) {
+    target = ModelingTaskStatusEnum.READY;
+} else {
+    target = ModelingTaskStatusEnum.PLANNING;
+}
+
+</code></pre>
+<p>这段是真实分支顺序。allTerminal优先；其后hasExecutionActivity只检查是否存在非null且非PENDING的dispatchStatus，连FAILED／CANCELLED也算“已有处理活动”，并不表示真的有飞机正在飞。areAllRoutesTerminal只看全部航线SUCCESS／FAILED，不检查全部Mission创建成功。因此READY表达可进入准备后调度阶段，实际候选仍由missionStatus等条件过滤。</p>
+<figure class="diagram" id="schedule-aggregate-figure"><div class="figure-label">父批次聚合的判断顺序</div><div class="svg-scroll"><svg viewBox="0 0 1040 615" role="img" aria-labelledby="schedule-aggregate-title schedule-aggregate-desc"><title id="schedule-aggregate-title">父批次聚合的判断顺序</title><desc id="schedule-aggregate-desc">先计算全部区域是否终结。全部终结按成功失败计数形成终态，否则优先执行活动，其次全部航线收口，最后规划中。目标状态还受单向和终态保护。</desc><defs><marker id="schedule-aggregate-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/></marker></defs><rect class="node" x="260" y="15" width="520" height="60" rx="8"/><text x="520.0" y="50.0" text-anchor="middle">读取区域：完成数／失败数／终结数</text><path d="M 520 75 V 110" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-aggregate-arrow)"/><rect class="node accent" x="350" y="110" width="340" height="55" rx="8"/><text x="520.0" y="142.5" text-anchor="middle">全部区域都已终结？</text><path d="M 350 137 H 175 V 210" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-aggregate-arrow)"/><path d="M 520 165 V 210" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-aggregate-arrow)"/><text class="small" x="265" y="126">是</text><text class="small" x="535" y="190">否</text><rect class="node" x="15" y="210" width="310" height="95" rx="8"/><text x="170.0" y="239.5" text-anchor="middle">无失败：COMPLETED</text><text x="170.0" y="262.5" text-anchor="middle">有成有败：PARTIAL_FAILED</text><text x="170.0" y="285.5" text-anchor="middle">没有成功：FAILED</text><rect class="node accent" x="365" y="210" width="310" height="65" rx="8"/><text x="520.0" y="247.5" text-anchor="middle">存在非PENDING下发状态？</text><path d="M 675 242 H 815" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-aggregate-arrow)"/><rect class="node" x="815" y="215" width="210" height="55" rx="8"/><text x="920.0" y="247.5" text-anchor="middle">EXECUTING</text><text class="small" x="740" y="232">是</text><path d="M 520 275 V 330" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-aggregate-arrow)"/><text class="small" x="535" y="304">否</text><rect class="node accent" x="365" y="330" width="310" height="60" rx="8"/><text x="520.0" y="365.0" text-anchor="middle">全部航线SUCCESS／FAILED？</text><path d="M 675 360 H 815" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-aggregate-arrow)"/><rect class="node" x="815" y="333" width="210" height="55" rx="8"/><text x="920.0" y="365.5" text-anchor="middle">READY</text><text class="small" x="740" y="349">是</text><path d="M 520 390 V 435" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-aggregate-arrow)"/><text class="small" x="535" y="415">否</text><rect class="node" x="415" y="435" width="210" height="55" rx="8"/><text x="520.0" y="467.5" text-anchor="middle">PLANNING</text><path d="M 170 305 V 530 H 260" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-aggregate-arrow)"/><path d="M 920 270 V 530 H 780" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-aggregate-arrow)"/><path d="M 920 388 V 530 H 780" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-aggregate-arrow)"/><path d="M 520 490 V 530" fill="none" stroke="var(--accent)" stroke-width="1.7" marker-end="url(#schedule-aggregate-arrow)"/><rect class="node accent" x="260" y="530" width="520" height="65" rx="8"/><text x="520.0" y="556.0" text-anchor="middle">updateForward：目标不一定成为最终状态</text><text x="520.0" y="579.0" text-anchor="middle">终态保持 → 非终态不倒退 → 旧status条件更新</text></svg></div><figcaption>先计算全部区域是否终结。全部终结按成功失败计数形成终态，否则优先执行活动，其次全部航线收口，最后规划中。目标状态还受单向和终态保护。</figcaption></figure>
+<h3>六组明细，现场手算父状态</h3><div class="table"><table>
+<thead>
+<tr>
+<th>当前区域事实（假设父状态尚允许推进）</th>
+<th>计数／命中条件</th>
+<th>本次请求写入的目标</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A已飞完整链，B等待机库</td>
+<td>completed=1，terminal=1/2；A下发SUCCESS</td>
+<td>EXECUTING，继续等B</td>
+</tr>
+<tr>
+<td>A航线失败，B航线成功但尚未下发；两者dispatch均PENDING</td>
+<td>terminal=1/2，无下发活动，航线均终结</td>
+<td>READY，并携带A失败原因</td>
+</tr>
+<tr>
+<td>A明确下发失败，B仍待发</td>
+<td>terminal=1/2；A的dispatch=FAILED也命中活动</td>
+<td>EXECUTING；不保证此时有飞机在飞</td>
+</tr>
+<tr>
+<td>A成功完成，B永久失败</td>
+<td>terminal=2/2，completed=1，failed=1</td>
+<td>PARTIAL_FAILED</td>
+</tr>
+<tr>
+<td>A、B都失败</td>
+<td>terminal=2/2，completed=0，failed=2</td>
+<td>FAILED</td>
+</tr>
+<tr>
+<td>A、B完成且无失败标记</td>
+<td>terminal=2/2，failed=0</td>
+<td>COMPLETED，并清父failReason</td>
+</tr>
+</tbody>
+</table></div>
+<p>空区域列表不是COMPLETED，而是markFailed“建模任务区域记录为空”。正常聚合也不会产生父CANCELLED，取消由显式markCancelled写入。另一个细节：Mission.status=CANCEL在生命周期函数里直接算完成；若区域自身没有失败／取消标记，聚合可能把它计入completedCount。因此不能把“业务成功”无条件等同于completedCount。</p>
+
+<h3>目标状态不一定成为数据库最终状态</h3><p>refreshTaskStatus算出target后调用updateForward。它最多3次读批次并更新：不存在或非法状态则退出；当前已终态且目标是另一状态则保持不变；非终态仅允许PLANNING(10)→READY(20)→EXECUTING(30)同级或向前，以及推进任一终态。UPDATE同时带id和读取时的旧status。</p>
+<p><strong>源码摘录 · <code>ModelingTaskStatusService.java</code> 第146–163行（v2.5工作树）：</strong></p>
+<pre><code class="language-java">if (currentStatus.isTerminal() &amp;&amp; currentStatus != requestedStatus) {
+    log.info("建模任务终态保持不变 taskId={}, currentStatus={}, requestedStatus={}",
+            taskId, currentStatus.getCode(), requestedStatus.getCode());
+    return false;
+}
+
+ModelingTaskStatusEnum targetStatus = currentStatus.canAdvanceTo(requestedStatus)
+        ? requestedStatus : currentStatus;
+String targetFailReason = replaceFailReason ? failReason : task.getFailReason();
+if (targetStatus == ModelingTaskStatusEnum.COMPLETED) {
+    targetFailReason = null;
+}
+int updated = modelingTaskDao.update(null, new LambdaUpdateWrapper&lt;ModelingTaskEntity&gt;()
+        .eq(ModelingTaskEntity::getId, task.getId())
+        .eq(ModelingTaskEntity::getStatus, task.getStatus())
+        .set(ModelingTaskEntity::getStatus, targetStatus.getCode())
+        .set(ModelingTaskEntity::getFailReason, targetFailReason)
+        .set(ModelingTaskEntity::getUpdateTime, new Date()));
+</code></pre>
+<p>如果当前EXECUTING而重算target=READY，仍保留EXECUTING；终态允许同态更新原因，不能改为另一终态。父CANCELLED后晚到的完成刷新不会把它变COMPLETED。条件更新冲突只重读父状态，不重新计算整组区域；而且WHERE只有旧status，相同status下的并发原因更新仍可能相互覆盖。这是有限并发保护，不是完整版本号快照或强一致聚合。</p>
+<p>failReason从失败区域取非空原因，补区域名／ID、去重、拼接并截断；COMPLETED清空，FAILED但没有细节时补默认文案。等待原因、普通起飞重试说明不一定进入父失败聚合，因为只有failed区域参与原因收集。</p>
+
+<h3>谁刷新父批次，页面查询会不会顺便修好</h3><div class="table"><table>
+<thead>
+<tr>
+<th>刷新点</th>
+<th>解决什么时机</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>规划无成功航线／准备Mission结束</td>
+<td>让规划结果和创建失败进入父状态</td>
+</tr>
+<tr>
+<td>onTaskPrepared</td>
+<td>首轮扫描前刷新；生成调度摘要不是另一个权威状态字段</td>
+</tr>
+<tr>
+<td>reserveDispatchCandidates的第一步</td>
+<td>每轮对该showroom的READY／EXECUTING批次刷新；此查询未按paused过滤，暂停批次也可更新进度</td>
+</tr>
+<tr>
+<td>普通派飞候选循环结束</td>
+<td>对本轮候选涉及的taskId去重刷新</td>
+</tr>
+<tr>
+<td>父／子Mission完成事件</td>
+<td>找回父区域、确认下发成功，再刷新所属批次</td>
+</tr>
+<tr>
+<td>续飞永久阻飞、普通起飞／续飞重试耗尽</td>
+<td>明确失败后立即刷新</td>
+</tr>
+<tr>
+<td>markExecuting／markFailed／markCancelled</td>
+<td>显式推进仍走updateForward，不要求先经过refreshTaskStatus</td>
+</tr>
+</tbody>
+</table></div>
+<p>pageProgress读取持久状态、父子Mission和建模进度组装响应，没有顺便调用refreshTaskStatus。刷新页面不能替代后台补偿。批次COMPLETED按飞行链聚合，模型生成进度另查projectId；飞行完成、图片完成、模型完成是不同时间点。</p>
+
+<details class="question" id="q-scheduling-239"><summary><span class="qnum">239</span><span class="question-title">面试官问：一个区域失败了，为什么批次还显示EXECUTING</span></summary><div class="answer"><blockquote>
+<p class="memory-cue"><strong>记忆关键词：还有未终结区域 · 先等全部收口 · 活动不是在飞。</strong></p>
+<p>父批次先判断全部区域是否终结。没全部终结且有任意非PENDING下发状态，就计算EXECUTING，其中失败本身也命中活动；所以它表示批次处理阶段。其余区域完成后，有成功有失败才收敛PARTIAL_FAILED，全失败才FAILED。父状态还受单向推进规则约束，不会因为一次重算退回READY。</p>
+</blockquote>
+<a class="back-link" href="#q-scheduling-239">↑ 回到本题</a></div></details>
+</section>
+<section class="chapter" id="sec-scheduling-20-ch-2"><h2>1.20 续飞父子状态刷新：返航、完成上报与最新执行腿</h2>
+<p>这里的父子指Mission链，不是建模批次。理解这条链，要分清四个字段：<code>status</code>是某一腿飞行观测，<code>hasSubMission</code>表示根任务存在续飞记录，<code>resumeTaskStatus=1</code>表示这条续飞腿已经结束，<code>overallStatus</code>是根任务整体完成标记。后两个字段都不等于task.status。</p>
+
+<h3>设备上报finishStatus之后，代码写哪条记录</h3><p>MissionResumeFlyHandler收到MissionResumeFlyEvent，解析上报：</p>
+<p><strong>源码摘录 · <code>MissionResumeFlyHandler.java</code> 第31–39行（v2.5工作树）：</strong></p>
+<pre><code class="language-java">if (1 == resumeFlyHandleRequestParam.getFinishStatus()) {
+    log.info("当前任务id为{}整体已执行完毕,不生成续飞任务", resumeFlyHandleRequestParam.getMissionId());
+    //修改当前任务的父任务整体完成状态用于前端逻辑
+    missionResumeFlyService.updateMissionOverallStatus(resumeFlyHandleRequestParam);
+    //更新当前任务续飞完成状态为已完成
+    missionResumeFlyService.updateMissionResumeTaskStatus(resumeFlyHandleRequestParam);
+    return;
+}
+Result&lt;Object&gt; submission = missionResumeFlyService.createSubmission(resumeFlyHandleRequestParam);
+</code></pre>
+<p>finishStatus=1时，不再生成下一腿。updateMissionOverallStatus读取当前Mission：parentId=0就更新自己，否则更新根parentId的overallStatus；updateMissionResumeTaskStatus则只把<strong>这次上报missionId</strong>的resumeTaskStatus置1。这里没有顺手把建模task.status写完成，也没有在这个分支显式调用queueManager。</p>
+<p>finishStatus非1则createSubmission：保存中断记录、裁剪已飞段、为剩余航段加去程并创建航线与新Mission。新执行腿status=WAITING、resumeTaskStatus=0，parentId指根任务。首次中断会把根任务hasSubMission设1；后续中断在裁剪前将当前旧子腿resumeTaskStatus置1，然后生成新子腿。因此<strong>S1的resumeTaskStatus=1可能只是S1这腿结束，后面还有S2</strong>。</p>
+<p>首次飞行还会有TASK_CREATED(8)的补录记录，它用于保留实际已飞航段，不是待下发执行腿。不要把这类记录卡住当“还有一架飞机未飞”。字段更新的设备消息入口和上游Mission.status同步属于不同链路，本仓库没有证明二者与完成事件一定按同一事务、同一时序到达。</p>
+
+<h3>新生子腿、继续子腿、超时重试子腿：三个发送入口</h3><div class="table"><table>
+<thead>
+<tr>
+<th>路径</th>
+<th>核对到的调用链</th>
+<th>保证范围</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>设备中断后自动续飞（机库路径）</td>
+<td>createSubmission → 父resumeFlightEnabled=1 → executeTask → execMissionV4</td>
+<td>独立线程池轮询机库nestStatus为900／6；每轮检查根续飞开关；睡眠间隔1分钟、名义等待预算30分钟，接口耗时额外计算；不是普通区域PENDING→DISPATCHING入口</td>
+</tr>
+<tr>
+<td>暂停后继续</td>
+<td>doResumeTask → retriggerWaitingResumeSubMission → commonExecMission</td>
+<td>仅最新WAITING子腿；检查机库电池和统一准入；在批次控制的样板间锁内调用</td>
+</tr>
+<tr>
+<td>队列补偿续飞超时</td>
+<td>handleStaleResumeSubMission → retryStaleResumeSubMission → commonExecMission</td>
+<td>针对最新未结束子腿；机库和准入通过后才计本条子腿重试次数，最多2次</td>
+</tr>
+</tbody>
+</table></div>
+<p>新生子腿创建仍调用通用createOrUpdateMission，不是初始建模Mission使用的createOrUpdateModelingMission；其创建安全检查和等待执行路径不能与1.18逐项等同。队列恢复路径有专门准入，不代表所有续飞调用者自动共享同一把锁、同一套CAS和预算。这是必须如实区分的现状，统一入口是后续改进方向。</p>
+
+<h3>区域整条链完成的精确判断顺序</h3><ol>
+<li>taskArea／missionId／Mission缺失：false，不能凭空算完成。</li>
+<li>根Mission.status=CANCEL：直接true，这是当前产品规则；不会继续检查子腿。</li>
+<li>根状态必须是FINISH(2)、DRONE_BACK(4)、DOCK_RESET(5)、IMAGE_UPLOAD_COMPLETED(6)、TASK_CREATED(8)之一，否则false。ALREADY_RECEIVED(7)、RUNNING(1)、TAKEOFF(21)、LAND(29)不是完成。</li>
+<li>根hasSubMission不为1：true。</li>
+<li>标记有子任务却查不到子任务：false，保守等待数据收敛。</li>
+<li>过滤子任务status=TASK_CREATED的归档记录；过滤后为空：true。</li>
+<li>剩余任意子任务为ALREADY_RECEIVED／RUNNING／TAKEOFF／LAND：false，先保留执行链。</li>
+<li>按createdAt最大、再id最大找最新可执行子腿（null排最前）。最新status=CANCEL或resumeTaskStatus=1：true；否则false。</li>
+</ol>
+<p><strong>源码摘录 · <code>ModelingMissionLifecycleService.java</code> 第125–143行（v2.5工作树）：</strong></p>
+<pre><code class="language-java">boolean hasActiveSubMission = executableSubMissions.stream().anyMatch(this::isMissionInFlight);
+if (hasActiveSubMission) {
+    log.info("建模任务队列暂停，续飞链仍有已接收或飞行中的子任务 parentMissionId={}, routeCode={}, subMissions={}",
+            parentMissionId, taskArea.getRouteCode(), subMissionDetails);
+    return false;
+}
+if (latestSubMission != null
+        &amp;&amp; Objects.equals(latestSubMission.getStatus(), MissionStatusEnum.CANCEL.getType())) {
+    log.info("建模任务队列续飞校验通过，最新续飞子任务已取消 parentMissionId={}, routeCode={}, latestSubMissionId={}, subMissions={}",
+            parentMissionId, taskArea.getRouteCode(), latestSubMission.getId(), subMissionDetails);
+    return true;
+}
+if (latestSubMission != null
+        &amp;&amp; Objects.equals(latestSubMission.getResumeTaskStatus(), RESUME_TASK_FINISHED)) {
+    log.info("建模任务队列续飞校验通过，最新续飞子任务已结束 parentMissionId={}, routeCode={}, latestSubMissionId={}, latestSubMissionStatus={}, subMissions={}",
+            parentMissionId, taskArea.getRouteCode(), latestSubMission.getId(),
+            latestSubMission.getStatus(), subMissionDetails);
+    return true;
+}
+</code></pre>
+<p>因此“根返航就算结束”“任意子腿resumeTaskStatus=1就算结束”“要求每个历史子腿status都变成某个终态”都不是当前算法。它依赖根hasSubMission、子记录排序及上游状态正确性；多次查询没有全链事务快照，晚生子腿和乱序回调要结合证据排查。根CANCEL的提前返回也不能解释成已验证所有子腿都停飞。</p>
+
+<h3>一张表走完M0、S1、S2</h3><div class="table"><table>
+<thead>
+<tr>
+<th>时点</th>
+<th>已持久化的事实</th>
+<th>生命周期返回及影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M0运行中</td>
+<td>M0=RUNNING</td>
+<td>false，同库后续区域等待</td>
+</tr>
+<tr>
+<td>M0返航，已标有子任务但记录尚未可见</td>
+<td>M0=DRONE_BACK，hasSubMission=1，查询子列表空</td>
+<td>false，挡住这段生成窗口</td>
+</tr>
+<tr>
+<td>S1已生成尚未执行</td>
+<td>M0已返航；S1=WAITING、resumeTaskStatus=0</td>
+<td>false，机库仍留给这条链</td>
+</tr>
+<tr>
+<td>S1中断后生成S2</td>
+<td>S1.resumeTaskStatus=1；S2=WAITING、resumeTaskStatus=0</td>
+<td>最新是S2，仍false；不重发M0</td>
+</tr>
+<tr>
+<td>S2已收到／在飞</td>
+<td>S2=ALREADY_RECEIVED／RUNNING</td>
+<td>false，即使其他旧腿已结束</td>
+</tr>
+<tr>
+<td>S2整条任务完成上报已到，尚未落库状态回调</td>
+<td>S2.resumeTaskStatus=1，但S2.status仍RUNNING</td>
+<td>活跃子腿检查优先，仍false</td>
+</tr>
+<tr>
+<td>S2返航且完成标记已到，无其他活跃子腿</td>
+<td>最新S2.resumeTaskStatus=1、status不再活跃</td>
+<td>true；后续刷新父批次并重新调度，同库仍需设备／电池就绪</td>
+</tr>
+</tbody>
+</table></div>
+
+<h3>子腿完成事件如何回到父区域</h3><p>queueManager先按事件missionId查taskArea.missionId。找不到就读取该子Mission，取parentId，再查指向根Mission的区域。找到后用<strong>区域的父routeCode</strong>确认dispatch=SUCCESS、刷新区域所属taskId，再根据批次showroom调度。没有创建新的taskArea，也不是把event中的子routeCode直接写成批次主键。</p>
+<p>ActiveRouteProcessService则按<strong>事件当前missionId</strong>清理该腿的活跃航线，且@Order最高优先级；清理失败被捕获，仍有TTL。二者分别处理“这一腿的远端占用”和“父区域整链的调度投影”。一次事件不会自动证明整个区域完成，仍要运行上面的生命周期判断；若最终完成字段比事件晚到，后续扫描才有机会收敛。</p>
+
+<details class="question" id="q-scheduling-240"><summary><span class="qnum">240</span><span class="question-title">面试官问：overallStatus已经是1，为什么队列还挡着</span></summary><div class="answer"><blockquote>
+<p class="memory-cue"><strong>记忆关键词：展示标记 · 整链判定 · 活跃腿优先。</strong></p>
+<p>队列生命周期函数不直接读overallStatus，而是先看根Mission是否处于完成集合，再看有无子记录、是否还有活跃子腿以及最新可执行腿的resumeTaskStatus。overallStatus用于整体展示，不能覆盖“设备仍显示在飞”或“新子腿未结束”的事实。需要排查具体字段和事件先后，不要只手改整体完成标记。</p>
+</blockquote>
+<a class="back-link" href="#q-scheduling-240">↑ 回到本题</a></div></details>
+</section>
+<section class="chapter" id="sec-scheduling-21-ch-2"><h2>1.21 兜底逻辑总账：什么会重试、什么会等待、什么没人自动修</h2>
+<p><strong>每个兜底都要能回答：扫描对象、时间基准、写哪个状态、重试谁、预算多少、由谁再唤醒。</strong> 默认值是源码默认，不代表线上配置。下表把创建、调度、续飞和资源登记放在一处，避免把不同“2次／2分钟”混背。</p>
+
+<h3>恢复分支与预算对照</h3><div class="table"><table>
+<thead>
+<tr>
+<th>情况</th>
+<th>判断／时间基准</th>
+<th>动作与预算</th>
+<th>再推进的入口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>规划阶段无可用机库</td>
+<td>仍route=PENDING且dockSn为空的原区域</td>
+<td>每隔6秒追加分配，最多2次；耗尽route=FAILED并清dockSn</td>
+<td>CompletableFuture延迟重试链；不是调度fixedDelay</td>
+</tr>
+<tr>
+<td>异步规划链异常</td>
+<td>收口重查仍route=PENDING的区域</td>
+<td>补标route=FAILED；已成功的不整体抹掉</td>
+<td>完成回调；宕机丢失整条回调不由此自动修复</td>
+</tr>
+<tr>
+<td>部分Mission准备失败</td>
+<td>每条routeCode准备catch</td>
+<td>仅该区域mission=FAILED；其余继续准备</td>
+<td>正常进入父状态聚合；没有通用“失败Mission无限重建”</td>
+</tr>
+<tr>
+<td>机库恢复但原区域没实际起飞</td>
+<td>同库未结束区域dispatch=SUCCESS，Mission=WAITING</td>
+<td>立即SUCCESS→PENDING；DISPATCHING不走此快捷恢复；无2次预算</td>
+<td>DOCK_READY首轮</td>
+</tr>
+<tr>
+<td>普通下发未确认接收</td>
+<td>活跃未暂停批次；区域DISPATCHING／SUCCESS；Mission=WAITING；area.updateTime早于默认2分钟阈值</td>
+<td>回PENDING，重发同一父Mission；这个分支没有独立有限次数计数</td>
+<td>每次调度前requeueStaleDispatching</td>
+</tr>
+<tr>
+<td>普通任务已接收未起飞</td>
+<td>Mission=ALREADY_RECEIVED；area.updateTime早于默认5分钟阈值</td>
+<td>回PENDING，写第N/2次；同库优先重发当前Mission；预算耗尽区域FAILED</td>
+<td>每次调度前恢复，再正常候选派飞</td>
+</tr>
+<tr>
+<td>续飞子腿未接收／未起飞</td>
+<td>最新未结束子Mission分别WAITING／ALREADY_RECEIVED；看子updatedAt与createdAt较新值</td>
+<td>默认2／5分钟；匹配当前subMissionId重试文案时再纳入area.updateTime；重试该子Mission，最多2次</td>
+<td>同一恢复扫描，禁止顺带重排根Mission</td>
+</tr>
+<tr>
+<td>续飞等待电池、设备或临时空域</td>
+<td>机库未就绪或准入未通过</td>
+<td>写waitReason，保持原DISPATCHING／SUCCESS；不消耗发送次数；永久阻飞则失败并关续飞</td>
+<td>其他事件／低频扫描</td>
+</tr>
+<tr>
+<td>明确下发失败后的补位</td>
+<td>本轮候选派飞后观察到FAILED</td>
+<td>一次scheduleShowroom最多32轮；继续寻找后面的可用区域</td>
+<td>同步本次调用，预算后等下一次触发</td>
+</tr>
+<tr>
+<td>IoT结果未知</td>
+<td>异常／空响应／调用后写回异常</td>
+<td>保留占用和待确认原因；不立即当失败放行，但后续本地超时策略仍可能重排</td>
+<td>设备状态对账、后续事件／恢复扫描；安全边界见2.7</td>
+</tr>
+<tr>
+<td>取消后又生成WAITING续飞腿</td>
+<td>每次showroom调度先查CANCELLED批次及其根Mission</td>
+<td>将后来出现的WAITING子腿条件改CANCEL，不处理已在飞子腿</td>
+<td>后续该showroom有调度机会才收敛</td>
+</tr>
+<tr>
+<td>取消批次残留ALREADY_RECEIVED占用</td>
+<td>区域DISPATCHING／SUCCESS；area.updateTime早于默认5分钟；Mission=7；机库isDockReady</td>
+<td>条件改Mission为CANCEL并标区域CANCELLED；这里只检查就绪，不要求派飞电池阈值</td>
+<td>每次showroom调度前</td>
+</tr>
+<tr>
+<td>活跃登记未正常删除</td>
+<td>完成监听删除失败／未收到完成事件</td>
+<td>远端TTL兜底；不是修改区域状态，也不是自动终止飞机</td>
+<td>碰撞服务过期机制，具体服务端实现未验证</td>
+</tr>
+<tr>
+<td>父批次并发写冲突</td>
+<td>UPDATE旧status匹配失败</td>
+<td>最多3次重读父状态再写；耗尽打日志</td>
+<td>后续刷新机会；不是同一轮无限自旋</td>
+</tr>
+</tbody>
+</table></div>
+
+<h3>为什么普通父任务超时前必须先处理续飞</h3><p>requeueStaleDispatching对每个已下发区域，<strong>先调用handleStaleResumeSubMission，再判断父区域的2分钟时间门槛</strong>。有子任务标记但列表为空，返回true，父回退不得继续；最新子腿未结束，优先按子状态处理。这样不会因为M0早已返航、area时间很老，就从头重发整条根航线。</p>
+<p><strong>源码摘录 · <code>ModelingQueueManager.java</code> 第950–969行（v2.5工作树）：</strong></p>
+<pre><code class="language-java">    // 有未结束续飞链时，只处理最新续飞子任务，绝不能把父区域退回 PENDING 后重发父 mission。
+    if (handleStaleResumeSubMission(showroomId, area, mission)) {
+        continue;
+    }
+    // 普通父 mission 仍以区域最近调度时间为超时基准；续飞子任务不受这个门槛限制。
+    if (area.getUpdateTime() == null || !area.getUpdateTime().before(dispatchStaleBefore)) {
+        continue;
+    }
+    Integer status = mission.getStatus();
+    // WAITING(0)：指令尚未送达飞机，超2分钟即回退重发
+    if (Objects.equals(status, MissionStatusEnum.WAITING.getType())) {
+        requeueStaleAreaToPending(showroomId, area, mission, "下发超时未送达飞机，自动回退重排");
+        continue;
+    }
+    if (Objects.equals(status, MissionStatusEnum.ALREADY_RECEIVED.getType())
+            &amp;&amp; takeoffStaleTimeoutMs &gt; 0
+            &amp;&amp; area.getUpdateTime().before(takeoffStaleBefore)) {
+        requeueTakeoffTimeoutArea(showroomId, area, mission);
+    }
+}
+</code></pre>
+<p>恢复函数找“最新”时使用原始子任务列表，没有复用生命周期里过滤TASK_CREATED的步骤。最新resumeTaskStatus=1则返回false允许继续检查根；最新是其他非WAITING／非ALREADY_RECEIVED状态时返回true但不重发；子列表缺失也只等待。这意味着<strong>完成判定和恢复选择不是同一个函数，不能把两者所有细节视为一致</strong>。</p>
+
+<h3>计时起点和“最多2次”怎么维护</h3><p>普通父任务以区域updateTime计时，不是只用Mission.createdAt，也不是第一次发送的独立时间戳。成功下发、记录UNKNOWN及某些等待更新会刷新这个字段，可能推迟下次达到超时条件。判断是严格早于阈值；恰好等于边界要等后续扫描。dispatch-stale-timeout-ms≤0会提前跳过整段恢复，连后面的起飞／续飞处理也不执行；takeoff阈值≤0则不执行对应已接收重试。</p>
+<p>父起飞次数保存在failReason的“起飞超时，重新下发当前任务（第N/2次）”里，字符串解析还原；下发成功专门保留这个计数，避免成功响应清空后无限重试。子腿计数前缀还包含subMissionId，切到新的子腿从其自身前缀重新计数；续飞发送前更新原因和时间，但不把父区域改PENDING。普通父任务在回退PENDING并写“第N/2次”时就占用一轮预算，之后即使候选因设备或空域等待而未发送，这轮计数也已存在；子腿则先通过机库与安全检查，随后写计数再直接发送，所以子腿条件等待不计次。两者在后续调用抛异常时都不会自动退还已占预算。</p>
+<p>这套文本计数不是独立重试表。改文案、截断或其他路径覆盖failReason可能影响预算；普通WAITING回退、机库恢复回退也没有共享这套次数，不能回答“全系统所有任务最多重试两次”。</p>
+
+<h3>四个时钟必须分开讲</h3><div class="table"><table>
+<thead>
+<tr>
+<th>时钟</th>
+<th>默认值与含义</th>
+<th>不能推出什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>机库状态处理</td>
+<td>fixedRate 5秒，计算ready变化</td>
+<td>不保证每5秒派飞；电量越线不一定触发事件</td>
+</tr>
+<tr>
+<td>调度补偿</td>
+<td>fixedDelay 120秒，上轮运行结束后再等</td>
+<td>不保证故障发生后精确120秒恢复，锁和接口耗时会延后</td>
+</tr>
+<tr>
+<td>本地未接收／未起飞恢复</td>
+<td>默认2分钟／5分钟，按各自更新时间判断</td>
+<td>不证明远端没收到命令，也不是Redis锁租约</td>
+</tr>
+<tr>
+<td>远端登记TTL</td>
+<td>普通登记6分钟；起飞事件续签到60分钟；队列续飞准入35分钟；另有直接IoT类型65分钟</td>
+<td>不代表每60分钟自动续签；当前监听在起飞事件调用续签，TTL到期不代表物理飞行已经结束</td>
+</tr>
+</tbody>
+</table></div>
+
+<h3>补偿覆盖不到的地方要主动说明</h3><p>定时任务先枚举未暂停READY／EXECUTING批次的showroom。若一个showroom只剩CANCELLED或PLANNING批次，它不会仅凭这些记录被这段定时任务选中；取消晚生子腿清理仍需其他事件、新批次或其他调度机会。所有父批次终态粘滞也意味着普通刷新不会自动纠正错误终态。</p>
+<p>图片齐全后的组级建模提交用另一把父Mission锁，详见1.8；撞锁跳过及远端成功、本地保存projectId失败的窗口，不由普通飞行调度扫描自动填补。模型进度查询失败可以展示UNAVAILABLE，不能因此重新派飞或重新提交建模项目。</p>
+
+<details class="question" id="q-scheduling-241"><summary><span class="qnum">241</span><span class="question-title">面试官问：有事件加定时补偿，为什么还不能承诺绝不漏执行</span></summary><div class="answer"><blockquote>
+<p class="memory-cue"><strong>记忆关键词：扫描入口有范围 · 每个故障有条件 · 终态粘滞 · 外部事实。</strong></p>
+<p>定时补偿给满足范围的持久任务再检查一次，解决很多漏触发，但它不恢复全部阶段。PLANNING、仅取消批次的样板间、人工暂停、错误终态及图片提交窗口各有边界。设备消息缺失、远端结果未知也不能只靠本地时间推断。应讲清每项兜底依赖什么状态、由哪个入口再触发，而不是一句“定时扫一下就好了”。</p>
+</blockquote>
+<a class="back-link" href="#q-scheduling-241">↑ 回到本题</a></div></details>
+</section>
+<section class="chapter" id="sec-scheduling-22-ch-2"><h2>1.22 暂停、继续和取消怎样插入调度：逐行理解控制语义</h2>
+<p>SELF的三种控制都使用<code>modeling:airspace:dispatch:{showroomId}</code>，与普通派飞最终锁相同。正常持锁期间，取消不能插入最终复检和IoT发送之间；代价是慢接口会延迟控制请求。这不等于撤销已被设备受理的命令，也不涵盖所有独立自动续飞线程的副作用。</p>
+
+<h3>暂停：先停止准入，再关下一腿</h3><p>doPauseTask只接受READY／EXECUTING批次，条件把paused从0设1；查询各区域根Mission，首次暂停把原resumeFlightEnabled存进pausedResumeEnabled（原值null按1）；重复暂停不覆盖已有快照；再把根开关关为0。当前飞行不主动中止。paused是独立标志，不是新增一个PAUSED批次状态，也不会强行把task.status退回READY。</p>
+
+<h3>继续：快照是恢复清单，不代表必须恢复到原开关值</h3><p>doResumeTask只在paused=1时推进。有暂停快照的根Mission一律直接写resumeFlightEnabled=1；<strong>原快照为0也会开为1</strong>，因为“继续批次”按自动推进处理。它不调用可能立即执行最新子腿的resumeFlightEnabled(...,1)，避免与专门重触发入口叠加发送。</p>
+<p>随后逐区域找最新WAITING子腿，检查设备电池和统一准入；用<code>id + status=WAITING</code>更新子Mission.updatedAt后调用commonExecMission。该条件更新没有把WAITING改成另一种领取状态，所以它是观测条件校验，不是跨所有调用者的独占领取令牌。</p>
+<p><strong>源码摘录 · <code>ModelingQueueManager.java</code> 第355–368行（v2.5工作树）：</strong></p>
+<pre><code class="language-java">// paused 仍为 1 时逐条恢复续飞；成功一条清一条快照。中途失败可重复调用继续补偿，
+// 已成功任务因快照已清除不会再次触发，未成功任务仍保留原快照。
+for (ModelingTaskAreaEntity area : resumeCandidates) {
+    retriggerWaitingResumeSubMission(area);
+    clearPausedResumeSnapshot(area.getId());
+}
+// 所有 mission 和待发续飞任务均恢复成功后，才允许普通区域重新进入调度。
+int resumed = modelingTaskDao.update(null, new LambdaUpdateWrapper&lt;ModelingTaskEntity&gt;()
+        .eq(ModelingTaskEntity::getTaskId, taskId)
+        .eq(ModelingTaskEntity::getPaused, 1)
+        .in(ModelingTaskEntity::getStatus, ModelingTaskStatusEnum.queueEligibleCodes())
+        .set(ModelingTaskEntity::getPaused, 0)
+        .set(ModelingTaskEntity::getUpdateTime, new Date()));
+Assert.isTrue(resumed &gt; 0, "解除建模批次暂停状态失败，taskId=" + taskId);
+</code></pre>
+<p>关键细节：retriggerWaitingResumeSubMission在无子腿、最新非WAITING、机库／电池未就绪或临时空域等待时可以正常return；调用者随后<strong>仍清该区域暂停快照</strong>，最后把paused改0。因此“快照已清、批次已继续”表示本轮恢复步骤未抛异常，不证明每条子腿都已经发送成功。未就绪子腿依靠后续恢复扫描再次推进；永久阻飞则会标区域失败并关链。</p>
+<p>若某条抛异常，之后的快照和最终解除暂停没有执行；已清部分跳过，未清部分可再次调用继续。但远端已受理、清快照前抛异常的窗口仍可能重复尝试，不能把逐条清快照说成跨系统严格一次。</p>
+
+<h3>取消：批次马上终态，飞机可能还在飞</h3><div class="table"><table>
+<thead>
+<tr>
+<th>被取消时的区域事实</th>
+<th>当前实现动作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>区域已失败／取消／整链完成</td>
+<td>保持，不重新覆盖结果</td>
+</tr>
+<tr>
+<td>区域PENDING</td>
+<td>有父Mission则尽力写CANCEL；区域dispatch=CANCELLED</td>
+</tr>
+<tr>
+<td>区域DISPATCHING／SUCCESS，父Mission仍WAITING</td>
+<td>尽力改父CANCEL并标区域CANCELLED</td>
+</tr>
+<tr>
+<td>父Mission已ALREADY_RECEIVED或在飞</td>
+<td>不在这次操作中强制改成未飞；等待当前飞行结束</td>
+</tr>
+<tr>
+<td>所有相关根Mission</td>
+<td>关闭自动续飞，条件取消仍WAITING子腿</td>
+</tr>
+<tr>
+<td>父批次</td>
+<td>清paused，显式markCancelled；晚到聚合不会把它改回其他终态</td>
+</tr>
+</tbody>
+</table></div>
+<p>cancelPreTakeoffMission是数据库更新，源码注释明确“仅改库状态，是否真阻止起飞取决于设备”。它在调用者读状态后按id更新，父Mission更新本身未再带旧status；普通取消不等于设备确认撤销，也没有在这一步统一删除全部活跃登记。</p>
+<p>同库占用查询纳入CANCELLED批次的DISPATCHING／SUCCESS未结束链，避免只因父批次取消就立刻把该库给下一条。晚生WAITING子腿由调度入口补取消，陈旧ALREADY_RECEIVED还需超时加机库就绪才释放。生命周期对根CANCEL直接true的规则及其他外部发送入口仍是需要核对的边界，不能承诺取消后所有物理占用都被完美追踪。</p>
+
+<details class="question" id="q-scheduling-242"><summary><span class="qnum">242</span><span class="question-title">面试官问：暂停和取消都关续飞，区别在哪里</span></summary><div class="answer"><blockquote>
+<p class="memory-cue"><strong>记忆关键词：可恢复意图 · 独立paused · 取消终态 · 保留在飞事实。</strong></p>
+<p>暂停保留批次可执行状态和恢复快照，用paused挡普通区域、关根开关挡后续自动腿；继续可以重新开放。取消则把未执行区域及待发子腿取消，并把父批次写入不可回退的CANCELLED，后续不通过继续入口恢复。两者都不靠改数据库去强制停止已在飞设备，取消后的残余占用还要单独收敛。</p>
+</blockquote>
+<a class="back-link" href="#q-scheduling-242">↑ 回到本题</a></div></details>
+</section>
+<section class="chapter" id="sec-scheduling-23-ch-2"><h2>1.23 面试现场推演与源码索引：从一条日志讲完整闭环</h2>
+
+<h3>推演：一个批次三块区域，中间经历续飞、失败和丢事件</h3><p>下面是教学输入，不是生产运行记录。T含A→D1、B→D2、C→D1。三条航线规划成功，B在准备Mission时静态安全检查永久失败；A、C准备成功。规划都结束后才准备Mission。假设A／C暂不冲突且机库达到85%电量。</p>
+<div class="table"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>发生什么</th>
+<th>区域／Mission变化</th>
+<th>父批次与下一步</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 创建</td>
+<td>短事务保存T及A／B／C，事务提交</td>
+<td>T=PLANNING；区域阶段PENDING</td>
+<td>异步规划从已提交记录开始</td>
+</tr>
+<tr>
+<td>2 收口</td>
+<td>B准备Mission失败；A／C已可派飞</td>
+<td>B.missionStatus=FAILED；A／C missionStatus=SUCCESS、dispatch=PENDING</td>
+<td>全部航线已收口，无下发活动，目标READY；有失败原因但未全部终结</td>
+</tr>
+<tr>
+<td>3 首轮</td>
+<td>A最终领取、准入、IoT成功；C最终复检被同库A挡住</td>
+<td>A.dispatch=SUCCESS、A的M0=WAITING；C保持PENDING</td>
+<td>EXECUTING，由A.dispatch=SUCCESS触发；B的Mission创建失败参与失败计数</td>
+</tr>
+<tr>
+<td>4 飞行中断</td>
+<td>A的M0返航，生成S1</td>
+<td>M0.hasSubMission=1；S1=WAITING、resumeTaskStatus=0</td>
+<td>A整链未完，C不能因M0返航而接管D1</td>
+</tr>
+<tr>
+<td>5 续飞异常</td>
+<td>S1迟迟WAITING，根区域更新时间即使很老也先走子腿超时</td>
+<td>以S1更新时间检查2分钟；电池不足只写等待、不计次</td>
+<td>不把A回PENDING重发M0；等设备或补偿</td>
+</tr>
+<tr>
+<td>6 子腿补偿</td>
+<td>条件满足后，统一准入通过，记录S1第1/2次再发</td>
+<td>发送S1，父区域仍DISPATCHING／SUCCESS</td>
+<td>等S1状态与整链完成事实</td>
+</tr>
+<tr>
+<td>7 完成乱序</td>
+<td>finishStatus=1先到，但S1.status仍RUNNING</td>
+<td>根overallStatus=1；S1.resumeTaskStatus=1，仍是活跃腿</td>
+<td>生命周期仍false，不因整体标记提前交库</td>
+</tr>
+<tr>
+<td>8 状态补齐，完成事件丢失</td>
+<td>S1已返航，无活跃子腿，最新腿结束</td>
+<td>生命周期现在true，但没人刚好立即触发聚合</td>
+<td>下次有范围内READY／EXECUTING批次的扫描可刷新T并尝试C；旧登记还要完成清理或TTL</td>
+</tr>
+<tr>
+<td>9 C派飞并完成</td>
+<td>C按最新设备、空域再准入，不直接沿用A结论</td>
+<td>A、C完成，B失败，terminal=3/3</td>
+<td>T=PARTIAL_FAILED；图片齐全与模型生成继续走另外的组级链路</td>
+</tr>
+</tbody>
+</table></div>
+<p>步骤8不能承诺“120秒内一定发出C”：fixedDelay从上次执行结束计时，持锁／接口时延、机库电池、活跃登记残留都会延迟。扫描只能提供再次检查机会。</p>
+
+<details class="question" id="q-scheduling-243"><summary><span class="qnum">243</span><span class="question-title">面试官问：如何判断是“没触发”还是“触发了但不能派”</span></summary><div class="answer"><blockquote>
+<p>先用taskId／showroomId找source与scheduleRound，确认PLAN_READY、MISSION_FINISHED、DOCK_READY、RESUME或RECONCILE是否出现；再看候选数、筛选数、最终复检、CAS影响行数、安全准入和IoT结果。PENDING不是“没调度”的证据，waitReason可能明确写着同库、电池或活跃冲突；DISPATCHING加待确认原因是未知结果，要查设备受理，不直接改状态释放。</p>
+</blockquote>
+<a class="back-link" href="#q-scheduling-243">↑ 回到本题</a></div></details>
+<details class="question" id="q-scheduling-244"><summary><span class="qnum">244</span><span class="question-title">面试官问：区域SUCCESS了但批次一直不完成，排查顺序是什么</span></summary><div class="answer"><blockquote>
+<p>先确认是dispatchStatus=SUCCESS还是飞行完成：依次查根Mission.status、hasSubMission、子腿列表是否缺失、剔除归档后有没有活跃腿、最新可执行腿的resumeTaskStatus；再看其他区域是否仍未终结，以及refreshTaskStatus是否发生、updateForward有无条件更新冲突或终态保护。最后区分task完成和模型进度，不用projectId进度反推飞行状态。</p>
+</blockquote>
+<a class="back-link" href="#q-scheduling-244">↑ 回到本题</a></div></details>
+<details class="question" id="q-scheduling-245"><summary><span class="qnum">245</span><span class="question-title">面试官问：为什么飞完了，后面的区域仍然排队</span></summary><div class="answer"><blockquote>
+<p>本腿结束不一定整链结束；整链结束也不一定设备已就绪或电量达标；设备就绪后还要与其他机库当前活跃航迹重新准入。完成清理失败会留登记等TTL，完成字段晚到要等下一次刷新，电量越线未必有ready事件。这些分别是续飞链等待、设备等待、空域等待和触发延迟，不能统一归因于调度算法。</p>
+</blockquote>
+<a class="back-link" href="#q-scheduling-245">↑ 回到本题</a></div></details>
+<details class="question" id="q-scheduling-246"><summary><span class="qnum">246</span><span class="question-title">面试官问：最值得补强哪几处，不要只回答“加重试”</span></summary><div class="answer"><blockquote>
+<p class="memory-cue"><strong>记忆关键词：尝试代际 · 资源归属 · 执行端幂等 · 恢复覆盖 · 显式计数。</strong></p>
+<p>第一，UNKNOWN回退要结合设备查询或可靠撤销，补attempt／epoch和执行端fencing／commandId，防旧执行者与重发重叠。第二，把不同续飞发送入口的准入、锁、结果处理统一到可验证的契约。第三，将重试次数和发送时间从failReason／通用updateTime中独立出来。第四，对PLANNING卡住、仅取消批次的样板间和图片提交窗口分别设计恢复入口。它们是改进方向，当前文档不能把它们写成已实现。</p>
+</blockquote>
+<a class="back-link" href="#q-scheduling-246">↑ 回到本题</a></div></details>
+<h3>证据索引：只为核对，不要求复习时跳回代码</h3><p>以下路径相对<code>D:\Project\hushi-services-platform-fix_auto_modeling_v2.5</code>；行号为2026-10-16工作树。本节的源码片段由这些实际文件截取，省略处使用独立片段而不伪装成完整方法。<code>web</code>表示<code>hushi-web/src/main/java/com/ikingtec/hushi/web/</code>，<code>service</code>表示<code>hushi-shared/hushi-shared-service/src/main/java/com/ikingtec/hushi/service/</code>。</p>
+<div class="table"><table>
+<thead>
+<tr>
+<th>文件／入口</th>
+<th>当前行号</th>
+<th>对照内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>web/service/modeling/impl/ModelingTaskServiceImpl.java</code></td>
+<td>120</td>
+<td>创建事务、异步启动及首轮规划</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingTaskServiceImpl.java</code></td>
+<td>383</td>
+<td>规划收口、逐条准备Mission</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingQueueManager.java</code></td>
+<td>93</td>
+<td>五入口：首轮准备</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingQueueManager.java</code></td>
+<td>110</td>
+<td>扫描范围与fixedDelay</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingQueueManager.java</code></td>
+<td>131</td>
+<td>完成事件关联根区域</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingQueueManager.java</code></td>
+<td>155</td>
+<td>机库事件查showroom</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingQueueManager.java</code></td>
+<td>607</td>
+<td>两段锁、32轮失败补位</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingQueueManager.java</code></td>
+<td>740</td>
+<td>候选条件与排序</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingQueueManager.java</code></td>
+<td>1224</td>
+<td>最终复检、CAS、准入及IoT分类</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingTaskStatusService.java</code></td>
+<td>48</td>
+<td>父批次三个计数和目标状态</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingTaskStatusService.java</code></td>
+<td>129</td>
+<td>单向推进、终态保持、3次重试</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingMissionLifecycleService.java</code></td>
+<td>91</td>
+<td>根与最新可执行子腿的结束判定</td>
+</tr>
+<tr>
+<td><code>web/handler/MissionResumeFlyHandler.java</code></td>
+<td>27</td>
+<td>finishStatus分流</td>
+</tr>
+<tr>
+<td><code>service/service/impl/mission/MissionResumeFlyServiceImpl.java</code></td>
+<td>331</td>
+<td>根overallStatus更新</td>
+</tr>
+<tr>
+<td><code>service/service/impl/mission/MissionServiceImpl.java</code></td>
+<td>1209</td>
+<td>当前腿resumeTaskStatus更新</td>
+</tr>
+<tr>
+<td><code>service/service/impl/mission/MissionResumeFlyServiceImpl.java</code></td>
+<td>582</td>
+<td>自动续飞独立轮询执行入口</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingQueueManager.java</code></td>
+<td>927</td>
+<td>先子后父的超时恢复</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingQueueManager.java</code></td>
+<td>1029</td>
+<td>子腿重试计数与失败收口</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingQueueManager.java</code></td>
+<td>327</td>
+<td>等待返回、清快照与解除paused</td>
+</tr>
+<tr>
+<td><code>web/handler/DockStatusEventHandler.java</code></td>
+<td>176</td>
+<td>ready跃迁发事件，非电量越线事件</td>
+</tr>
+<tr>
+<td><code>web/service/modeling/impl/ModelingDockAvailabilityServiceImpl.java</code></td>
+<td>46</td>
+<td>设备加电池双门槛</td>
+</tr>
+<tr>
+<td><code>service/service/impl/collision/MissionRouteSafetyServiceImpl.java</code></td>
+<td>100</td>
+<td>放行例外与登记查证</td>
+</tr>
+<tr>
+<td><code>service/service/impl/collision/ActiveRouteProcessService.java</code></td>
+<td>30</td>
+<td>最高优先级清理；起飞续签</td>
+</tr>
+<tr>
+<td><code>service/enums/ActiveRouteTtlType.java</code></td>
+<td>18</td>
+<td>登记TTL各类型及分钟数</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>复述路线：</strong> 请求短事务 → 规划／Mission收口 → 五入口扫样板间 → 两段锁与最终领取 → 准入／IoT结果分类 → 按父子链判断区域完成 → 聚合父批次 → 有条件补偿。先说正常链，再选一个WAITING、续飞或UNKNOWN分支展开，最后主动说明源码保证的边界。</p>
+
 </section><section class="chapter" id="sec-9-ch-2"><h2>第 1 周速记</h2><pre><code class="language-text">先报版本：v2.5工作树已接入碰撞中心；旧提交/v3 SELF仍有JTS
 创建：createOrUpdateModelingMission→静态检查，taskDispatch=false，不登记
 下发：最终复检→区域CAS→checkAndRegisterBeforeDispatch→查证登记→IoT
@@ -1665,6 +2737,7 @@ return checkResult;
 统一碰撞登记不等于命令幂等或fencing，GC/ABA边界仍要理解
 历史JTS：米制折线距离、冲突矩阵、分组搜索；版本对照而非当前主线
 下游：父子图片组→组锁→就绪/去重→远端项目→状态→projectId
+待优化：P0锁内IO超时/重试计数字段化/碰撞降级告警/routeCode约束；P1时长加权与电池建模；见1.16
 </code></pre>
 </section><section class="chapter" id="ch-3"><h2>第 2 周：并发控制、任务预占与分布式一致性</h2><p>这一周是重点。每个结论都回答五件事：<strong>谁并发、共享什么、在哪裁决、故障后谁还能继续、最终副作用由谁防重</strong> 。</p>
 </section><section class="chapter" id="sec-1-ch-3"><h2>2.1 任务从哪里来：没有第二个用户请求也会竞争</h2><p><strong>代码事实：</strong> 控制器创建并持久化任务；规划通过 <code>CompletableFuture</code> 执行；规划收口调用 <code>onTaskPrepared(taskId)</code>。taskId 是数据库批次身份，不是分配给某个节点的队列消息。</p>
@@ -2096,7 +3169,7 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
     DISPATCHING --&gt; CANCELLED : 下发前取消
     SUCCESS --&gt; [*]
     FAILED --&gt; [*]
-    CANCELLED --&gt; [*]</pre></details></figure><p>其中下发 SUCCESS 只表示设备下发链路成功，不表示飞行完成。真实飞行进度仍以 <code>Mission.status</code> 及续飞子 Mission 为准。</p>
+    CANCELLED --&gt; [*]</pre></details></figure><p>其中下发 SUCCESS 是本地下发成功投影，可来自IoT明确成功，或依据Mission状态修复；修复路径没有再次发送命令。它不表示飞行完成。真实飞行进度仍以 <code>Mission.status</code> 及续飞子 Mission 为准。</p>
 
 <details class="question" id="q-42"><summary><span class="qnum">072</span><span class="question-title">面试官问：为什么不能只使用一个任务状态</span></summary><div class="answer"><blockquote>
 <p class="memory-cue"><strong>记忆关键词：</strong> 批次 · 规划 · Mission · 下发 · 飞行；分层事实再聚合</p>
@@ -2192,12 +3265,12 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
 <p class="memory-cue"><strong>记忆关键词：</strong> 父子链 · 资源仍占用 · 只恢复最新子任务 · 不重发父任务</p>
 </blockquote>
 <blockquote>
-<p>必须区分父 Mission 和续飞子 Mission。存在未结束续飞链时，父区域仍然占用机库和空域；恢复时只能重试最新待执行的子 Mission，不能把父 Mission 退回 PENDING 再从头下发。</p>
+<p>必须区分父 Mission 和续飞子 Mission。存在未结束续飞链时，本地同库调度仍保留整链阻塞；远端空域按当前执行腿的登记、清理和TTL管理。恢复时只能重试最新待执行的子 Mission，不能把父 Mission 退回 PENDING 再从头下发。</p>
 </blockquote>
 <a class="back-link" href="#q-49">↑ 回到本题</a></div></details>
 
 <details class="question" id="q-167"><summary><span class="qnum">080</span><span class="question-title">面试官问：为什么机库、电池或航迹冲突等待不应消耗续飞重试次数</span></summary><div class="answer"><blockquote>
-<p>外部条件等待与真正再次尝试发送是两种动作。当前v2.5的续飞也调用统一碰撞准入；旧提交/v3 SELF使用本地航迹判断；等待不烧起飞重试预算，符合条件后仍有有限发送重试。重试预算不能提供幂等保证。</p>
+<p>外部条件等待与真正再次尝试发送是两种动作。当前v2.5的队列补偿及继续子腿路径调用统一碰撞准入；新生自动续飞另走入口，见1.20。这里的资源等待不消耗子腿恢复发送预算；普通父任务的ALREADY_RECEIVED起飞超时回退在写PENDING时已计次，见1.21，符合条件后仍有有限发送重试。重试预算不能提供幂等保证。</p>
 </blockquote>
 <p><strong>八股扩展：</strong> 父子任务聚合、资源占用生命周期与当前执行腿身份。只重试最新子Mission需要正确的排序和归属；父任务返航不是整条链完成。v3 EXTERNAL关闭本地续飞，不能套这段SELF解释。</p>
 <a class="back-link" href="#q-167">↑ 回到本题</a></div></details>
@@ -2222,14 +3295,14 @@ UNKNOWN：先查证/可靠撤销，再放资源；时间到了不是未执行证
 <ol>
 <li>恢复父 Mission 的自动续飞能力。</li>
 <li>对仍为 WAITING 的最新续飞子任务重新触发。</li>
-<li>每成功恢复一个区域，就清理对应暂停快照。</li>
-<li>所有续飞链处理成功后，最后把批次 paused 从 1 更新为 0。</li>
+<li>每个区域的恢复调用未抛异常返回后，就清理对应暂停快照；正常等待返回也包含在内。</li>
+<li>所有恢复调用未抛异常后，最后把批次 paused 从 1 更新为 0；设备／空域等待可以正常返回，不代表每条子腿已经发出。详见1.22。</li>
 <li>重新触发样板间调度，推进普通 PENDING 区域。</li>
 </ol>
-<p>逐条清理快照的设计使继续操作可以重试：已经恢复成功的不会再次触发，失败的仍保留快照作为补偿依据。</p>
+<p>逐条清理快照使异常中断后的继续操作可以重入：已清部分跳过，未清部分可补偿。但资源等待正常返回也会清快照，远端已受理、清快照前异常也可能再次尝试；后续恢复与副作用防重不能仅靠快照保证，详见1.22。</p>
 
 <details class="question" id="q-52"><summary><span class="qnum">082</span><span class="question-title">面试官问：继续执行到一半失败怎么办</span></summary><div class="answer"><blockquote>
-<p>继续操作不是一次性把所有快照清空。每个续飞链恢复成功后才清理自己的快照，失败区域仍保留原快照；批次 paused 也要等所有恢复成功后才解除。因此再次调用继续时，可以跳过已完成部分，补偿未完成部分。</p>
+<p>继续操作逐区域调用恢复并清快照；某条抛异常时，未清快照和最终解除paused步骤会保留供再次处理。正常等待返回也会清快照，所以已清不等于设备已受理。远端成功而本地清理前异常仍有重试窗口；具体顺序和边界见1.22。</p>
 </blockquote>
 <p><strong>八股扩展：</strong> 部分成功可重入、逐项持久化与补偿。外部恢复成功、快照清理前宕机仍可能再次恢复；每项效果仍须依赖执行身份，不能从逐项清理推出严格一次。</p>
 <a class="back-link" href="#q-52">↑ 回到本题</a></div></details>
