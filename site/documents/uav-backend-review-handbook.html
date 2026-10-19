@@ -1932,6 +1932,26 @@ if (!hasExplicitFailure) {
 </tbody>
 </table></div>
 <p>普通Mission只允许WAITING下发；ALREADY_RECEIVED只有带起飞超时重试标记的区域才是例外。预筛和最终复检都用这个规则。当前“非可下发→修复SUCCESS”条件较宽，并非只匹配RUNNING；面试时应说代码实际判断，再说明依赖上游状态合法性。</p>
+<p>如果追问ABA：DISPATCHING回到PENDING后，旧执行者只看状态仍可能再次通过检查。业务允许回退不证明上一次下发已消失；最终复检也不是隔离旧执行者的令牌。应区分当前恢复策略与严格保证，核对设备侧任务身份、结果查询及必要的代际/fencing设计，不能把这个窗口概括为“无害”。</p><a class="back-link" href="#q-35">↑ 回到本题</a></div></details><details class="question" id="q-247"><summary><span class="qnum">247</span><span class="question-title">面试官问：既然有数据库条件更新，把调度锁去掉会怎样</span></summary><div class="answer"><p>条件更新只能保住"同一条任务不重复下发"这个单行不变量，保不住跨行不变量。具体时序：线程 A 和线程 B 同时进入调度，都读到机库 3 空闲；A 挑了候选 1，B 挑了候选 2——是两条不同的任务行。A 的条件更新影响 1 行，B 的条件更新也影响 1 行，两个都成功、都"拥有下发资格"，机库 3 双发。条件更新全程没有任何一步报错，因为它裁决的每次单行流转都是合法的；而"一机库同时只跑一个任务"张在多行上，没有哪一行的 WHERE 能表达这种约束。最终复检也救不了：复检之所以可靠，恰恰因为它跑在锁内、读到的是别人提交后的状态；没有锁，两个复检并发读，谁也看不见对方未提交的决策。锁管多行决策一致性，条件更新管单行流转裁决，两层是互补而不是冗余。</p><a class="back-link" href="#q-138">↑ 回到本题</a></div></details>
+<details class="question" id="q-248"><summary><span class="qnum">248</span><span class="question-title">面试官问：Redis 宕机了，调度怎么办</span></summary><div class="answer"><p>加锁调用直接抛连接异常，本轮调度失败退出——失败发生在链路最前面，任务停留在数据库 PENDING，没有任何数据被污染；在飞任务不受影响，状态机推进靠数据库持久化状态，不依赖 Redis。安全性来自三层：一是 fail-close 纪律，加锁失败就不调度，绕过锁继续跑的代价是破坏"一机库一任务"的跨行不变量；二是数据库条件更新这道最后防线不建在 Redis 上，即使主从切换丢锁、GC 超租约，仍由影响行数裁决下发资格；三是两分钟定时补偿扫描的是数据库状态、与 Redis 无关，Redis 恢复前每轮补偿在加锁处失败跳过，恢复后下一轮自动补位，无需人工干预。结论：故障后果被钳制在"暂时不能下发"，永远到不了"错误下发"。</p><a class="back-link" href="#q-139">↑ 回到本题</a></div></details>
+<details class="question" id="q-249"><summary><span class="qnum">249</span><span class="question-title">面试官问：可以用机库占用唯一约束表作为 Redis 不可用时的兜底吗</span></summary><div class="answer"><p>可以作为降级路径，但要分清保住什么、保不住什么。做法：给机库占用建一张表，活跃占用行上 dock_id 唯一；调度把任务的条件更新和占用行的 INSERT 放在同一个本地事务里，DuplicateKey 时事务回滚、任务留在 PENDING，本轮安全退出。它保住的是正确性——同机库双发被数据库约束物理拦截，这和位置资产用唯一索引兜底 check-then-act 是同一个原则。保不住的是决策质量：全局优先级退化成"谁先插入算谁"，负载均衡基于过期快照，冲突候选要换目标重试。占用行的生命周期还要接进既有恢复体系：Mission 完成、取消、超时删除占用行，孤儿占用由定时补偿清理——正好复用"结果未知保留 DISPATCHING + 事件 + 补偿"的既有语义。代价是多一条常态维护的代码路径；按当前业务（批次巡检、Redis 恢复后一轮补偿自动补位），fail-close 已把故障钳制在延迟层面，这张表属于值得评估的演进项，不是必须补的漏洞。</p><a class="back-link" href="#q-140">↑ 回到本题</a></div></details>
+</section>
+<section class="chapter" id="sec-3-ch-3"><h2>2.3 为什么筛选候选时不立即写 DISPATCHING</h2>
+<p>候选筛选与真正调用 IoT 之间还有一段时间。如果筛选完成后立即把所有候选写成 DISPATCHING，随后服务异常退出，就会留下“从未真正下发，但长期占用机库”的孤儿状态。</p>
+
+<p>因此当前实现分为两步：</p>
+
+<ol><li>在锁内筛出基础条件满足的候选，但暂时不修改为 DISPATCHING。</li></ol>
+<ol><li>对每条候选正式下发前重新读取最新状态，完成最终复检，再原子切换为 DISPATCHING，并立即执行碰撞登记和 IoT 下发。</li></ol>
+
+<p>最终复检包括：</p>
+
+<ul><li>批次仍允许调度，没有暂停或取消。</li></ul>
+<ul><li>同机库不存在未结束任务链。</li></ul>
+<ul><li>Mission 存在且仍允许下发。</li></ul>
+<ul><li>机库此刻仍处于可调度待命状态，且存在达到阈值的电池。</li></ul>
+<ul><li>航线碰撞检测通过，活跃航线登记可确认。</li></ul>
+
 
 <h3>准入的两个提前返回与四种IoT结局</h3><p>安全方法先验证Mission，再查disableSafetyDetection样板间配置。命中关闭检测配置可以直接成功；否则检查sourceEnv、航线、飞机SN和openRouteDetect。按三元组查询：查询失败／空值挡住；已有登记直接成功；没有才检测并登记，随后再次查询确认。因此不是每次都完整重检，也不是检测网关降级成功就必然派飞。</p>
 <div class="table"><table>
@@ -4821,6 +4841,13 @@ AI 已经能写代码，所以技术不重要
 </table></div>
 <p><strong>P1 深入追问：</strong> 细化锁、短事务资源领取、UNKNOWN恢复、候选搜索成本、数据库执行计划、SSE断线、AI数据切片。** P2 继续扩展：** 可靠事件Outbox、集群准入、跨业务空域、工作流部署版本；未实现时按方案解释。</p>
 <p>原理专栏可按类补充：<a href="resume-tech-java-principles.html">Java</a>、<a href="resume-tech-spring-principles.html">Spring</a>、<a href="resume-tech-data-principles.html">数据库</a>、<a href="resume-tech-redis-principles.html">Redis与一致性</a>、<a href="resume-tech-messaging-principles.html">消息与事件</a>、<a href="foundations-os-network-column.html">基础OS与网络</a>。这些是扩展阅读，手册中的核心问题已有可直接复述的答案。</p>
+<details class="question" id="q-250"><summary><span class="qnum">250</span><span class="question-title">反问：这个岗位未来半年最重要的目标是什么——扩新业务场景，还是把现有链路的稳定性做深？</span></summary><div class="answer"><p>把个人贡献和团队目标对齐；从回答能判断岗位是增长型还是维护型，直接影响入职后做的事情有没有成长空间。如果对方答得含糊，本身就是信号。</p><a class="back-link" href="#q-122">↑ 回到本题</a></div></details>
+<details class="question" id="q-251"><summary><span class="qnum">251</span><span class="question-title">反问：这套系统目前的复杂度主要在哪一端——调度与规划算法、设备接入，还是现场环境的不确定性？</span></summary><div class="answer"><p>展示你理解这类系统的难点分布；答案直接决定入职后打交道最多的代码在哪一层，也是判断面试官水平的窗口。</p><a class="back-link" href="#q-123">↑ 回到本题</a></div></details>
+<details class="question" id="q-252"><summary><span class="qnum">252</span><span class="question-title">反问：AI 识别的误报治理，目前是人审为主还是已经走自动化闭环？下一步的重点是什么？</span></summary><div class="answer"><p>呼应本项目"识别结果治理 + 告警闭环"的经验，面试官会知道你做过同类的事；同时摸清 AI 在对方业务里是核心资产还是演示功能。</p><a class="back-link" href="#q-124">↑ 回到本题</a></div></details>
+<h4 class="sub-h">技术与架构</h4>
+<details class="question" id="q-253"><summary><span class="qnum">253</span><span class="question-title">反问：核心链路（如下发—飞行—回传）的一致性保障，事件驱动和定时补偿目前是怎么分工的？</span></summary><div class="answer"><p>用自己踩过坑的语言体系提问，对方会立刻意识到你做过分布式系统；从回答能听出这套系统是被事故教育过的，还是纸面设计。</p><a class="back-link" href="#q-125">↑ 回到本题</a></div></details>
+<details class="question" id="q-254"><summary><span class="qnum">254</span><span class="question-title">反问：现在最想重做的模块或技术债最重的地方是哪里？</span></summary><div class="answer"><p>判断团队有没有清醒的技术判断力；入职后你很可能就被派去还这笔债，先知道是什么债。问"重做什么"比问"有什么问题"更积极。</p><a class="back-link" href="#q-126">↑ 回到本题</a></div></details>
+<details class="question" id="q-255"><summary><span class="qnum">255</span><span class="question-title">反问：目前的发布节奏和回滚预案是怎样的——固定周期发布还是按需发布？</span></summary><div class="answer"><p>判断工程成熟度：有回滚预案和灰度意识的团队，晚上睡得着觉；从回答也能估算入职后的值班压力。</p><a class="back-link" href="#q-127">↑ 回到本题</a></div></details>
 </section><section class="chapter" id="sec-18-ch-8"><h2>6.19 反问面试官：常见问题与问法</h2><blockquote>
 <p>反问环节不是礼节性收尾：面试官用它判断你对岗位的认真程度，你用它完成双向筛选。准备三到五个问题按轮次选用——技术面问业务与架构，主管面问团队与决策，HR 面问流程与匹配。三个原则：问&quot;做过这份工作的人才会想到的问题&quot;；不问官网和招聘页能查到的信息；薪资话题留给 HR 面或 Offer 阶段。</p>
 </blockquote>
