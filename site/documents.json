@@ -1,5 +1,11 @@
 [
   {
+    "title": "Spring 一条线打通：BeanPostProcessor · AOP · 动态代理",
+    "description": "从 BeanPostProcessor 扩展点出发，一条线打通 @Autowired 注入、AOP 代理创建、JDK/CGLIB 动态代理与运行期拦截器链的完整链路，附十张面试口述卡片。",
+    "date": "2026-10-20",
+    "url": "documents/spring-aop-internals.html"
+  },
+  {
     "title": "无人机巡检平台后端 · 六周直读复习手册",
     "description": "自动建模调度面试精读：结合源码详解五类触发、逐条派飞、父批次聚合、续飞父子状态、超时补偿与暂停继续取消，并用完整案例解释实现边界。",
     "date": "2026-10-16",

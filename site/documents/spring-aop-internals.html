@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="从 BeanPostProcessor 扩展点出发，一条线打通 @Autowired 注入、AOP 代理创建、JDK/CGLIB 动态代理与运行期拦截器链的完整链路，附十张面试口述卡片。">
+  <meta name="date" content="2026-10-20">
+  <title>Spring 一条线打通：BeanPostProcessor · AOP · 动态代理</title>
+  <style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .decision{fill:var(--amber2);stroke:var(--amber);stroke-width:1.6}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    .active{fill:var(--blue2);stroke:var(--blue);stroke-width:1.2}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    pre{margin:0;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);
+      overflow:auto;font:13px/1.65 Consolas,monospace;color:var(--ink)}
+    pre code{padding:0;border:0;background:none;color:inherit;font:inherit}
+    .qa h3{margin:0 0 8px;font-size:16px}.qa p{margin:0;font-size:14.5px}
+    .qa .tag{color:var(--muted);font-size:12px}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell">
+      <div class="kicker">SPRING INTERNALS · ONE THREAD THROUGH</div>
+      <h1>Spring 一条线打通：BeanPostProcessor · AOP · 动态代理</h1>
+      <p class="lead">从一个容器扩展点出发，把 @Autowired 注入、AOP 代理创建、JDK/CGLIB 选型、运行期拦截器链串成一条完整因果链——理解优先，源码佐证，面试口述卡片收尾。</p>
+      <div class="doc-meta">
+        <time datetime="2026-10-20">2026年10月20日</time>
+        <span>Spring / Java 后端</span>
+      </div>
+      <div class="actions">
+        <a class="btn" href="../index.html">返回首页</a>
+        <a class="btn" href="#stack">开始阅读</a>
+        <button class="btn" id="theme" type="button">切换主题</button>
+        <button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>3 层堆叠</b><span>思想 → 手段 → 挂载点</span></div>
+        <div class="stat"><b>2 级过滤</b><span>Bean 级（谁被代理）/ 方法级（哪次调用）</span></div>
+        <div class="stat"><b>4 个钩子位</b><span>元数据 · 注入 · 构造 · AOP</span></div>
+        <div class="stat"><b>10 张口述卡</b><span>每张 30~60 秒面试答案</span></div>
+      </div>
+    </div>
+  </header>
+  <nav>
+    <div class="shell">
+      <a href="#stack">三层堆叠</a><a href="#bpp">BPP 地基</a><a href="#inject">注入原理</a><a href="#concepts">AOP 概念</a><a href="#creation">代理诞生</a><a href="#kinds">JDK vs CGLIB</a><a href="#objects">两个对象</a><a href="#invoke">调用旅程</a><a href="#pitfalls">现象地图</a><a href="#cards">口述卡片</a>
+    </div>
+  </nav>
+  <main class="shell">
+
+    <section id="stack">
+      <div class="head"><h2>1. 总纲：三层堆叠</h2><p>所有概念先摆对位置：谁是思想、谁是手段、谁是挂载点。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 310" role="img" aria-labelledby="s1t s1d">
+          <title id="s1t">AOP、动态代理与 BeanPostProcessor 的三层堆叠关系图</title>
+          <desc id="s1d">思想层是 AOP 范式，分出 AspectJ 织入式与 Spring AOP 代理式两条路；实现层是动态代理（JDK 与 CGLIB）；挂载层是 BeanPostProcessor 容器扩展点。</desc>
+          <defs><marker id="ar1" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker></defs>
+          <rect class="lane" x="20" y="20" width="1000" height="84" rx="16"/>
+          <text class="sub" x="36" y="40">思想层</text>
+          <rect class="node" x="120" y="40" width="150" height="44" rx="10"/><text class="title" x="195" y="58" text-anchor="middle">AOP</text><text class="sub" x="195" y="74" text-anchor="middle">面向切面编程（范式）</text>
+          <rect class="node" x="400" y="40" width="230" height="44" rx="10"/><text class="title" x="515" y="58" text-anchor="middle">AspectJ 织入式</text><text class="sub" x="515" y="74" text-anchor="middle">编译期 / 加载期改字节码</text>
+          <rect class="node v" x="700" y="40" width="240" height="44" rx="10"/><text class="title" x="820" y="58" text-anchor="middle">Spring AOP ★</text><text class="sub" x="820" y="74" text-anchor="middle">运行时 · 代理式</text>
+          <path class="edge" d="M270 62 H400" marker-end="url(#ar1)"/>
+          <path class="edge" d="M195 84 V98 H820 V84" marker-end="url(#ar1)"/>
+          <rect class="lane" x="20" y="124" width="1000" height="84" rx="16"/>
+          <text class="sub" x="36" y="144">实现层</text>
+          <rect class="node" x="330" y="148" width="380" height="48" rx="10"/><text class="title" x="520" y="168" text-anchor="middle">动态代理（手段）</text><text class="sub" x="520" y="186" text-anchor="middle">JDK 动态代理（接口 · 兄弟） ｜ CGLIB（子类 · 父子）</text>
+          <path class="edge" d="M820 84 V116 H520 V148" marker-end="url(#ar1)"/>
+          <rect class="lane" x="20" y="228" width="1000" height="72" rx="16"/>
+          <text class="sub" x="36" y="248">挂载层</text>
+          <rect class="node g" x="330" y="244" width="380" height="44" rx="10"/><text class="title" x="520" y="262" text-anchor="middle">BeanPostProcessor（容器扩展点）</text><text class="sub" x="520" y="278" text-anchor="middle">AbstractAutoProxyCreator 挂载于此 · 完成调包</text>
+          <path class="edge" d="M520 196 V244" marker-end="url(#ar1)"/>
+        </svg>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>总纲一句话：</strong>AOP 是思想，动态代理是实现手段，BeanPostProcessor 是 Spring 把这个手段"挂"进 Bean 生命周期的钩子。方向别搞反——不是"AOP 实现了 BPP"，而是 Spring AOP 作为一个 BPP 跑在容器里；动态代理离开 Spring 也能用（<code>Proxy.newProxyInstance</code> 是 JDK 的 API）。</p></div>
+    </section>
+
+    <section id="bpp">
+      <div class="head"><h2>2. BeanPostProcessor：一切"魔法"的地基</h2><p>容器内核极小，注解的语义全是插件提供的。</p></div>
+      <div class="card pad">
+        <h3 style="margin-top:0">基础接口：只有两个回调，返回值可以替换 Bean</h3>
+        <pre><code>public interface BeanPostProcessor {
+    default Object postProcessBeforeInitialization(Object bean, String beanName) { return bean; }
+    default Object postProcessAfterInitialization(Object bean, String beanName) { return bean; }
+    // 返回什么，容器里最终存的就是什么 —— "偷梁换柱"的合法入口
+}</code></pre>
+        <h3 style="margin-top:20px">接口家族树：把 Bean 创建的每个阶段都留了钩子</h3>
+        <pre><code>BeanPostProcessor                                 // 初始化前 / 初始化后
+  └─ InstantiationAwareBeanPostProcessor          // + 实例化前 / 实例化后 / 属性填充时
+       ├─ MergedBeanDefinitionPostProcessor       // + 定义合并后（扫描注入元数据）
+       └─ SmartInstantiationAwareBPP              // + 候选构造器 / 循环依赖提前引用</code></pre>
+      </div>
+      <div class="card pad table" style="margin-top:15px">
+        <table>
+          <thead><tr><th>注解 / 功能</th><th>处理者（插件）</th><th>干活的钩子</th></tr></thead>
+          <tbody>
+            <tr><td><code>@Autowired</code> <code>@Value</code> <code>@Inject</code></td><td><code>AutowiredAnnotationBeanPostProcessor</code></td><td>定义合并后扫描 + 属性填充时注入</td></tr>
+            <tr><td><code>@Resource</code></td><td><code>CommonAnnotationBeanPostProcessor</code></td><td>同上（先按名字匹配）</td></tr>
+            <tr><td><code>@PostConstruct</code> / <code>@PreDestroy</code></td><td><code>CommonAnnotationBeanPostProcessor</code></td><td>初始化前 / 销毁回调</td></tr>
+            <tr><td><code>@Transactional</code></td><td>AOP（<code>AbstractAutoProxyCreator</code>）</td><td>初始化后（包代理）</td></tr>
+            <tr><td><code>@Async</code></td><td><code>AsyncAnnotationBeanPostProcessor</code></td><td>初始化后（也是包代理）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn" style="margin-top:14px"><p><strong>核心认知：</strong>Spring 容器原生只认 XML / 编程式配置的属性，内核本身"不懂"注解。<code>@Autowired</code>、<code>@Resource</code>、<code>@Transactional</code> 的全部语义，都是标准扩展点上的插件加上去的——这就是 Spring"开放扩展、内核极小"的设计哲学。</p></div>
+    </section>
+
+    <section id="inject">
+      <div class="head"><h2>3. @Autowired / @Resource：注入是怎么发生的</h2><p>注入动作本身就发生在一个 BeanPostProcessor 的回调里，但坑位和 AOP 不同。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 260" role="img" aria-labelledby="s2t s2d">
+          <title id="s2t">Bean 生命周期与 BeanPostProcessor 家族钩子位置</title>
+          <desc id="s2d">五个阶段：合并定义、实例化、属性填充、初始化、初始化完成；下方对应各阶段的钩子：元数据扫描、候选构造器、postProcessProperties 注入、PostConstruct、AOP 包代理。</desc>
+          <defs><marker id="ar2" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker></defs>
+          <rect class="node" x="24" y="36" width="176" height="56" rx="10"/><text class="title" x="112" y="58" text-anchor="middle">① 合并 BeanDefinition</text><text class="sub" x="112" y="76" text-anchor="middle">merged</text>
+          <rect class="node" x="224" y="36" width="176" height="56" rx="10"/><text class="title" x="312" y="58" text-anchor="middle">② 实例化</text><text class="sub" x="312" y="76" text-anchor="middle">调用构造器</text>
+          <rect class="node" x="424" y="36" width="176" height="56" rx="10"/><text class="title" x="512" y="58" text-anchor="middle">③ 属性填充</text><text class="sub" x="512" y="76" text-anchor="middle">populateBean</text>
+          <rect class="node" x="624" y="36" width="176" height="56" rx="10"/><text class="title" x="712" y="58" text-anchor="middle">④ 初始化</text><text class="sub" x="712" y="76" text-anchor="middle">initializeBean</text>
+          <rect class="node" x="824" y="36" width="176" height="56" rx="10"/><text class="title" x="912" y="58" text-anchor="middle">⑤ 初始化完成</text><text class="sub" x="912" y="76" text-anchor="middle">Bean 成为成品</text>
+          <path class="edge" d="M200 64 H224" marker-end="url(#ar2)"/>
+          <path class="edge" d="M400 64 H424" marker-end="url(#ar2)"/>
+          <path class="edge" d="M600 64 H624" marker-end="url(#ar2)"/>
+          <path class="edge" d="M800 64 H824" marker-end="url(#ar2)"/>
+          <path class="edge" d="M112 92 V150" marker-end="url(#ar2)"/>
+          <path class="edge" d="M312 92 V150" marker-end="url(#ar2)"/>
+          <path class="edge" d="M512 92 V150" marker-end="url(#ar2)"/>
+          <path class="edge" d="M712 92 V150" marker-end="url(#ar2)"/>
+          <path class="edge" d="M912 92 V150" marker-end="url(#ar2)"/>
+          <rect class="node a" x="12" y="150" width="200" height="72" rx="10"/><text class="title" x="112" y="172" text-anchor="middle">元数据扫描</text><text class="sub" x="112" y="190" text-anchor="middle">postProcessMergedBeanDefinition</text><text class="sub" x="112" y="206" text-anchor="middle">找出全部注入点并缓存</text>
+          <rect class="node a" x="212" y="150" width="200" height="72" rx="10"/><text class="title" x="312" y="172" text-anchor="middle">候选构造器</text><text class="sub" x="312" y="190" text-anchor="middle">determineCandidateConstructors</text><text class="sub" x="312" y="206" text-anchor="middle">构造器上的 @Autowired</text>
+          <rect class="node a" x="412" y="150" width="200" height="72" rx="10"/><text class="title" x="512" y="172" text-anchor="middle">★ 真正注入</text><text class="sub" x="512" y="190" text-anchor="middle">postProcessProperties</text><text class="sub" x="512" y="206" text-anchor="middle">解析依赖 + field.set 反射赋值</text>
+          <rect class="node a" x="612" y="150" width="200" height="72" rx="10"/><text class="title" x="712" y="172" text-anchor="middle">@PostConstruct</text><text class="sub" x="712" y="190" text-anchor="middle">postProcessBeforeInitialization</text><text class="sub" x="712" y="206" text-anchor="middle">随后 invokeInitMethods</text>
+          <rect class="node v" x="812" y="150" width="200" height="72" rx="10"/><text class="title" x="912" y="172" text-anchor="middle">★★ AOP 包代理</text><text class="sub" x="912" y="190" text-anchor="middle">postProcessAfterInitialization</text><text class="sub" x="912" y="206" text-anchor="middle">createProxy · 偷梁换柱</text>
+        </svg>
+      </div>
+      <div class="grid3" style="margin-top:15px">
+        <div class="mini"><h3>钩子一：找在哪注入</h3><p><code>postProcessMergedBeanDefinition</code> 在定义合并后扫描类里所有 <code>@Autowired</code> 字段和方法，封装成 <code>InjectionMetadata</code> 缓存，只找不注。</p></div>
+        <div class="mini"><h3>钩子二：真正注入</h3><p><code>postProcessProperties</code> 在属性填充阶段干活：<code>resolveDependency</code> 按类型找 Bean（处理 <code>@Primary</code>/<code>@Qualifier</code>），最后 <code>field.set(bean, value)</code>。</p></div>
+        <div class="mini"><h3>@Autowired vs @Resource</h3><p>前者先按类型（支持 <code>@Primary</code>/<code>@Qualifier</code>），由 <code>AutowiredAnnotationBPP</code> 处理；后者先按名字、找不到再退回类型，由 <code>CommonAnnotationBPP</code> 处理。</p></div>
+      </div>
+      <div class="callout warn" style="margin-top:14px"><p><strong>时序决定结构：</strong>注入在 ③（populateBean），代理在 ⑤ 之后——所以 <code>@Autowired</code> 的依赖全打在<strong>原始对象</strong>身上，之后才包代理。循环依赖的提前暴露（三级缓存）恰好卡在 ② 与 ③ 之间：实例化后、注入前，通过 <code>getEarlyBeanReference</code> 提前把代理暴露给别人。</p></div>
+    </section>
+
+    <section id="concepts">
+      <div class="head"><h2>4. AOP 概念全景：从 Aspect 到 MethodInterceptor</h2><p>术语各自回答一个问题，别混。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>术语</th><th>回答的问题</th><th>例子</th></tr></thead>
+          <tbody>
+            <tr><td>JoinPoint 连接点</td><td>哪些位置<strong>可以</strong>拦</td><td>方法的执行（Spring 只支持这一种）</td></tr>
+            <tr><td>Pointcut 切点</td><td>具体拦<strong>哪些</strong></td><td><code>execution(* com.x.UserService.*(..))</code></td></tr>
+            <tr><td>Advice 通知</td><td>拦到之后<strong>干什么</strong></td><td><code>@Before</code> / <code>@Around</code> 修饰的方法逻辑</td></tr>
+            <tr><td><strong>Advisor 通知器</strong></td><td><strong>上面两者配成一对</strong></td><td>容器管理的最小增强单元</td></tr>
+            <tr><td>Aspect 切面</td><td>一组横切逻辑的<strong>集合</strong></td><td>一个 <code>@Aspect</code> 注解的类</td></tr>
+            <tr><td>MethodInterceptor</td><td>链上的<strong>执行形态</strong></td><td><code>proceed()</code> 递归调用的拦截器</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card pad" style="margin-top:15px">
+        <h3 style="margin-top:0">关键数量关系：一个 @Aspect 类 → N 个 Advisor</h3>
+        <pre><code>@Aspect
+public class LogAspect {
+    @Before("execution(* com.x.service.*.*(..))")   // → Advisor 1
+    public void before() { ... }
+
+    @Around("@annotation(LogRecord)")               // → Advisor 2
+    public Object around(ProceedingJoinPoint pjp) { ... }
+
+    @AfterThrowing("execution(* com.x..*.*(..))")   // → Advisor 3
+    public void afterThrow() { ... }
+}</code></pre>
+        <p style="margin:12px 0 0;color:var(--muted)">每个通知方法各带各的切点表达式，被解析成一个独立的 <code>Advisor</code>（实现类 <code>InstantiationModelAwarePointcutAdvisorImpl</code>）。运行时它的 Advice 经 <code>AdvisorAdapterRegistry</code> 适配成 <code>MethodInterceptor</code>：<code>@Around</code> 天生就是这个结构；<code>@Before</code> 包成"先通知再 <code>proceed()</code>"；<code>@AfterThrowing</code> 包成"try-catch 包住 <code>proceed()</code>"。</p>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>点睛：</strong>声明式事务本身就是一个内置 Advisor——<code>BeanFactoryTransactionAttributeSourceAdvisor</code>，切点匹配 <code>@Transactional</code>，通知是 <code>TransactionInterceptor</code>。你写的 <code>@Aspect</code> 和 Spring 的事务支持，在容器眼里是同一种东西，所以能共存于同一条拦截器链。</p></div>
+    </section>
+
+    <section id="creation">
+      <div class="head"><h2>5. 代理的诞生：创建期全链路</h2><p>每个 Bean 初始化完成后，都要过一遍这场"面试"。</p></div>
+      <div class="grid3">
+        <div class="mini"><h3>① 收集候选 Advisor</h3><p><code>findCandidateAdvisors</code>：普通 Advisor Bean + 扫描所有 <code>@Aspect</code> 类，把通知方法包装成 Advisor（懒解析、结果缓存，只做一次）。</p></div>
+        <div class="mini"><h3>② Bean 级匹配</h3><p><code>canApply</code>：先 <code>ClassFilter.matches(类)</code>，再 <code>MethodMatcher</code> 遍历所有方法——<strong>任意一个命中，整个 Bean 就要被代理</strong>。</p></div>
+        <div class="mini"><h3>③ 命中才造代理</h3><p>未命中 → <code>advisedBeans</code> 记 false，原样返回，零代理成本；命中 → <code>createProxy</code>，容器里 Bean 名下挂的换成代理。</p></div>
+      </div>
+      <div class="card pad" style="margin-top:15px">
+        <pre><code>protected Object wrapIfNecessary(Object bean, String beanName, Object cacheKey) {
+    Object[] interceptors = getAdvicesAndAdvisorsForBean(bean.getClass(), ...);
+    if (interceptors == DO_NOT_PROXY) {
+        advisedBeans.put(cacheKey, FALSE);            // 记住结论，不重复匹配
+        return bean;                                  // 不需要代理，原样返回
+    }
+    return createProxy(bean.getClass(), interceptors, ...);  // 返回代理，替换原 Bean
+}
+
+// DefaultAopProxyFactory：在两种动态代理之间二选一
+if (config.isProxyTargetClass() || hasNoUserSuppliedProxyInterfaces(config)) {
+    return new ObjenesisCglibAopProxy(config);        // CGLIB
+}
+return new JdkDynamicAopProxy(config);                // JDK 动态代理</code></pre>
+      </div>
+      <div class="card pad table" style="margin-top:15px">
+        <table>
+          <thead><tr><th>入口</th><th>时机</th><th>场景</th></tr></thead>
+          <tbody>
+            <tr><td><code>postProcessAfterInitialization</code></td><td>初始化完成后（<strong>主战场</strong>）</td><td>99% 的代理在这里生成，包的是已完成注入和初始化的"成品"</td></tr>
+            <tr><td><code>getEarlyBeanReference</code></td><td>实例化后、注入前</td><td>循环依赖：提前把代理暴露到三级缓存；<code>earlyProxyReferences</code> 保证一个 Bean 只有一个代理</td></tr>
+            <tr><td><code>postProcessBeforeInstantiation</code></td><td>实例化之前</td><td>冷门：自定义 TargetSource 时短路 Bean 创建</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>偷梁换柱的准确含义：</strong>对象换了，名字没换。单例池里以这个 Bean 名注册的从此是代理，<code>getBean</code> 和 <code>@Autowired</code> 拿到的都是代理。</p></div>
+    </section>
+
+    <section id="kinds">
+      <div class="head"><h2>6. JDK 动态代理 vs CGLIB</h2><p>区别远不止实现方式——类型关系直接决定你的代码会不会出事。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>维度</th><th>JDK 动态代理</th><th>CGLIB</th></tr></thead>
+          <tbody>
+            <tr><td>机制</td><td>运行时<strong>实现接口</strong>（<code>Proxy</code> + <code>InvocationHandler</code>）</td><td>ASM <strong>生成子类</strong>重写方法（<code>Enhancer</code> + <code>MethodInterceptor</code>）</td></tr>
+            <tr><td>前提</td><td>目标类必须实现接口</td><td>类 / 方法不能是 <code>final</code>；private / static 拦不到</td></tr>
+            <tr><td>类型关系</td><td>代理和目标是<strong>"兄弟"</strong>（同实现一个接口）</td><td>代理是目标的<strong>"儿子"</strong>（子类）</td></tr>
+            <tr><td>可拦截范围</td><td>只有接口里声明的方法</td><td>类上所有可重写方法（含没写进接口的）</td></tr>
+            <tr><td>调用方式</td><td>反射 <code>method.invoke</code></td><td>FastClass 索引定位（现代 JDK 下差距已不明显）</td></tr>
+            <tr><td>依赖</td><td>JDK 自带</td><td>第三方库（Spring 已内置重打包版本）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">"兄弟"关系的代价</h3>
+          <pre><code>proxy instanceof UserService     // true（接口）
+proxy instanceof UserServiceImpl // false！兄弟不是儿子
+@Autowired UserServiceImpl s     // 按具体类型注入 → 报错</code></pre>
+          <p style="margin:10px 0 0;color:var(--muted)">Spring Boot 2.x 起默认 <code>proxy-target-class=true</code>（强制 CGLIB），即使有接口也走 CGLIB——就是为了消灭这类按具体类注入失败的诡异问题。</p>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">CGLIB 特有的坑：final 方法 NPE</h3>
+          <pre><code>@Service
+public class UserService {
+    @Autowired
+    private UserMapper userMapper;  // 注入在原始对象上
+
+    public final void a() {         // final 无法被子类重写
+        userMapper.xxx();           // 落在代理实例上执行
+    }                               // 代理的字段 == null → NPE
+}</code></pre>
+          <p style="margin:10px 0 0;color:var(--muted)">CGLIB 代理用 Objenesis 创建、不走构造器，代理实例自己的字段全是默认值。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="objects">
+      <div class="head"><h2>7. 代理与原始对象：堆里的两个对象</h2><p>代理不是复制替换，是包一层——原始对象必须活着。</p></div>
+      <div class="card pad">
+        <pre><code>调用方 ──> 代理对象（容器单例池里注册的那个 Bean）
+              │  JdkDynamicAopProxy#invoke / CglibAopProxy#intercept
+              ├─ 拦截器链（TransactionInterceptor、@Around 切面 ...）
+              └──> target = 原始对象   ★ 字段、@Autowired 依赖全在这
+                        └─ 真正执行你的业务方法（this = 原始对象）</code></pre>
+        <ul class="clean">
+          <li><strong>状态只在原始对象上</strong>：字段、注入的 Mapper / Service 不重复存一份，代理只是"壳 + 拦截器链 + target 引用"；</li>
+          <li><strong>原始对象不是容器里的 Bean</strong>：它没被单独注册，只是代理肚子里被持有的 target，<code>getBean</code> 拿不到；</li>
+          <li><strong>想拿原始对象</strong>：<code>((Advised) proxy).getTargetSource().getTarget()</code> 或 <code>AopProxyUtils.getSingletonTarget(bean)</code>。</li>
+        </ul>
+      </div>
+      <div class="grid3" style="margin-top:15px">
+        <div class="mini"><h3>① 外部调有切面的方法</h3><p>进代理 → 方法级匹配命中 → 开启事务 → <code>target.method()</code> → 提交 / 回滚。<span class="pill g">正常</span></p></div>
+        <div class="mini"><h3>② 外部调无切面的方法</h3><p>同样进代理 → 匹配不上任何切面、链为空 → 直接放行调原始对象。路径经过代理，效果像直调。<span class="pill g">正常</span></p></div>
+        <div class="mini"><h3>③ 内部 this 调用</h3><p>原始对象直接调原始对象，压根不经过代理——连入口都没有。将来加 <code>@Transactional</code> 也不生效。<span class="pill a">失效根源</span></p></div>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>关键认知：</strong>代理的粒度是 Bean，不是方法。只要一个方法命中切点，整个 Bean 被代理，所有外部调用都打到代理上——"用不用事务"决定这次调用挂不挂切面逻辑，"用不用代理"在 Bean 创建那一刻就定了，全类统一。</p></div>
+    </section>
+
+    <section id="invoke">
+      <div class="head"><h2>8. 运行期：一次方法调用的完整旅程</h2><p>两级过滤的第二级在这里落地——每次调用现查链，按 Method 缓存。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 400" role="img" aria-labelledby="s3t s3d">
+          <title id="s3t">一次方法调用经过代理的完整流程图</title>
+          <desc id="s3d">调用方进入代理对象的 invoke 或 intercept，按当前方法查拦截器链；链为空时直接反射调用原始对象；链非空时递归走拦截器链，事务在 TransactionInterceptor 开启，最终同样调用原始对象的方法体，结果返回调用方。</desc>
+          <defs><marker id="ar3" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker>
+          <marker id="ar3a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--amber)"/></marker></defs>
+          <rect class="node" x="24" y="130" width="130" height="70" rx="10"/><text class="title" x="89" y="158" text-anchor="middle">调用方</text><text class="sub" x="89" y="176" text-anchor="middle">@Autowired 注入方</text>
+          <rect class="node" x="200" y="130" width="190" height="70" rx="10"/><text class="title" x="295" y="158" text-anchor="middle">代理对象</text><text class="sub" x="295" y="176" text-anchor="middle">invoke() / intercept()</text>
+          <rect class="node" x="430" y="130" width="230" height="70" rx="10"/><text class="title" x="545" y="158" text-anchor="middle">查拦截器链</text><text class="sub" x="545" y="176" text-anchor="middle">方法级匹配 · 按 Method 缓存</text>
+          <path class="edge" d="M154 165 H200" marker-end="url(#ar3)"/>
+          <path class="edge" d="M390 165 H430" marker-end="url(#ar3)"/>
+          <path class="edge" d="M660 165 H670" marker-end="url(#ar3)"/>
+          <polygon class="decision" points="760,110 850,165 760,220 670,165"/><text class="title" x="760" y="170" text-anchor="middle">链空？</text>
+          <rect class="node v" x="860" y="40" width="160" height="88" rx="10"/><text class="title" x="940" y="62" text-anchor="middle">proceed()</text><text class="sub" x="940" y="80" text-anchor="middle">递归走拦截器链</text><text class="sub" x="940" y="94" text-anchor="middle">事务在此开启</text><text class="sub" x="940" y="108" text-anchor="middle">终点 invokeJoinpoint()</text>
+          <path class="edge" d="M760 110 V77 H860" marker-end="url(#ar3)"/>
+          <text class="sub" x="766" y="100">否</text>
+          <path class="edge" d="M760 220 V250" marker-end="url(#ar3)"/>
+          <text class="sub" x="770" y="240">是</text>
+          <rect class="node" x="620" y="250" width="200" height="64" rx="10"/><text class="title" x="720" y="272" text-anchor="middle">method.invoke(target)</text><text class="sub" x="720" y="290" text-anchor="middle">跳过拦截流程 · 直接反射</text><text class="sub" x="720" y="304" text-anchor="middle">CGLIB 走 methodProxy（FastClass）</text>
+          <path class="edge" d="M820 282 H860" marker-end="url(#ar3)"/>
+          <rect class="node g" x="860" y="250" width="160" height="110" rx="10"/><text class="title" x="940" y="278" text-anchor="middle">原始对象</text><text class="sub" x="940" y="296" text-anchor="middle">方法体在这里执行</text><text class="sub" x="940" y="312" text-anchor="middle">this = 原始对象</text><text class="sub" x="940" y="328" text-anchor="middle">字段状态全在这</text>
+          <path class="edge" d="M940 128 V250" marker-end="url(#ar3)"/>
+          <path class="edge a" d="M940 360 V382 H90 V200" marker-end="url(#ar3a)"/>
+          <text class="sub" x="500" y="376">返回结果（调用方手里的始终是代理）</text>
+        </svg>
+      </div>
+      <div class="card pad" style="margin-top:15px">
+        <pre><code>List&lt;Object&gt; chain = advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
+if (chain.isEmpty()) {
+    // 没有任何切面命中这个方法：连 MethodInvocation 都不创建，直接反射调原始对象
+    return AopUtils.invokeJoinpointUsingReflection(target, method, args);
+}
+return new ReflectiveMethodInvocation(proxy, target, method, args, targetClass, chain).proceed();
+// 两条路的终点都是同一行代码：method.invoke(target, args)</code></pre>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">链是怎么现查出来的</h3>
+          <ul class="clean">
+            <li>遍历这个代理上注册的所有 Advisor，逐个 <code>MethodMatcher.matches(当前方法)</code>；</li>
+            <li>匹配的 Advice 经适配器转成 <code>MethodInterceptor</code> 放进链；</li>
+            <li>结果按 Method 缓存（ConcurrentHashMap），一个方法只算一次；</li>
+            <li>动态切点（表达式依赖参数值）每次调用还要带实参再 match 一次。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">殊途同归</h3>
+          <ul class="clean">
+            <li>链空 → 直接 <code>invokeJoinpoint()</code>；</li>
+            <li>链非空 → 穿过所有拦截器后<strong>也是</strong> <code>invokeJoinpoint()</code>；</li>
+            <li>区别只是中间有没有拦截器挡路，对原始对象的调用方式完全一样；</li>
+            <li>"放行"不是换回原始对象——代理完成了一次没有环绕逻辑的委托。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>两级过滤是整条链路的灵魂：</strong>创建时 Bean 级匹配决定"谁被代理"（一次），运行时方法级匹配决定"哪次调用走切面"（每次、有缓存）。</p></div>
+    </section>
+
+    <section id="pitfalls">
+      <div class="head"><h2>9. 现象地图：坑都是结构决定的</h2><p>每个"诡异现象"都能在这张图上指到根因层。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>现象</th><th>根因落在哪层</th></tr></thead>
+          <tbody>
+            <tr><td><code>this.b()</code> 事务失效</td><td>对象关系层：this 是原始对象，绕过代理，连入口都没有</td></tr>
+            <tr><td>CGLIB 下 final 方法 NPE</td><td>代理结构层：final 无法重写，调用落在代理实例上，其字段是 null</td></tr>
+            <tr><td>JDK 代理按具体类注入失败</td><td>选型层：代理和目标是"兄弟"不是"儿子"</td></tr>
+            <tr><td>循环依赖时有代理的 Bean 也能解</td><td>BPP 层：<code>getEarlyBeanReference</code> 提前生成代理暴露到三级缓存</td></tr>
+            <tr><td><code>UnexpectedRollbackException</code></td><td>拦截器链层：内层已标记 rollback-only——回滚的决定权在代理，不在业务代码</td></tr>
+            <tr><td>AspectJ 没有内部调用失效问题</td><td>流派层：织入式直接改目标类，压根没有"内外两个对象"</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid3" style="margin-top:15px">
+        <div class="mini"><h3>断点一：没走代理</h3><p>内部 <code>this</code> 调用、非 public 方法（静默忽略）、自己 new 的对象、接口注解 + CGLIB。</p></div>
+        <div class="mini"><h3>断点二：规则没命中</h3><p>异常被 catch 吞掉、受检异常没配 <code>rollbackFor</code>（默认只回滚 RuntimeException 和 Error）。</p></div>
+        <div class="mini"><h3>断点三：上下文 / 环境断</h3><p>多线程（事务绑 ThreadLocal）、多数据源没指定 transactionManager、MyISAM、DDL 隐式提交。</p></div>
+      </div>
+      <div class="callout warn" style="margin-top:14px"><p><strong>事务失效速记：</strong>所有场景收拢成三个断点——代理没走到、回滚规则没命中、异常没传到代理边界。回滚的决定权在代理层，不在业务代码里。</p></div>
+    </section>
+
+    <section id="cards">
+      <div class="head"><h2>10. 面试口述简记卡片</h2><p>每张 30~60 秒。背框架不背条目，留钩子引向准备充分的地方。</p></div>
+      <div class="grid2">
+        <div class="card pad qa">
+          <h3>Q1 · BeanPostProcessor 和 AOP 的关系 <span class="tag">≈40s</span></h3>
+          <p>BeanPostProcessor 是 Spring 容器的扩展点，在 Bean 初始化前后提供回调，返回值可以直接替换容器里的 Bean。Spring AOP 就建立在这个扩展点上：核心类 AbstractAutoProxyCreator 实现了 SmartInstantiationAwareBeanPostProcessor，在 postProcessAfterInitialization 里查找切面、匹配切点，匹配上就用 JDK 动态代理或 CGLIB 把原始 Bean 包成代理返回——容器里存的是代理，注入出去的也是代理。这也是事务内部调用失效的根源：this 调用走的是原始对象，没经过代理。循环依赖时则是通过 getEarlyBeanReference 提前暴露代理的。可以说 BeanPostProcessor 是 Spring 各种"魔法"的通用机制，AOP 是它最典型的应用。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>Q2 · @Autowired 的原理 <span class="tag">≈35s</span></h3>
+          <p>@Autowired 的注入就是在一个 BeanPostProcessor 回调里完成的，具体是 AutowiredAnnotationBeanPostProcessor。它用两个钩子分工：postProcessMergedBeanDefinition 在 BeanDefinition 合并后扫描出所有待注入的字段和方法并缓存；postProcessProperties 在属性填充阶段真正干活——按类型解析依赖，处理 Primary 和 Qualifier，最后反射 field.set 赋值。AOP 用的则是初始化后的钩子，两者是同一扩展机制下不同坑位的插件。这也说明 Spring 容器内核本身不懂注解，原生只认 XML 和编程式属性，@Autowired、@Resource、@PostConstruct 全是各个 BPP 插件提供的语义。@Resource 由 CommonAnnotationBeanPostProcessor 处理，先按名字匹配。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>Q3 · 代理什么时候创建、怎么发现该代理谁 <span class="tag">≈40s</span></h3>
+          <p>代理对象是在 Bean 初始化完成之后、postProcessAfterInitialization 这个回调里创建的，循环依赖时才会通过 getEarlyBeanReference 提前生成。判断"该不该建代理"靠切点匹配：先把容器里所有 Advisor 收集出来——包括普通 Advisor Bean，和扫描 @Aspect 类把每个通知方法包装成的 Advisor；然后对当前 Bean 做 canApply 检查，先用 ClassFilter 过滤类，再用 MethodMatcher 遍历所有方法，任何一个方法命中就算匹配；命中才 createProxy 生成 JDK 或 CGLIB 代理，一个都没命中就原样返回，不花代理成本。另外切点其实匹配了两次：创建时决定哪些 Bean 被代理，运行时每次方法调用还会再匹配一次，决定这次调用走不走通知。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>Q4 · 生成了代理，原始对象还在吗 <span class="tag">≈40s</span></h3>
+          <p>会有，而且必须有。代理不是复制，而是包一层：代理对象通过 TargetSource 持有原始对象的引用，真正执行业务方法、字段和 @Autowired 依赖都在原始对象上，代理本身只是壳和拦截器链。但容器层面，单例池里以 Bean 名注册的是代理，getBean 和注入拿到的都是代理，原始对象只是代理内部的目标，不能再从容器里获取。由此还有个经典坑：CGLIB 代理用 Objenesis 创建、不走构造器，代理实例的字段全是默认值，如果方法被 final 修饰，无法被代理类重写，调用会直接落在代理实例上，访问字段就是 null，直接 NPE。需要原始对象时可以用 ((Advised) proxy).getTargetSource().getTarget()。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>Q5 · 有事务方法和非事务方法，各走什么 <span class="tag">≈30s</span></h3>
+          <p>代理的粒度是整个 Bean 而不是方法。只要类里有一个方法命中切点，这个 Bean 就会被整体代理，容器里注册的是代理对象，所有外部调用都先打到代理上。有事务的方法，代理拦截后开启事务、委托原始对象执行方法体、最后提交或回滚；没注解的方法，调用同样进代理，但方法级匹配不上任何切面，拦截器链为空，直接放行去调原始对象——效果上和没代理一样，但路径上经过了代理。真正绕过代理的只有内部 this 调用，这也是事务失效的经典原因。"用不用事务"决定这次调用挂不挂切面，"用不用代理"在 Bean 创建那一刻就定了，全类统一。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>Q6 · 没匹配到切面时怎么放行 <span class="tag">≈30s</span></h3>
+          <p>代理的 invoke 方法里，每次调用会先按当前方法查拦截器链：遍历这个代理上注册的所有 Advisor，用 MethodMatcher 对这个方法做匹配，结果按 Method 缓存，所以每个方法只算一次。链是空的，就直接跳过整个拦截流程，用反射 method.invoke 调原始对象，CGLIB 用 methodProxy.invoke 走 FastClass，更快；链非空就创建 ReflectiveMethodInvocation 递归 proceed 走完拦截器，而链条的最后一环同样是对原始对象的反射调用。所以放行不是"换回原始对象"，而是代理完成了一次没有环绕逻辑的委托，调用方手里的始终是代理。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>Q7 · JDK 动态代理 vs CGLIB <span class="tag">≈35s</span></h3>
+          <p>JDK 动态代理基于接口，运行时让代理实现同样的接口，靠 InvocationHandler 拦截，代理和目标是"兄弟"关系，所以按具体类注入会失败，而且只能拦接口里声明的方法。CGLIB 用 ASM 生成目标类的子类，靠 MethodInterceptor 拦截，代理是目标的"儿子"，可以按具体类注入，但 final 方法没法重写所以拦不到，private 和 static 也不行。调用上 JDK 走反射，CGLIB 走 FastClass 索引，现代 JDK 下差距已经不大。Spring Boot 2 之后默认 proxy-target-class 等于 true，强制走 CGLIB，就是为了避免 JDK 代理类型不一致导致的按具体类注入失败。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>Q8 · AOP、动态代理、AspectJ 什么关系 <span class="tag">≈45s</span></h3>
+          <p>分三层看：AOP 是编程思想，动态代理是实现手段之一。AOP 有两大实现流派——代理式和织入式：Spring AOP 是代理式，运行时生成代理对象；AspectJ 是织入式，在编译期或类加载期直接改字节码，所以它能拦截构造器、字段这些 Spring AOP 拦不到的连接点，而且没有内部调用失效的问题。我们常用的 @Aspect 注解只是 Spring 借用的 AspectJ 语法，运行时还是代理。所以准确的说法是：Spring AOP 的底层是动态代理，AOP 本身不等于动态代理。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>Q9 · Advisor 是什么 <span class="tag">≈35s</span></h3>
+          <p>Advisor 是切点和通知的封装：Pointcut 回答"在哪些方法增强"，Advice 回答"增强逻辑是什么"，两者绑成一个 Advisor 才是容器管理的最小单元。一个 @Aspect 类会被解析成多个 Advisor——类里每个 @Before、@Around 方法各带各的切点表达式，各自成一个 Advisor。运行时 Advisor 的 Advice 会被适配器统一转成 MethodInterceptor 放进拦截器链：@Around 天生就是 MethodInterceptor 的结构，@Before、@AfterThrowing 需要包一层。有意思的是，Spring 的声明式事务本身就是一个内置的 Advisor——切点匹配 @Transactional，通知是 TransactionInterceptor，所以自定义切面和事务在容器眼里是同一种东西。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>Q10 · 讲讲 Spring AOP 原理（终极版）<span class="tag">≈60s</span></h3>
+          <p>Spring AOP 的底层是动态代理，而它挂载在 BeanPostProcessor 这个容器扩展点上。核心类 AbstractAutoProxyCreator 在每个 Bean 初始化完成后的 postProcessAfterInitialization 里做两件事：先收集容器里所有 Advisor，再用切点对这个 Bean 做匹配——类过滤加方法遍历，任何一个方法命中，整个 Bean 就会被包成代理，容器里注册的从此是代理对象；一个都没命中就原样返回。代理内部通过 TargetSource 持有原始对象的引用，字段和依赖都在原始对象上，方法体也永远在原始对象上执行。调用时，代理先按当前方法查拦截器链——链空就直接反射调原始对象，链非空就穿过拦截器再调，事务就是在 TransactionInterceptor 这个拦截器里开启的。造代理的方式由 DefaultAopProxyFactory 在 JDK 动态代理和 CGLIB 之间二选一，Spring Boot 2 之后默认 CGLIB。所以事务内部调用失效这类问题，根源都在这：this 是原始对象，没经过代理。</p>
+        </div>
+      </div>
+      <div class="callout warn" style="margin-top:15px"><p><strong>使用建议：</strong>背 Q10 的框架而不是十张卡的全文；每张卡讲到一半观察面试官反应；讲完主动留钩子（比如"我还遇到过 UnexpectedRollbackException 这种生效了但反直觉的场景"），把面试往准备充分的地方引。高频追问三连备好答案：默认只回滚 RuntimeException 的原因（沿袭 EJB 约定）、内部调用怎么解决（拆 Bean / 注入自身代理 / AopContext.currentProxy / TransactionTemplate）、UnexpectedRollbackException 怎么解（REQUIRES_NEW 或别 catch）。</p></div>
+    </section>
+  </main>
+  <footer><div class="shell">Spring 一条线打通：BeanPostProcessor · AOP · 动态代理</div></footer>
+  <script>
+    (()=>{const root=document.documentElement,key="spring-aop-doc-theme";
+      const saved=localStorage.getItem(key);
+      if(saved)root.dataset.theme=saved;document.getElementById("theme").addEventListener("click",()=>{
+        const next=root.dataset.theme==="dark"?"light":"dark";root.dataset.theme=next;localStorage.setItem(key,next)})})();
+  </script>
+</body>
+</html>
