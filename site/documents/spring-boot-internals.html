@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Spring Boot 专题：@SpringBootApplication 拆解、自动装配全链路、SpringApplication.run 启动流程、starter 与配置体系，附十张面试口述卡片。">
+  <meta name="date" content="2026-10-20">
+  <title>Spring Boot 专题：自动装配与启动流程</title>
+  <style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .decision{fill:var(--amber2);stroke:var(--amber);stroke-width:1.6}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    .active{fill:var(--blue2);stroke:var(--blue);stroke-width:1.2}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    pre{margin:0;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);
+      overflow:auto;font:13px/1.65 Consolas,monospace;color:var(--ink)}
+    pre code{padding:0;border:0;background:none;color:inherit;font:inherit}
+    .qa h3{margin:0 0 8px;font-size:16px}.qa p{margin:0;font-size:14.5px}
+    .qa .tag{color:var(--muted);font-size:12px}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell">
+      <div class="kicker">SPRING BOOT INTERNALS · AUTO-CONFIGURATION</div>
+      <h1>Spring Boot 专题：自动装配与启动流程</h1>
+      <p class="lead">Boot 不是替代 Spring，而是给 Spring 写好了一整套条件化默认答案——自动装配全链路、SpringApplication.run 启动流程、starter 原理与配置体系，附十张面试口述卡片。</p>
+      <div class="doc-meta">
+        <time datetime="2026-10-20">2026年10月20日</time>
+        <span>Spring Boot / Java 后端 · 三部曲之三</span>
+      </div>
+      <div class="actions">
+        <a class="btn" href="../index.html">返回首页</a>
+        <a class="btn" href="#positioning">开始阅读</a>
+        <button class="btn" id="theme" type="button">切换主题</button>
+        <button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>3 个注解</b><span>@SpringBootApplication 的组成</span></div>
+        <div class="stat"><b>140+ 候选</b><span>自动配置类全量清单</span></div>
+        <div class="stat"><b>1 个衔接点</b><span>refresh 的 BFPP 阶段</span></div>
+        <div class="stat"><b>10 张口述卡</b><span>每张 30~60 秒面试答案</span></div>
+      </div>
+    </div>
+  </header>
+  <nav>
+    <div class="shell">
+      <a href="#positioning">定位</a><a href="#annotation">注解拆解</a><a href="#autoconfig">自动装配</a><a href="#startup">启动流程</a><a href="#starter">Starter</a><a href="#config">配置体系</a><a href="#cards">口述卡片</a>
+    </div>
+  </nav>
+  <main class="shell">
+
+    <section id="positioning">
+      <div class="head"><h2>1. 定位：Boot 是什么、不是什么</h2><p>它是脚手架和默认答案，不是另一套框架。</p></div>
+      <div class="grid3">
+        <div class="mini"><h3>它不是</h3><p>不是 Spring 的替代品。容器还是 IoC，增强还是 AOP，<code>ApplicationContext</code> 还是那一个——Boot 没有重写内核。</p></div>
+        <div class="mini"><h3>它是</h3><p>四件事的打包：<strong>starter 依赖管理</strong>（版本对齐）+ <strong>自动装配</strong>（条件化默认配置）+ <strong>内嵌容器</strong>（jar 直接跑）+ <strong>生产特性</strong>（Actuator、指标、健康检查）。</p></div>
+        <div class="mini"><h3>一句话</h3><p>Boot 把"一个典型 Spring 应用应该配什么"写成了<strong>条件化的默认答案</strong>——你不配就给你默认的，你配了就尊重你的（<code>@ConditionalOnMissingBean</code>）。</p></div>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>三部曲导航：</strong><a href="spring-ioc-internals.html">① IoC 篇：容器、Bean 生命周期与循环依赖</a> · <a href="spring-aop-internals.html">② AOP 篇：BeanPostProcessor、动态代理与拦截器链</a> · <strong>③ Boot 篇（本篇）</strong>。本篇两处回到前两篇：自动装配发生在 refresh 的 BeanFactoryPostProcessor 阶段（IoC 篇第 5 节），AOP 代理发生在最后的单例实例化阶段（AOP 篇第 5 节）。</p></div>
+    </section>
+
+    <section id="annotation">
+      <div class="head"><h2>2. @SpringBootApplication 拆解</h2><p>一个注解三个身份，每个都有独立职责。</p></div>
+      <div class="card pad">
+        <pre><code>@SpringBootConfiguration   // 就是 @Configuration：主类也是一个配置类
+@EnableAutoConfiguration   // ★ 自动装配总开关（下一节主角）
+@ComponentScan             // 扫描主类所在包及子包的 @Component</code></pre>
+        <ul class="clean">
+          <li><strong>@SpringBootConfiguration</strong>：身份是配置类，所以主类里的 <code>@Bean</code> 一样生效；它单独起名是为了在测试和嵌套配置场景里可被识别；</li>
+          <li><strong>@ComponentScan</strong>：默认扫主类所在包——这就是"启动类要放根包"的原因：放错了，你的 Service 就扫不到；</li>
+          <li><strong>@EnableAutoConfiguration</strong>：唯一的"魔法"入口，其余两个都是普通 Spring 能力。</li>
+        </ul>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>高频考点：</strong>三个注解各自能干什么可以独立追问；但"自动装配"只由 <code>@EnableAutoConfiguration</code> 负责——很多候选人把 <code>@ComponentScan</code> 扫 Bean 也说成自动装配，这两条是<strong>完全不同的注册路径</strong>（扫描 vs 配置类 import）。</p></div>
+    </section>
+
+    <section id="autoconfig">
+      <div class="head"><h2>3. 自动装配全链路（主菜）</h2><p>从注解到 BeanDefinition 的完整路径，条件过滤是灵魂。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 470" role="img" aria-labelledby="b1t b1d">
+          <title id="b1t">Spring Boot 自动装配全链路图</title>
+          <desc id="b1d">上排是注解链：EnableAutoConfiguration Import AutoConfigurationImportSelector；下排是装配流水线：读取候选清单、条件过滤、注册 BeanDefinition、进入标准 Spring 创建流程。</desc>
+          <defs><marker id="ba" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker>
+          <marker id="baw" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--amber)"/></marker></defs>
+          <rect class="lane" x="20" y="20" width="1000" height="120" rx="16"/>
+          <text class="sub" x="36" y="42">注解链（发生在配置类解析阶段）</text>
+          <rect class="node" x="50" y="60" width="250" height="60" rx="10"/><text class="title" x="175" y="84" text-anchor="middle">@EnableAutoConfiguration</text><text class="sub" x="175" y="102" text-anchor="middle">@AutoConfigurationPackage + @Import</text>
+          <rect class="node" x="360" y="60" width="280" height="60" rx="10"/><text class="title" x="500" y="84" text-anchor="middle">AutoConfigurationImportSelector</text><text class="sub" x="500" y="102" text-anchor="middle">selectImports( ) 提供全量候选</text>
+          <path class="edge" d="M300 90 H360" marker-end="url(#ba)"/>
+          <rect class="lane" x="20" y="170" width="1000" height="280" rx="16"/>
+          <text class="sub" x="36" y="192">装配流水线（Selector 内部）</text>
+          <rect class="node" x="50" y="220" width="280" height="72" rx="10"/><text class="title" x="190" y="244" text-anchor="middle">读取候选清单</text><text class="sub" x="190" y="262" text-anchor="middle">META-INF/spring/</text><text class="sub" x="190" y="276" text-anchor="middle">…AutoConfiguration.imports（140+ 条）</text>
+          <rect class="node" x="390" y="220" width="220" height="72" rx="10"/><text class="title" x="500" y="244" text-anchor="middle">去重 · 排除</text><text class="sub" x="500" y="262" text-anchor="middle">exclude 属性 / spring.autoconfigure.exclude</text><text class="sub" x="500" y="276" text-anchor="middle">旧版本为 spring.factories 机制</text>
+          <rect class="node a" x="670" y="220" width="250" height="72" rx="10"/><text class="title" x="795" y="244" text-anchor="middle">@Conditional 过滤 ★</text><text class="sub" x="795" y="262" text-anchor="middle">OnClass / OnBean / OnProperty / OnWebApplication…</text><text class="sub" x="795" y="276" text-anchor="middle">不满足的直接淘汰</text>
+          <path class="edge" d="M330 256 H390" marker-end="url(#ba)"/>
+          <path class="edge" d="M610 256 H670" marker-end="url(#ba)"/>
+          <rect class="node v" x="390" y="340" width="220" height="66" rx="10"/><text class="title" x="500" y="364" text-anchor="middle">注册 BeanDefinition</text><text class="sub" x="500" y="382" text-anchor="middle">以配置类身份进容器，</text><text class="sub" x="500" y="396" text-anchor="middle">其中的 @Bean 逐个注册</text>
+          <rect class="node g" x="670" y="340" width="250" height="66" rx="10"/><text class="title" x="795" y="364" text-anchor="middle">标准 Spring 创建流程</text><text class="sub" x="795" y="382" text-anchor="middle">实例化 → 注入 → AOP 代理</text><text class="sub" x="795" y="396" text-anchor="middle">与前两篇的链路汇合</text>
+          <path class="edge" d="M795 292 V340" marker-end="url(#ba)"/>
+          <path class="edge" d="M610 373 H670" marker-end="url(#ba)"/>
+          <path class="edge a" d="M500 150 V220" marker-end="url(#baw)"/>
+          <text class="sub" x="516" y="200">候选从这里开始分流</text>
+        </svg>
+      </div>
+      <div class="card pad table" style="margin-top:15px">
+        <table>
+          <thead><tr><th>常用条件注解</th><th>含义</th><th>典型用途</th></tr></thead>
+          <tbody>
+            <tr><td><code>@ConditionalOnClass</code></td><td>类路径存在某类才生效</td><td>引了 tomcat 依赖才装配 Tomcat——"有什么依赖就配什么"的实现基础</td></tr>
+            <tr><td><code>@ConditionalOnMissingBean</code></td><td>容器里<strong>没有</strong>该 Bean 才生效</td><td>用户自己配了就用用户的——"可覆盖的默认值"，Boot 可定制性的核心</td></tr>
+            <tr><td><code>@ConditionalOnProperty</code></td><td>配置项满足条件才生效</td><td><code>spring.datasource.url</code> 存在才配数据源；开关式装配</td></tr>
+            <tr><td><code>@ConditionalOnWebApplication</code></td><td>是 Web 环境才生效</td><td>Servlet / Reactive 环境分叉</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>衔接前两篇：</strong>自动配置类最终以<strong>配置类</strong>身份进入容器，在 <code>refresh()</code> 的 <code>invokeBeanFactoryPostProcessors</code> 阶段被解析（IoC 篇的"改配方"阶段）；它们内部的 <code>@Bean</code> 再在最后的单例实例化阶段创建实例——AOP 代理就挂在那一环。三部曲在这里闭环。</p></div>
+    </section>
+
+    <section id="startup">
+      <div class="head"><h2>4. 启动流程：SpringApplication.run</h2><p>Boot 的壳（run）包着 Spring 的芯（refresh）。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 330" role="img" aria-labelledby="b2t b2d">
+          <title id="b2t">Spring Boot 启动流程时间轴与 refresh 内部关键步</title>
+          <desc id="b2d">六个阶段：推断类型并加载初始化器、准备环境、创建并准备上下文、refresh 前半程解析配置类与自动装配、refresh 后半程创建内嵌容器与实例化单例、执行 runners 后就绪。</desc>
+          <defs><marker id="bb" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker>
+          <marker id="bbw" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--amber)"/></marker></defs>
+          <rect class="node" x="24" y="40" width="150" height="66" rx="10"/><text class="title" x="99" y="64" text-anchor="middle">推断应用类型</text><text class="sub" x="99" y="80" text-anchor="middle">Servlet / Reactive / 普通</text><text class="sub" x="99" y="94" text-anchor="middle">+ 加载初始化器/监听器</text>
+          <rect class="node" x="204" y="40" width="150" height="66" rx="10"/><text class="title" x="279" y="64" text-anchor="middle">准备 Environment</text><text class="sub" x="279" y="80" text-anchor="middle">加载 application.yml</text><text class="sub" x="279" y="94" text-anchor="middle">命令行 · 环境变量 · profile</text>
+          <rect class="node" x="384" y="40" width="150" height="66" rx="10"/><text class="title" x="459" y="64" text-anchor="middle">创建并准备 context</text><text class="sub" x="459" y="80" text-anchor="middle">按应用类型选</text><text class="sub" x="459" y="94" text-anchor="middle">ApplicationContext 子类</text>
+          <rect class="node v" x="564" y="40" width="180" height="66" rx="10"/><text class="title" x="654" y="60" text-anchor="middle">refresh 前半程</text><text class="sub" x="654" y="76" text-anchor="middle">invokeBeanFactoryPostProcessors ★</text><text class="sub" x="654" y="90" text-anchor="middle">解析主类 → 扫描 + 自动装配</text><text class="sub" x="654" y="104" text-anchor="middle">registerBeanPostProcessors</text>
+          <rect class="node v" x="774" y="40" width="180" height="66" rx="10"/><text class="title" x="864" y="60" text-anchor="middle">refresh 后半程</text><text class="sub" x="864" y="76" text-anchor="middle">onRefresh：创建内嵌 Tomcat</text><text class="sub" x="864" y="90" text-anchor="middle">finishBean：实例化全部单例 ★</text><text class="sub" x="864" y="104" text-anchor="middle">（AOP 代理在此生成）</text>
+          <rect class="node g" x="564" y="170" width="390" height="66" rx="10"/><text class="title" x="759" y="192" text-anchor="middle">执行 Runners → 就绪</text><text class="sub" x="759" y="210" text-anchor="middle">ApplicationRunner / CommandLineRunner（拿到刷新完的容器）</text><text class="sub" x="759" y="226" text-anchor="middle">发布 ApplicationReadyEvent · Banner 打完收工</text>
+          <path class="edge" d="M174 73 H204" marker-end="url(#bb)"/>
+          <path class="edge" d="M354 73 H384" marker-end="url(#bb)"/>
+          <path class="edge" d="M534 73 H564" marker-end="url(#bb)"/>
+          <path class="edge" d="M744 73 H774" marker-end="url(#bb)"/>
+          <path class="edge" d="M864 106 V170" marker-end="url(#bb)"/>
+          <rect class="node a" x="24" y="170" width="480" height="66" rx="10"/><text class="title" x="264" y="192" text-anchor="middle">三部曲的闭环时刻</text><text class="sub" x="264" y="210" text-anchor="middle">Boot 的 run 只是壳：解析配置（IoC）→ 注册扩展点（IoC）→ 自动装配生效（Boot）</text><text class="sub" x="264" y="226" text-anchor="middle">→ 实例化 + 注入（IoC）→ 初始化后包代理（AOP）——一条时间轴串完三篇</text>
+          <path class="edge a" d="M504 203 H564" marker-end="url(#bbw)"/>
+        </svg>
+      </div>
+      <div class="grid3" style="margin-top:15px">
+        <div class="mini"><h3>主类是入口</h3><p>prepareContext 阶段把主类注册为配置类；refresh 解析它时才触发 <code>@ComponentScan</code>（扫你的 Bean）和 <code>@EnableAutoConfiguration</code>（装默认 Bean）——两条注册路径从此并行。</p></div>
+        <div class="mini"><h3>Tomcat 在 onRefresh 创建</h3><p>不是"启动完再开服务器"：<code>ServletWebServerApplicationContext</code> 覆写 <code>onRefresh</code>，容器刷新到一半就把内嵌 Tomcat 建好、端口监听起来。</p></div>
+        <div class="mini"><h3>Runners 是业务钩子</h3><p>容器完全就绪后执行，常用来做启动预热、缓存加载、延迟任务的触发入口——拿得到完整的容器，又早于对外服务。</p></div>
+      </div>
+      <div class="callout warn" style="margin-top:14px"><p><strong>面试高频陷阱：</strong>"自动装配发生在启动的哪一步？"——不是 <code>main</code> 方法一进来，而是 refresh 的 <code>invokeBeanFactoryPostProcessors</code>（解析主配置类时）。答出这个位置，说明你把 Boot 的壳和 Spring 的芯真正接上了。</p></div>
+    </section>
+
+    <section id="starter">
+      <div class="head"><h2>5. Starter：原理与自定义</h2><p>starter = 依赖聚合 + 自动装配入口，没有任何新机制。</p></div>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">官方 starter 在做什么</h3>
+          <ul class="clean">
+            <li><strong>依赖聚合</strong>：把某场景需要的一组依赖（含版本）打包成一个坐标，比如 <code>spring-boot-starter-web</code> 拉 Spring MVC + Jackson + Tomcat；</li>
+            <li><strong>版本对齐</strong>：父 POM / BOM 统一管版本，你只挑场景不挑版本——"约定优于配置"的依赖层体现；</li>
+            <li><strong>空壳设计</strong>：很多官方 starter 本身没有代码，只是依赖清单；真正的装配逻辑在 <code>spring-boot-autoconfigure</code> 里。</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">自定义 starter 四步</h3>
+          <pre><code>// 1. 建模块：xxx-spring-boot-starter（依赖 autoconfigure 模块）
+// 2. 写属性类
+@ConfigurationProperties(prefix = "xxx")
+public class XxxProperties { ... }
+
+// 3. 写自动配置类
+@AutoConfiguration
+@ConditionalOnClass(XxxService.class)
+@EnableConfigurationProperties(XxxProperties.class)
+public class XxxAutoConfiguration {
+    @Bean @ConditionalOnMissingBean
+    public XxxService xxxService(XxxProperties p) { ... }
+}
+// 4. 登记：META-INF/spring/org.springframework.boot
+//        .autoconfigure.AutoConfiguration.imports 写入配置类全名</code></pre>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:14px"><p><strong>检验标准：</strong>别人引你的 starter + 在 yml 里写 <code>xxx.*</code> 就能改变行为，配自己的 <code>@Bean</code> 就能整体替换——做到这两点，说明条件装配的两面（默认值 + 可覆盖）都用对了。</p></div>
+    </section>
+
+    <section id="config">
+      <div class="head"><h2>6. 配置体系与内嵌容器</h2><p>外置配置怎么加载、两种绑定注解怎么选。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>维度</th><th>@ConfigurationProperties</th><th>@Value</th></tr></thead>
+          <tbody>
+            <tr><td>绑定方式</td><td>批量：一个前缀绑定整组字段</td><td>单个：一个表达式一个值</td></tr>
+            <tr><td>松散语法</td><td>支持（<code>user-name</code>/<code>userName</code>/<code>USER_NAME</code> 互通）</td><td>需精确匹配</td></tr>
+            <tr><td>表达式 / SpEL</td><td>不支持</td><td>支持（<code>#{...}</code>）</td></tr>
+            <tr><td>校验 / 元数据</td><td>支持 JSR-303 校验、IDE 提示（配置元数据文件）</td><td>无</td></tr>
+            <tr><td>绑定时机</td><td colspan="2" style="text-align:left">都发生在 Bean 生命周期内：<code>@ConfigurationProperties</code> 由 <code>ConfigurationPropertiesBindingPostProcessor</code>（一个 BPP，见 IoC/AOP 篇）在初始化前绑定；<code>@Value</code> 在属性填充阶段注入</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid3" style="margin-top:15px">
+        <div class="mini"><h3>配置优先级（外置覆盖内置）</h3><p>命令行参数 &gt; <code>SPRING_APPLICATION_JSON</code> &gt; 环境变量 &gt; <code>application-{profile}.yml</code> &gt; <code>application.yml</code> &gt; <code>@PropertySource</code> / 默认值。原则：越靠外、越贴近部署环境的越赢。</p></div>
+        <div class="mini"><h3>profile 多环境</h3><p><code>spring.profiles.active</code> 激活；同一配置项，激活的 profile 文件覆盖默认文件——测试 / 预发 / 生产一份代码多套配置。</p></div>
+        <div class="mini"><h3>内嵌容器</h3><p><code>ServletWebServerFactoryAutoConfiguration</code> 按 classpath 选容器（默认 Tomcat，换 Undertow 只要换依赖）；<code>onRefresh</code> 创建、<code>finishRefresh</code> 启动。可执行 FatJar 由 Boot 的 Launcher 引导，<code>java -jar</code> 直接跑，不再需要外置 Tomcat。</p></div>
+      </div>
+    </section>
+
+    <section id="cards">
+      <div class="head"><h2>7. 面试口述简记卡片</h2><p>每张 30~60 秒。B1 和 B4 是高频中的高频。</p></div>
+      <div class="grid2">
+        <div class="card pad qa">
+          <h3>B1 · Spring Boot 自动装配原理 <span class="tag">≈60s · 高频</span></h3>
+          <p>@EnableAutoConfiguration 通过 @Import 引入 AutoConfigurationImportSelector，它的 selectImports 读取所有 jar 里 META-INF/spring 目录下的 AutoConfiguration.imports 文件——旧版本是 spring.factories——拿到一百四十多个自动配置类的全量候选，先去重和按 exclude 排除，再经过 @Conditional 家族过滤：OnClass 判断类路径有没有依赖、OnProperty 判断配置开关、OnMissingBean 判断用户有没有自己配，条件不满足的直接淘汰，剩下的以配置类身份注册成 BeanDefinition，里面的 @Bean 在单例实例化阶段创建。整个过程发生在 refresh 的 invokeBeanFactoryPostProcessors 阶段，也就是解析主配置类的时候。一句话：自动装配就是"按条件装配的默认配置"，用户配置优先由 OnMissingBean 保证。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>B2 · @SpringBootApplication 三个组成 <span class="tag">≈30s</span></h3>
+          <p>拆成三个注解：@SpringBootConfiguration 本质是 @Configuration，说明主类自身是一个配置类，里面的 @Bean 一样生效；@ComponentScan 默认扫描主类所在包及子包，这是启动类要放根包的原因；@EnableAutoConfiguration 是自动装配总开关。注意扫描和自动装配是两条独立的注册路径：前者注册你写的组件，后者注册框架的默认配置，别混为一谈。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>B3 · SpringApplication.run 启动流程 <span class="tag">≈45s</span></h3>
+          <p>分六步：第一，构造 SpringApplication 时推断应用类型，加载 ApplicationContextInitializer 和监听器；第二，准备 Environment，把 application.yml、命令行参数、环境变量、profile 都装进环境；第三，按应用类型创建 ApplicationContext 并 prepareContext，把主类注册为配置类；第四，调 refresh——解析配置类、扫描加自动装配、注册 BeanPostProcessor；第五，refresh 的后半程在 onRefresh 创建内嵌 Tomcat，在 finishBeanFactoryInitialization 实例化所有单例，AOP 代理也在这一步生成；最后执行 ApplicationRunner 和 CommandLineRunner，发布就绪事件。核心记忆点：Boot 的 run 是壳，Spring 的 refresh 是芯。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>B4 · 自动装配发生在启动的哪一步 <span class="tag">≈30s</span></h3>
+          <p>发生在 refresh 的 invokeBeanFactoryPostProcessors 阶段。主类在 prepareContext 时被注册为配置类，refresh 解析它时，@Import 进来的 AutoConfigurationImportSelector 作为配置类解析的一部分被触发，候选清单、条件过滤、注册 BeanDefinition 都在这一个阶段完成；而候选里的 @Bean 真正实例化要等到 finishBeanFactoryInitialization 批量创建单例的时候。区分"注册定义"和"创建实例"两个时机，这题就算答透了。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>B5 · @ConditionalOnMissingBean 的作用 <span class="tag">≈30s</span></h3>
+          <p>它是 Boot"可覆盖的默认值"的实现机制：自动配置类里的 @Bean 加了这个条件，只有容器里不存在同类型 Bean 时才生效。因为用户自定义的配置先被处理，所以用户配了自己的 DataSource 或 RedisTemplate，自动装配就让位。这就是为什么 Boot 给了全套默认配置却不挡着你自己定制——约定优于配置，但配置永远赢过约定。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>B6 · 怎么自定义一个 starter <span class="tag">≈40s</span></h3>
+          <p>四步：建两个模块，一个 autoconfigure 放逻辑，一个 starter 只做依赖聚合；写 XxxProperties 用 @ConfigurationProperties 绑定 xxx 前缀的配置；写 XxxAutoConfiguration，类上 @AutoConfiguration 加 @ConditionalOnClass 判断核心类在不在，@EnableConfigurationProperties 启用属性，里面的 @Bean 加 @ConditionalOnMissingBean 保证用户可覆盖；最后在 META-INF/spring 的 AutoConfiguration.imports 文件里登记配置类全名。检验标准：引入即生效、yml 可调、用户自己配 Bean 能整体替换。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>B7 · @ConfigurationProperties vs @Value <span class="tag">≈30s</span></h3>
+          <p>ConfigurationProperties 是批量绑定，一个前缀对应一组字段，支持松散语法、JSR-303 校验和 IDE 元数据提示，适合结构化配置；@Value 是单值绑定，支持 SpEL 表达式，适合取一两个简单值。绑定时机都在 Bean 生命周期内：前者由 ConfigurationPropertiesBindingPostProcessor 在初始化前完成绑定——它本身就是一个 BeanPostProcessor；后者在属性填充阶段注入。选型原则：成组的配置用前者，零散的单值用后者。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>B8 · 配置文件优先级 <span class="tag">≈30s</span></h3>
+          <p>总原则是外置覆盖内置、越靠近部署环境的优先级越高：命令行参数最高，然后是 SPRING_APPLICATION_JSON、操作系统环境变量、profile 指定的 application-{profile}.yml、默认的 application.yml，再往下是 @PropertySource 和代码默认值。同一个 key，高优先级直接覆盖低优先级而不是报错。profile 机制让一份代码配多套环境，激活的 profile 文件覆盖默认文件，这也是它能生效的原理。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>B9 · 内嵌容器怎么启动的 <span class="tag">≈30s</span></h3>
+          <p>ServletWebServerApplicationContext 覆写了 refresh 里的 onRefresh，在这里根据 classpath 创建对应的 WebServer——classpath 有 tomcat 就建 Tomcat，换 Undertow 只要换依赖，这正是 ServletWebServerFactoryAutoConfiguration 加 ConditionalOnClass 实现的；容器刷新到 finishRefresh 时调用 WebServer 的 start 端口就监听起来。加上 Boot 的 FatJar 和 Launcher 引导，java -jar 直接运行，部署不再依赖外置容器。</p>
+        </div>
+        <div class="card pad qa">
+          <h3>B10 · Boot 2.6 为什么默认禁止循环依赖 <span class="tag">≈30s</span></h3>
+          <p>官方认为循环依赖是设计坏味道，而且三级缓存这套解法有边界（构造器注入和 prototype 本来就解不了），全量默认放开容易掩盖问题，所以 2.6 起 allow-circular-references 默认 false，出现循环直接启动失败。需要打开要显式配置。出现循环依赖时的推荐处理：优先重构，把两个 Bean 互相依赖的公共逻辑下沉到第三个 Bean；临时缓解用 @Lazy 打断一边，注入的是代理，首次调用才真正创建。</p>
+        </div>
+      </div>
+      <div class="callout warn" style="margin-top:15px"><p><strong>使用建议：</strong>B1 是 Spring Boot 面试的第一题，务必练到不看稿能说；B4 是区分度题，把"注册定义 vs 创建实例"两个时机分开讲。三部曲收尾：<a href="spring-ioc-internals.html">IoC 篇</a>管"对象怎么来"，<a href="spring-aop-internals.html">AOP 篇</a>管"功能怎么增强"，本篇管"配置怎么自动来"——Spring 面试的完整骨架就这三根柱子。</p></div>
+    </section>
+  </main>
+  <footer><div class="shell">Spring Boot 专题：自动装配与启动流程</div></footer>
+  <script>
+    (()=>{const root=document.documentElement,key="spring-boot-doc-theme";
+      const saved=localStorage.getItem(key);
+      if(saved)root.dataset.theme=saved;document.getElementById("theme").addEventListener("click",()=>{
+        const next=root.dataset.theme==="dark"?"light":"dark";root.dataset.theme=next;localStorage.setItem(key,next)})})();
+  </script>
+</body>
+</html>

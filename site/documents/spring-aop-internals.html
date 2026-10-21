@@ -136,6 +136,7 @@
         </svg>
       </div>
       <div class="callout" style="margin-top:15px"><p><strong>总纲一句话：</strong>AOP 是思想，动态代理是实现手段，BeanPostProcessor 是 Spring 把这个手段"挂"进 Bean 生命周期的钩子。方向别搞反——不是"AOP 实现了 BPP"，而是 Spring AOP 作为一个 BPP 跑在容器里；动态代理离开 Spring 也能用（<code>Proxy.newProxyInstance</code> 是 JDK 的 API）。</p></div>
+      <div class="callout" style="margin-top:15px"><p><strong>三部曲导航：</strong><a href="spring-ioc-internals.html">① IoC 篇：容器、Bean 生命周期与循环依赖</a> · <strong>② AOP 篇（本篇）</strong> · <a href="spring-boot-internals.html">③ Boot 篇：自动装配与启动流程</a>。本篇讲的 BeanPostProcessor 钩子，是 IoC 篇生命周期主线上的插件位；Boot 篇的自动装配最终也落回这条链路。</p></div>
     </section>
 
     <section id="bpp">

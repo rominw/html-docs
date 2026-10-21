@@ -6,6 +6,18 @@
     "url": "documents/spring-aop-internals.html"
   },
   {
+    "title": "Spring Boot 专题：自动装配与启动流程",
+    "description": "Spring Boot 专题：@SpringBootApplication 拆解、自动装配全链路、SpringApplication.run 启动流程、starter 与配置体系，附十张面试口述卡片。",
+    "date": "2026-10-20",
+    "url": "documents/spring-boot-internals.html"
+  },
+  {
+    "title": "Spring IoC 专题：容器、Bean 生命周期与循环依赖",
+    "description": "Spring IoC 专题：容器体系、Bean 生命周期主线、三级缓存与循环依赖、容器扩展点对比，附十张面试口述卡片。",
+    "date": "2026-10-20",
+    "url": "documents/spring-ioc-internals.html"
+  },
+  {
     "title": "无人机巡检平台后端 · 六周直读复习手册",
     "description": "自动建模调度面试精读：结合源码详解五类触发、逐条派飞、父批次聚合、续飞父子状态、超时补偿与暂停继续取消，并用完整案例解释实现边界。",
     "date": "2026-10-16",
