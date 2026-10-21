@@ -1,5 +1,11 @@
 [
   {
+    "title": "Spring 能力全家桶：并发、调度、缓存与事件",
+    "description": "Spring 能力全家桶：@Async 线程池、@Scheduled 调度、@Cacheable 缓存、事件机制、校验重试与模板体系的统一套路与高频坑，附十张面试口述卡片。",
+    "date": "2026-10-21",
+    "url": "documents/spring-capabilities.html"
+  },
+  {
     "title": "Spring 一条线打通：BeanPostProcessor · AOP · 动态代理",
     "description": "从 BeanPostProcessor 扩展点出发，一条线打通 @Autowired 注入、AOP 代理创建、JDK/CGLIB 动态代理与运行期拦截器链的完整链路，附十张面试口述卡片。",
     "date": "2026-10-20",

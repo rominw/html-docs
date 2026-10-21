@@ -118,7 +118,7 @@
         <div class="mini"><h3>它是</h3><p>四件事的打包：<strong>starter 依赖管理</strong>（版本对齐）+ <strong>自动装配</strong>（条件化默认配置）+ <strong>内嵌容器</strong>（jar 直接跑）+ <strong>生产特性</strong>（Actuator、指标、健康检查）。</p></div>
         <div class="mini"><h3>一句话</h3><p>Boot 把"一个典型 Spring 应用应该配什么"写成了<strong>条件化的默认答案</strong>——你不配就给你默认的，你配了就尊重你的（<code>@ConditionalOnMissingBean</code>）。</p></div>
       </div>
-      <div class="callout" style="margin-top:15px"><p><strong>三部曲导航：</strong><a href="spring-ioc-internals.html">① IoC 篇：容器、Bean 生命周期与循环依赖</a> · <a href="spring-aop-internals.html">② AOP 篇：BeanPostProcessor、动态代理与拦截器链</a> · <strong>③ Boot 篇（本篇）</strong>。本篇两处回到前两篇：自动装配发生在 refresh 的 BeanFactoryPostProcessor 阶段（IoC 篇第 5 节），AOP 代理发生在最后的单例实例化阶段（AOP 篇第 5 节）。</p></div>
+      <div class="callout" style="margin-top:15px"><p><strong>系列导航：</strong><a href="spring-ioc-internals.html">① IoC 篇：容器、Bean 生命周期与循环依赖</a> · <a href="spring-aop-internals.html">② AOP 篇：BeanPostProcessor、动态代理与拦截器链</a> · <strong>③ Boot 篇（本篇）</strong> · <a href="spring-capabilities.html">④ 能力全家桶篇：并发、调度、缓存与事件</a>。本篇两处回到前两篇：自动装配发生在 refresh 的 BeanFactoryPostProcessor 阶段（IoC 篇第 5 节），AOP 代理发生在最后的单例实例化阶段（AOP 篇第 5 节）。</p></div>
     </section>
 
     <section id="annotation">
@@ -307,7 +307,7 @@ public class XxxAutoConfiguration {
           <p>官方认为循环依赖是设计坏味道，而且三级缓存这套解法有边界（构造器注入和 prototype 本来就解不了），全量默认放开容易掩盖问题，所以 2.6 起 allow-circular-references 默认 false，出现循环直接启动失败。需要打开要显式配置。出现循环依赖时的推荐处理：优先重构，把两个 Bean 互相依赖的公共逻辑下沉到第三个 Bean；临时缓解用 @Lazy 打断一边，注入的是代理，首次调用才真正创建。</p>
         </div>
       </div>
-      <div class="callout warn" style="margin-top:15px"><p><strong>使用建议：</strong>B1 是 Spring Boot 面试的第一题，务必练到不看稿能说；B4 是区分度题，把"注册定义 vs 创建实例"两个时机分开讲。三部曲收尾：<a href="spring-ioc-internals.html">IoC 篇</a>管"对象怎么来"，<a href="spring-aop-internals.html">AOP 篇</a>管"功能怎么增强"，本篇管"配置怎么自动来"——Spring 面试的完整骨架就这三根柱子。</p></div>
+      <div class="callout warn" style="margin-top:15px"><p><strong>使用建议：</strong>B1 是 Spring Boot 面试的第一题，务必练到不看稿能说；B4 是区分度题，把"注册定义 vs 创建实例"两个时机分开讲。系列收尾：<a href="spring-ioc-internals.html">IoC 篇</a>管"对象怎么来"，<a href="spring-aop-internals.html">AOP 篇</a>管"功能怎么增强"，本篇管"配置怎么自动来"，<a href="spring-capabilities.html">④ 能力全家桶篇</a>管"Spring 出厂自带哪些能力"——Spring 面试的四根柱子。</p></div>
     </section>
   </main>
   <footer><div class="shell">Spring Boot 专题：自动装配与启动流程</div></footer>
