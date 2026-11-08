@@ -1,7 +1,7 @@
 [
   {
-    "title": "工业物联网通信协议详解:MQTT · Modbus · OPC UA",
-    "description": "系统讲解工业物联网三大通信协议 MQTT、Modbus、OPC UA:设计动机、报文字节结构、核心机制、安全模型、动手实验与选型指南。",
+    "title": "小白也能懂的物联网三协议:MQTT · Modbus · OPC UA",
+    "description": "零基础入门工业物联网三大通信协议:用生活比喻讲透 MQTT、Modbus、OPC UA 是什么、解决什么问题,附可复制粘贴的动手实验。",
     "date": "2026-11-08",
     "url": "documents/iot-protocols-guide.html"
   },
