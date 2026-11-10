@@ -1,5 +1,11 @@
 [
   {
+    "title": "物联网三协议进阶:术语、版本体系与企业实战",
+    "description": "物联网三协议进阶指南:官方术语对照、MQTT/Modbus/OPC UA 版本与传输变体体系、ISA-95 企业分层架构、EMQX/SparkPlug/KepServerEX 等企业实战用法与岗位方向。",
+    "date": "2026-11-10",
+    "url": "documents/iot-protocols-advanced.html"
+  },
+  {
     "title": "小白也能懂的物联网三协议:MQTT · Modbus · OPC UA",
     "description": "零基础入门工业物联网三大通信协议:用生活比喻讲透 MQTT、Modbus、OPC UA 是什么、解决什么问题,附可复制粘贴的动手实验。",
     "date": "2026-11-08",
