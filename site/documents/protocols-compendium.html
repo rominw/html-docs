@@ -98,14 +98,14 @@
         <div class="stat"><b>3 篇 15 章</b><span>网络基础 · 工业协议 · 面试冲刺</span></div>
         <div class="stat"><b>6 个协议</b><span>TCP/UDP/HTTP(S)/MQTT/Modbus/OPC UA</span></div>
         <div class="stat"><b>1 条主线</b><span>底层特性 → 上层设计动因</span></div>
-        <div class="stat"><b>45 道面试题</b><span>答案要点 + 场景设计 + 话术</span></div>
+        <div class="stat"><b>46 道面试题</b><span>答案要点 + 场景设计 + 话术</span></div>
       </div>
     </div>
   </header>
   <nav>
     <div class="shell">
       <a href="#p1">基础篇</a><a href="#sec1">1 分层</a><a href="#sec2">2 IP/端口</a><a href="#sec3">3 TCP</a>
-      <a href="#sec4">4 UDP</a><a href="#sec5">5 HTTP</a><a href="#sec6">6 TLS/HTTPS</a><a href="#sec7">7 WS/DNS</a>
+      <a href="#sec4">4 UDP</a><a href="#sec5">5 HTTP</a><a href="#sec6">6 TLS/HTTPS</a><a href="#sec7">7 WS/SSE/DNS</a>
       <a href="#p2">工业篇</a><a href="#sec8">8 图景</a><a href="#sec9">9 MQTT</a><a href="#sec10">10 Modbus</a>
       <a href="#sec11">11 OPC UA</a><a href="#sec12">12 企业实战</a>
       <a href="#p3">面试篇</a><a href="#sec13">13 题库</a><a href="#sec14">14 场景/话术</a><a href="#sec15">15 岗位</a>
@@ -344,23 +344,51 @@
 
     <!-- ═══ 7 ═══ -->
     <section id="sec7">
-      <div class="head"><h2>7. 两个配角:WebSocket 与 DNS</h2><p>各有一个必考点,顺带一条因果线。</p></div>
+      <div class="head"><h2>7. 三个配角:WebSocket、SSE 与 DNS</h2><p>凑齐"服务端推送"全家福:轮询、长轮询、SSE、WebSocket——再各带一条因果线。</p></div>
+
+      <h3 style="margin:0 0 6px">7.1 WebSocket:HTTP 升级出的全双工</h3>
       <div class="grid2">
         <div class="card pad">
-          <h3 style="margin-top:0">WebSocket:HTTP 升级出的全双工</h3>
-          <ul class="clean">
-            <li>一次 HTTP 握手(<code>Upgrade: websocket</code>)"改签",此后双向自由收发</li>
+          <ul class="clean" style="margin:0">
+            <li>一次 HTTP 握手(<code>Upgrade: websocket</code>)"改签",此后双向自由收发,支持二进制</li>
             <li><strong>联动:</strong>MQTT over WebSocket(8083)让浏览器 JS 直连 Broker——Web 看板标配</li>
           </ul>
         </div>
         <div class="card pad">
-          <h3 style="margin-top:0">DNS:域名→IP 的电话簿</h3>
-          <ul class="clean">
+          <h3 style="margin-top:0">7.3 DNS:域名→IP 的电话簿</h3>
+          <ul class="clean" style="margin:0">
             <li>UDP 53 端口;缓存链:本机→本地 DNS→根→顶级→权威,TTL 定时效</li>
             <li><strong>联动:</strong>长连接重连必须重新解析,否则 Broker 换 IP 后设备还傻连旧地址</li>
           </ul>
         </div>
       </div>
+
+      <h3 style="margin:28px 0 6px">7.2 SSE:HTTP 响应"不结束"的艺术(大模型时代翻红)</h3>
+      <div class="card pad">
+        <p style="margin:0 0 10px"><strong>原理推导:</strong>第 5 章说 HTTP 是"一问一答、答完就散"——但 HTTP 响应允许<strong>分块传输且不关闭</strong>(chunked)。SSE(Server-Sent Events)就是把这一点用到极致:响应头 <code>Content-Type: text/event-stream</code>,连接永远不结束,服务端有事件就写一段,浏览器原生 <code>EventSource</code> API 接收,<strong>断线自动重连</strong>(带 <code>Last-Event-ID</code> 请求续传)。本质:<strong>仍是 HTTP,只是把"响应"变成了一条单向河流</strong>。</p>
+        <p style="margin:0 0 4px">报文格式极简到可爱,四种字段 + 空行分隔:</p>
+        <pre>id: 42           ← 事件序号:断线重连时浏览器带 Last-Event-ID: 42,服务端可从断点补发
+event: alert     ← 自定义事件类型(可选)
+data: 温度过高    ← 数据行(多行 data 会自动拼接)
+retry: 3000      ← 建议重连间隔毫秒(可选)
+                 ← 空行 = 一条事件结束</pre>
+        <p style="margin:10px 0 0"><strong>为什么 ChatGPT 们清一色用 SSE 而不是 WebSocket?</strong>①用户输入是一次普通 HTTP 请求,<strong>单向流回</strong>就够,不需要双工;②纯 HTTP,现有网关/CDN/负载均衡/鉴权中间件<strong>全部直接兼容</strong>(WebSocket 的 Upgrade 常被代理卡);③实现极简,<code>curl -N</code> 都能测。"一个字一个字蹦"= 服务端把生成好的 token 逐条 <code>data:</code> 推下来。</p>
+      </div>
+      <div class="card pad table" style="margin-top:15px">
+        <table>
+          <thead><tr><th>维度</th><th>轮询</th><th>长轮询</th><th>SSE</th><th>WebSocket</th></tr></thead>
+          <tbody>
+            <tr><td>延迟</td><td>取决于间隔</td><td>低</td><td>低</td><td>低</td></tr>
+            <tr><td>方向</td><td>客户端拉</td><td>客户端拉(挂着等)</td><td><strong>服务端单向推</strong></td><td><strong>双向</strong></td></tr>
+            <tr><td>协议本质</td><td>HTTP</td><td>HTTP</td><td>HTTP 流式响应</td><td>独立协议(HTTP 升级)</td></tr>
+            <tr><td>断线重连</td><td>—</td><td>自己写</td><td><span class="pill g">自动 + 断点续传</span></td><td>自己写</td></tr>
+            <tr><td>数据格式</td><td>—</td><td>—</td><td>仅文本</td><td>文本 + 二进制</td></tr>
+            <tr><td>代理/网关兼容</td><td>完美</td><td>完美</td><td><span class="pill g">好(就是 HTTP)</span></td><td>一般(需支持 Upgrade)</td></tr>
+            <tr><td>典型场景</td><td>低频刷新</td><td>旧系统</td><td>看板/通知/<strong>LLM 流式输出</strong></td><td>聊天/游戏/双向控制</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>物联网联动:</strong>Web 能源看板要实时刷新,三条路——①轮询(傻但零成本);②SSE(服务端算好推给浏览器,轻);③MQTT over WebSocket(浏览器直接订阅设备主题,数据不过中间层)。选型看"谁产生数据":业务服务产出用 SSE,设备数据直达用 MQTT over WS。</p></div>
     </section>
 
     <div class="part" id="p2"><h2>PART B · 工业协议篇:MQTT / Modbus / OPC UA</h2></div>
@@ -524,10 +552,10 @@
 
     <!-- ═══ 13 ═══ -->
     <section id="sec13">
-      <div class="head"><h2>13. 45 道高频题速查(按协议分组)</h2><p>答题结构:一句话结论 → 机制 → "我验证过" → 延伸一个坑。</p></div>
+      <div class="head"><h2>13. 46 道高频题速查(按协议分组)</h2><p>答题结构:一句话结论 → 机制 → "我验证过" → 延伸一个坑。</p></div>
       <div class="card pad table">
         <table>
-          <thead><tr><th style="width:30%">网络基础 10 题</th><th>答案要点</th></tr></thead>
+          <thead><tr><th style="width:30%">网络基础 11 题</th><th>答案要点</th></tr></thead>
           <tbody>
             <tr><td>① 三次握手为何不是两次</td><td>双向收发确认 + 防历史重复 SYN(第三次 ACK 可否决)</td></tr>
             <tr><td>② 挥手为何四次</td><td>全双工独立关;被动方 ACK 与 FIN 间还要发完数据</td></tr>
@@ -538,7 +566,8 @@
             <tr><td>⑦ 输入网址到显示</td><td>DNS→TCP 握手→(TLS)→HTTP→渲染</td></tr>
             <tr><td>⑧ HTTPS 握手</td><td>见第 6 章六步;混用对称非对称;证书链;Finished 防篡改</td></tr>
             <tr><td>⑨ HTTP 演进</td><td>1.1 keep-alive / 2 多路复用 / 3 QUIC(UDP 重建可靠)</td></tr>
-            <tr><td>⑩ NAT 内网下发指令</td><td>设备主动出连长连接,下行复用</td></tr>
+            <tr><td>⑩ SSE vs WebSocket</td><td>单向推选 SSE(HTTP 流式响应、自动重连续传、网关全兼容,LLM 流式输出标配);双向实时选 WebSocket(独立协议、支持二进制)</td></tr>
+            <tr><td>⑪ NAT 内网下发指令</td><td>设备主动出连长连接,下行复用</td></tr>
           </tbody>
         </table>
       </div>
@@ -620,7 +649,7 @@
 
     <!-- ═══ 15 ═══ -->
     <section id="sec15">
-      <div class="head"><h2>15. 按岗位的复习优先级与冲刺计划</h2><p>45 题不必平均用力——先看目标岗。</p></div>
+      <div class="head"><h2>15. 按岗位的复习优先级与冲刺计划</h2><p>46 题不必平均用力——先看目标岗。</p></div>
       <div class="card pad table">
         <table>
           <thead><tr><th>岗位</th><th>必答(★)</th><th>加分</th></tr></thead>
