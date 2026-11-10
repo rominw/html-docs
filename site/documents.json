@@ -12,6 +12,12 @@
     "url": "documents/iot-protocols-advanced.html"
   },
   {
+    "title": "协议面试题全集:从 TCP 到 OPC UA 的 45 道高频题",
+    "description": "协议面试题全集:网络基础(TCP/UDP/HTTP)与工业三协议(MQTT/Modbus/OPC UA)共 45 道高频题的参考答案要点,含场景设计题、项目话术与按岗位的复习清单。",
+    "date": "2026-11-10",
+    "url": "documents/protocols-interview-guide.html"
+  },
+  {
     "title": "小白也能懂的物联网三协议:MQTT · Modbus · OPC UA",
     "description": "零基础入门工业物联网三大通信协议:用生活比喻讲透 MQTT、Modbus、OPC UA 是什么、解决什么问题,附可复制粘贴的动手实验。",
     "date": "2026-11-08",
