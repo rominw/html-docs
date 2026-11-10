@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="协议全书:从 TCP/IP 分层到 TLS 握手逐消息、从 MQTT/Modbus/OPC UA 底层原理到企业实战与 45 道面试题——按'为什么这么设计'组织的协议知识体系。">
+  <meta name="date" content="2026-11-10">
+  <title>协议全书:从比特到云端的底层原理</title>
+  <style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .part{margin:52px 0 20px;padding:16px 22px;border-radius:15px;background:var(--blue2);border:1px solid var(--line)}
+    .part h2{margin:0;font-size:15px;letter-spacing:.06em;color:var(--blue)}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    pre{margin:10px 0 0;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);
+      overflow:auto;font:.85em Consolas,monospace;line-height:1.6}
+    pre b{color:var(--blue);font-weight:700}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell">
+      <div class="kicker">PROTOCOL COMPENDIUM</div>
+      <h1>协议全书:从比特到云端</h1>
+      <p class="lead">TCP/IP、TLS、HTTP、MQTT、Modbus、OPC UA——一册讲透。每一节都从"为什么这么设计"讲起:底层原理理解了,上层协议就不再是背诵,而是推理。</p>
+      <div class="doc-meta">
+        <time datetime="2026-11-10">2026年11月10日</time>
+        <span>合并版 · 基础篇 + 工业篇 + 面试篇</span>
+      </div>
+      <div class="actions">
+        <a class="btn" href="../index.html">返回首页</a>
+        <a class="btn" href="#p1">开始阅读</a>
+        <button class="btn" id="theme" type="button">切换主题</button>
+        <button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>3 篇 15 章</b><span>网络基础 · 工业协议 · 面试冲刺</span></div>
+        <div class="stat"><b>6 个协议</b><span>TCP/UDP/HTTP(S)/MQTT/Modbus/OPC UA</span></div>
+        <div class="stat"><b>1 条主线</b><span>底层特性 → 上层设计动因</span></div>
+        <div class="stat"><b>45 道面试题</b><span>答案要点 + 场景设计 + 话术</span></div>
+      </div>
+    </div>
+  </header>
+  <nav>
+    <div class="shell">
+      <a href="#p1">基础篇</a><a href="#sec1">1 分层</a><a href="#sec2">2 IP/端口</a><a href="#sec3">3 TCP</a>
+      <a href="#sec4">4 UDP</a><a href="#sec5">5 HTTP</a><a href="#sec6">6 TLS/HTTPS</a><a href="#sec7">7 WS/DNS</a>
+      <a href="#p2">工业篇</a><a href="#sec8">8 图景</a><a href="#sec9">9 MQTT</a><a href="#sec10">10 Modbus</a>
+      <a href="#sec11">11 OPC UA</a><a href="#sec12">12 企业实战</a>
+      <a href="#p3">面试篇</a><a href="#sec13">13 题库</a><a href="#sec14">14 场景/话术</a><a href="#sec15">15 岗位</a>
+    </div>
+  </nav>
+  <main class="shell">
+
+    <div class="part" id="p1"><h2>PART A · 网络基础篇:所有协议脚下的地基</h2></div>
+
+    <!-- ═══ 1 ═══ -->
+    <section id="sec1">
+      <div class="head"><h2>1. 分层地图:先看懂这座楼</h2><p>每个协议的怪癖,都能在楼下两层找到出处。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 400" role="img" aria-labelledby="d1Title d1Desc">
+          <title id="d1Title">网络协议分层地图</title>
+          <desc id="d1Desc">四层地图:应用层含 MQTT、Modbus TCP、OPC UA、HTTPS、DNS、WebSocket;传输层 TCP 与 UDP;网络层 IP;链路层以太网 WiFi;右侧注明串口协议 Modbus RTU 不进此栈。</desc>
+          <rect class="lane" x="20" y="20" width="1000" height="90" rx="14"/>
+          <text class="sub" x="40" y="44">应用层(各说各的"业务语言")</text>
+          <rect class="node v" x="50" y="58" width="130" height="40" rx="8"/><text class="title" x="115" y="83" text-anchor="middle">MQTT</text>
+          <rect class="node v" x="195" y="58" width="130" height="40" rx="8"/><text class="title" x="260" y="83" text-anchor="middle">Modbus TCP</text>
+          <rect class="node v" x="340" y="58" width="130" height="40" rx="8"/><text class="title" x="405" y="83" text-anchor="middle">OPC UA</text>
+          <rect class="node" x="485" y="58" width="130" height="40" rx="8"/><text class="title" x="550" y="83" text-anchor="middle">HTTP/S</text>
+          <rect class="node" x="630" y="58" width="110" height="40" rx="8"/><text class="title" x="685" y="83" text-anchor="middle">DNS</text>
+          <rect class="node a" x="755" y="58" width="130" height="40" rx="8"/><text class="title" x="820" y="83" text-anchor="middle">WebSocket</text>
+          <rect class="lane" x="20" y="126" width="1000" height="76" rx="14"/>
+          <text class="sub" x="40" y="150">传输层(管"送到",不管"含义")</text>
+          <rect class="node g" x="330" y="162" width="150" height="32" rx="8"/><text class="title" x="405" y="183" text-anchor="middle">TCP · 可靠字节流</text>
+          <rect class="node a" x="510" y="162" width="150" height="32" rx="8"/><text class="title" x="585" y="183" text-anchor="middle">UDP · 尽力而为</text>
+          <rect class="lane" x="20" y="218" width="1000" height="76" rx="14"/>
+          <text class="sub" x="40" y="242">网络层(全球寻址)</text>
+          <rect class="node" x="440" y="254" width="160" height="32" rx="8"/><text class="title" x="520" y="275" text-anchor="middle">IP · IPv4 / IPv6</text>
+          <rect class="lane" x="20" y="310" width="1000" height="76" rx="14"/>
+          <text class="sub" x="40" y="334">链路/物理层(真正的电线与无线电)</text>
+          <rect class="node" x="400" y="346" width="120" height="32" rx="8"/><text class="title" x="460" y="367" text-anchor="middle">以太网/WiFi</text>
+          <rect class="node r" x="760" y="330" width="240" height="48" rx="10"/><text class="title" x="880" y="351" text-anchor="middle">Modbus RTU / RS-485</text><text class="sub" x="880" y="368" text-anchor="middle">串口协议,不进 TCP/IP 栈</text>
+        </svg>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>本书主线:</strong>底层特性会向上"漏问题"——TCP 不保证消息边界(→ 粘包,催生各协议的切帧设计)、不保证对端应用活着(→ 应用层心跳/遗嘱)、不替你重发业务消息(→ 应用层 QoS)。把这三条因果线刻在脑子里,后面每个协议都是"必然如此"。</p></div>
+    </section>
+
+    <!-- ═══ 2 ═══ -->
+    <section id="sec2">
+      <div class="head"><h2>2. IP 与端口:门牌系统</h2><p>消息如何找到目标——以及 NAT 如何决定了物联网的连接方向。</p></div>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">IP = 小区地址</h3>
+          <ul class="clean">
+            <li>IPv4 32 位(<code>192.168.1.10</code>),约 43 亿个已耗尽;IPv6 128 位,物联网海量设备的主角</li>
+            <li>公网 vs 内网:设备通常在内网(<code>192.168.x</code>/<code>10.x</code>),经 <strong>NAT</strong> 共享公网出口</li>
+            <li><strong>NAT 的因果线:</strong>外部无法主动进内网 → 物联网必然"设备主动出连、长连接保持、下行复用"——MQTT 形态的根本原因</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">端口 = 门牌号</h3>
+          <ul class="clean">
+            <li>16 位,区分同机不同服务</li>
+            <li>熟面孔:<code>80/443</code> HTTP(S) · <code>1883/8883</code> MQTT(明文/TLS) · <code>502</code> Modbus TCP · <code>4840</code> OPC UA · <code>53</code> DNS</li>
+            <li>排查"连不上"第一步:<code>telnet ip 端口</code> / <code>netstat -ano</code> 看监听</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 3 ═══ -->
+    <section id="sec3">
+      <div class="head"><h2>3. TCP:可靠字节流</h2><p>面试题密度之王:握手、挥手、粘包三大考点一次讲透底层逻辑。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 230" role="img" aria-labelledby="d2Title d2Desc">
+          <title id="d2Title">TCP 三次握手与四次挥手</title>
+          <desc id="d2Desc">左:三次握手 SYN、SYN+ACK、ACK;右:四次挥手 FIN、ACK、FIN、ACK 与 TIME_WAIT。</desc>
+          <defs><marker id="ar2" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker>
+          <marker id="ar2a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--amber)"/></marker></defs>
+          <text class="title" x="240" y="18" text-anchor="middle">三次握手(建立连接)</text>
+          <line class="life" x1="80" y1="26" x2="80" y2="210"/><line class="life" x1="400" y1="26" x2="400" y2="210"/>
+          <text class="sub" x="80" y="22" text-anchor="middle">客户端</text><text class="sub" x="400" y="22" text-anchor="middle">服务端</text>
+          <path class="edge" d="M90 50H390" marker-end="url(#ar2)"/><text class="sub" x="240" y="44" text-anchor="middle">① SYN(seq=x)「我想连接」</text>
+          <path class="edge" d="M390 88H90" marker-end="url(#ar2)"/><text class="sub" x="240" y="82" text-anchor="middle">② SYN+ACK(seq=y, ack=x+1)「收到,我也想连」</text>
+          <path class="edge" d="M90 126H390" marker-end="url(#ar2)"/><text class="sub" x="240" y="120" text-anchor="middle">③ ACK(ack=y+1)「收到」→ 双方就绪</text>
+          <text class="title" x="760" y="18" text-anchor="middle">四次挥手(断开连接)</text>
+          <line class="life" x1="600" y1="26" x2="600" y2="210"/><line class="life" x1="920" y1="26" x2="920" y2="210"/>
+          <text class="sub" x="600" y="22" text-anchor="middle">主动方</text><text class="sub" x="920" y="22" text-anchor="middle">被动方</text>
+          <path class="edge a" d="M610 50H910" marker-end="url(#ar2a)"/><text class="sub" x="760" y="44" text-anchor="middle">① FIN「我说完了」</text>
+          <path class="edge a" d="M910 80H610" marker-end="url(#ar2a)"/><text class="sub" x="760" y="74" text-anchor="middle">② ACK「收到」(可能还有数据 → 所以四次)</text>
+          <path class="edge a" d="M920 116H612" marker-end="url(#ar2a)"/><text class="sub" x="760" y="110" text-anchor="middle">③ FIN「我也说完了」</text>
+          <path class="edge a" d="M612 150H920" marker-end="url(#ar2a)"/><text class="sub" x="760" y="144" text-anchor="middle">④ ACK → 主动方 TIME_WAIT 等 2MSL</text>
+          <text class="sub" x="760" y="190" text-anchor="middle">TIME_WAIT:最后的 ACK 可重传 + 旧报文自然消亡</text>
+        </svg>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">为什么三次,不能两次?</h3>
+          <ul class="clean">
+            <li>目的:双方都确认"我能发他能收、他能发我能收"</li>
+            <li>两次的致命伤:<strong>历史重复 SYN</strong>(网络里迷路的老请求)会被误当新连接;第三次 ACK 给了客户端否决权</li>
+            <li>挥手为何四次:全双工两方向独立关,被动方 ACK 与 FIN 之间还要发完剩余数据</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">可靠四件套 + 粘包</h3>
+          <ul class="clean">
+            <li>序号+确认 / 超时重传 / 滑动窗口(流控)/ 拥塞控制</li>
+            <li><strong>粘包</strong>:字节流无边界;应用层三解法——定长 / 分隔符 / <strong>长度前缀</strong>(MQTT 剩余长度、Modbus MBAP 的设计根源;串口 RTU 无前缀只能 3.5 字符静默切帧)</li>
+            <li>TCP keepalive 默认 2 小时太迟钝 → MQTT 自定义 60s 应用层心跳</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>面试三连:</strong>TCP 可靠只是"字节送到对方内核缓冲区"(点到点),应用进程崩溃照样丢 → 所以 MQTT 要应用层 QoS(端到端);TIME_WAIT 堆积会端口耗尽 → 物联网全用长连接;半包粘包 → 一切应用层协议都要回答"怎么切帧"。</p></div>
+    </section>
+
+    <!-- ═══ 4 ═══ -->
+    <section id="sec4">
+      <div class="head"><h2>4. UDP:自由但有代价</h2><p>没有握手、没有重传——换来极致轻快与天然多播。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>维度</th><th>TCP</th><th>UDP</th></tr></thead>
+          <tbody>
+            <tr><td>连接/状态</td><td>三次握手,有状态</td><td>无连接,拿了就发</td></tr>
+            <tr><td>可靠性</td><td>确认+重传+排序</td><td>尽力而为,可能丢/乱序</td></tr>
+            <tr><td>头部</td><td>20 字节起</td><td>固定 8 字节</td></tr>
+            <tr><td>边界</td><td>字节流(粘包问题)</td><td>数据报天然有边界</td></tr>
+            <tr><td>一对多</td><td>一对一</td><td>广播/多播原生支持</td></tr>
+            <tr><td>物联网用户</td><td>MQTT / Modbus TCP / OPC UA</td><td>MQTT-SN / OPC UA PubSub 多播 / CoAP / DNS</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>选型因果:</strong>低延迟不要重传(音视频、实时控制)、一对多(PubSub 多播)、包小到亏 TCP 头(DNS)→ UDP;MQTT-SN 把 MQTT 搬上 UDP 给跑不动 TCP 栈的超弱传感器,可靠性由应用层 QoS 补——又一次"传输层不可靠,应用层兜底"。</p></div>
+    </section>
+
+    <!-- ═══ 5 ═══ -->
+    <section id="sec5">
+      <div class="head"><h2>5. HTTP:互联网通用语</h2><p>模型、方法、状态码与四代演进——以及它为什么退守物联网平台层。</p></div>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">核心模型</h3>
+          <ul class="clean">
+            <li>请求/响应:客户端发起,服务端无法主动推</li>
+            <li>方法:<code>GET/POST/PUT/DELETE</code> → REST;状态码:<code>200/301/404/500</code></li>
+            <li>文本协议,头几百字节——比 MQTT 重百倍</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">四代演进(每代一句话)</h3>
+          <ul class="clean">
+            <li>1.0 每请求新建连接(贵)→ 1.1 keep-alive 长连接(主流)</li>
+            <li>2 二进制分帧+多路复用(一条连接并行多请求)</li>
+            <li>3 弃 TCP 改 <strong>QUIC(UDP 上重建可靠)</strong>,根治队头阻塞</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>与 MQTT 分工(面试高频):</strong>设备→平台用 MQTT(省电/弱网/可下行);平台对外 REST API 给业务系统;固件/文件用 HTTPS 下载。答"分层共存"而非"二选一"。</p></div>
+    </section>
+
+    <!-- ═══ 6 TLS/HTTPS 深度(新) ═══ -->
+    <section id="sec6">
+      <div class="head"><h2>6. HTTPS / TLS 深度详解:从密码学讲到握手逐消息</h2><p>本章是"经得住拷打"的重灾区——按"为什么需要"的顺序推导出 TLS 的每一步。</p></div>
+
+      <h3 style="margin:0 0 6px">6.1 从 HTTP 的三宗罪推导 TLS 的三个保证</h3>
+      <div class="card pad">
+        <p style="margin:0">HTTP 明文传输,中间人可以<strong>窃听</strong>(抄走内容)、<strong>篡改</strong>(改了你也发现不了)、<strong>冒充</strong>(假装是服务器)。TLS 对症下药提供三个保证:<strong>机密性</strong>(加密,看不懂)、<strong>完整性</strong>(校验,改不了)、<strong>真实性</strong>(证书,冒充不了)。下面逐步推导:为了同时做到这三点,TLS 的握手为什么长成那样。</p>
+      </div>
+
+      <h3 style="margin:28px 0 6px">6.2 密码学三件套(先补地基,后面全是推理)</h3>
+      <div class="grid3">
+        <div class="mini"><h3>对称加密(AES)</h3><p>加解密同一把钥匙,快(硬件加速,GB/s 级)。致命问题:<strong>钥匙怎么安全地给对方?</strong>明文寄钥匙等于没加密。</p></div>
+        <div class="mini"><h3>非对称加密(RSA/ECC)</h3><p>公钥加密只有私钥能解(或反之做签名)。解决"钥匙分发":公钥随便公开。缺点:慢非对称约千倍,只适合传小数据。</p></div>
+        <div class="mini"><h3>哈希与签名(SHA-256)</h3><p>哈希单向指纹;数字签名=用<strong>私钥</strong>签哈希,任何人用<strong>公钥</strong>验证——证明"是他发的且没被改"。</p></div>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>混合加密(一切的核心套路):</strong>非对称加密很慢 → 只用它交换一把临时的<strong>对称密钥</strong> → 之后全程对称加密。就像用昂贵的挂号信寄一把保险箱钥匙,之后天天往保险箱里塞普通信件。TLS 握手所做的全部事情,本质就是<strong>安全地协商出这把对称密钥 + 验明对方正身</strong>。</p></div>
+
+      <h3 style="margin:28px 0 6px">6.3 证书:为什么不能直接发公钥?</h3>
+      <div class="card pad">
+        <p style="margin:0 0 10px">如果服务器只是把公钥明文发给你——中间人把它<strong>替换成自己的公钥</strong>,你后续的"加密"全部对中间人透明。这就是中间人攻击(MITM)。解法:公钥不裸发,由 <strong>CA(证书颁发机构)</strong>用它的私钥签名担保:</p>
+        <p style="margin:0"><strong>证书 = 你的公钥 + 你的身份信息 + CA 的签名</strong>。验证链:操作系统内置<strong>根 CA</strong>公钥(信任的起点)→ 验中间 CA 证书 → 验网站证书,逐级用上一级公钥验下一级签名。链条尽头是机器里预置的根证书——所以"装来路不明的根证书"等于把整个信任体系交出去。</p>
+      </div>
+
+      <h3 style="margin:28px 0 6px">6.4 TLS 1.2 握手逐消息(RSA 密钥交换版,最经典)</h3>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 420" role="img" aria-labelledby="d3Title d3Desc">
+          <title id="d3Title">TLS 1.2 完整握手时序</title>
+          <desc id="d3Desc">客户端与服务端时序:ClientHello 带随机数与套件列表,ServerHello 选套件,Certificate 传证书,ClientKeyExchange 用公钥加密预主密钥,双方各自算出会话密钥,ChangeCipherSpec 后交换 Finished 验证握手完整性。</desc>
+          <defs><marker id="ar3" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker>
+          <marker id="ar3a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--amber)"/></marker></defs>
+          <line class="life" x1="240" y1="30" x2="240" y2="400"/><line class="life" x1="800" y1="30" x2="800" y2="400"/>
+          <text class="title" x="240" y="22" text-anchor="middle">客户端</text><text class="title" x="800" y="22" text-anchor="middle">服务端</text>
+          <path class="edge" d="M250 60H790" marker-end="url(#ar3)"/>
+          <text class="sub" x="520" y="54" text-anchor="middle">① ClientHello:客户端随机数 R1 + 我支持的密码套件清单</text>
+          <path class="edge" d="M790 108H250" marker-end="url(#ar3)"/>
+          <text class="sub" x="520" y="102" text-anchor="middle">② ServerHello:服务端随机数 R2 + 选定套件(如 TLS_ECDHE_RSA_WITH_AES_128_GCM)</text>
+          <path class="edge" d="M790 148H250" marker-end="url(#ar3)"/>
+          <text class="sub" x="520" y="142" text-anchor="middle">③ Certificate:服务器证书(公钥在此,客户端沿证书链验证身份)</text>
+          <path class="edge" d="M250 196H790" marker-end="url(#ar3)"/>
+          <text class="sub" x="520" y="190" text-anchor="middle">④ ClientKeyExchange:预主密钥 PMS,用服务器公钥加密后发送(仅私钥能解)</text>
+          <rect class="lane" x="300" y="216" width="440" height="56" rx="10"/>
+          <text class="sub" x="520" y="238" text-anchor="middle">双方独立计算:会话密钥 = f(R1, R2, PMS) —— 谁也没在网上传过密钥本身</text>
+          <text class="sub" x="520" y="256" text-anchor="middle">三个随机数保证:即使某次随机数弱,密钥也不可预测</text>
+          <path class="edge a" d="M250 300H790" marker-end="url(#ar3a)"/>
+          <text class="sub" x="520" y="294" text-anchor="middle">⑤ ChangeCipherSpec + Finished:切换加密模式;Finished=此前全部握手消息的哈希(加密发送)</text>
+          <path class="edge a" d="M790 348H250" marker-end="url(#ar3a)"/>
+          <text class="sub" x="520" y="342" text-anchor="middle">⑥ 服务端同样 ChangeCipherSpec + Finished</text>
+          <text class="sub" x="520" y="392" text-anchor="middle">之后所有 HTTP 数据走对称加密(AES)——握手完成,密钥从未裸奔,身份已被担保,篡改会被哈希发现</text>
+        </svg>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">每一步"为什么存在"</h3>
+          <ul class="clean">
+            <li>两个随机数(R1/R2):防止"双方今天和昨天用了完全一样的密钥";三随机共同决定密钥</li>
+            <li>套件协商:客户端报家底、服务端挑一个——兼容 20 年代差</li>
+            <li><strong>Finished 是精华</strong>:把之前所有握手消息做哈希互验——如果中间人篡改过任何一步(比如换公钥),双方算出的哈希对不上,连接立刻失败。这是"完整性"的收官</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">TLS 1.3 的三大改进</h3>
+          <ul class="clean">
+            <li>握手从 2-RTT 降到 <strong>1-RTT</strong>(ClientHello 就带上密钥材料,消息也更少)</li>
+            <li><strong>废弃 RSA 密钥交换,只留 ECDHE</strong>——为前向保密(见下)</li>
+            <li>握手消息本身也加密(抓包看不到证书细节);支持 0-RTT 会话恢复(有重放风险,只用于幂等请求)</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 style="margin:28px 0 6px">6.5 前向保密:面试深水区的一道分水岭</h3>
+      <div class="card pad">
+        <p style="margin:0 0 10px"><strong>RSA 交换的致命伤:</strong>预主密钥用服务器公钥加密——如果哪天服务器私钥泄露,攻击者把过去录下的所有密文流量<strong>全部解密</strong>(流量录制攻击:先存着,等钥匙到手)。</p>
+        <p style="margin:0"><strong>ECDHE(E=临时)的解法:</strong>双方每次会话各自生成<strong>一次性临时密钥对</strong>,用 Diffie-Hellman 算法协商出会话密钥,用完即焚、永不存储。私钥只用来签名证明身份,不再参与加密——即使私钥泄露,历史会话的临时密钥早已销毁,<strong>过去的流量永远安全</strong>。这就是"前向保密(Forward Secrecy)":过去不因今日的失守而失守。</p>
+      </div>
+
+      <h3 style="margin:28px 0 6px">6.6 与工业协议的三条联动(答出即封神)</h3>
+      <div class="grid3">
+        <div class="mini"><h3>MQTT 的 8883</h3><p>= MQTT over TLS,设备与 Broker 之间就是本章的握手;每设备一张 X.509 证书 = 双向 mTLS(Broker 也验客户端)。</p></div>
+        <div class="mini"><h3>OPC UA SecureChannel</h3><p>没直接用 TLS,而是<strong>在自己的二进制协议里实现了同一套思想</strong>(非对称协商对称+签名加密)——2008 年设计时要跨平台跑嵌入式,顺带支持非 TCP 传输;知识点完全互通。</p></div>
+        <div class="mini"><h3>工业现场的自签名证书</h3><p>内网设备常不买 CA 证书,用自签证书+白名单互信——所以 OPC UA 落地最大成本是证书管理制度,不是协议本身。</p></div>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>面试六连:</strong>①握手过程(按上图六步讲)②为什么混用对称与非对称(快慢与分发)③证书链怎么验(根→中间→站点)④中间人怎么防(公钥不裸发+Finished 哈希收官)⑤前向保密(ECDHE 临时密钥,私钥泄露不解历史)⑥HTTPS 绝对安全吗(不防服务端被入侵、0-RTT 重放、客户端信任了恶意根证书)。</p></div>
+    </section>
+
+    <!-- ═══ 7 ═══ -->
+    <section id="sec7">
+      <div class="head"><h2>7. 两个配角:WebSocket 与 DNS</h2><p>各有一个必考点,顺带一条因果线。</p></div>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">WebSocket:HTTP 升级出的全双工</h3>
+          <ul class="clean">
+            <li>一次 HTTP 握手(<code>Upgrade: websocket</code>)"改签",此后双向自由收发</li>
+            <li><strong>联动:</strong>MQTT over WebSocket(8083)让浏览器 JS 直连 Broker——Web 看板标配</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">DNS:域名→IP 的电话簿</h3>
+          <ul class="clean">
+            <li>UDP 53 端口;缓存链:本机→本地 DNS→根→顶级→权威,TTL 定时效</li>
+            <li><strong>联动:</strong>长连接重连必须重新解析,否则 Broker 换 IP 后设备还傻连旧地址</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <div class="part" id="p2"><h2>PART B · 工业协议篇:MQTT / Modbus / OPC UA</h2></div>
+
+    <!-- ═══ 8 ═══ -->
+    <section id="sec8">
+      <div class="head"><h2>8. 三协议全局图景:分层地盘,不是竞争</h2><p>一句话定位:Modbus 取数、OPC UA 赋义、MQTT 上云。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 320" role="img" aria-labelledby="d4Title d4Desc">
+          <title id="d4Title">工业物联网三层通信架构</title>
+          <desc id="d4Desc">数据从传感器经 Modbus 到 PLC,经 OPC UA 到网关与监控,经 MQTT 到云平台;下方三个卡片给出三个协议的性格。</desc>
+          <defs><marker id="ar4" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker></defs>
+          <rect class="lane" x="20" y="20" width="1000" height="130" rx="16"/>
+          <text class="sub" x="40" y="44">一条数据从设备到云端的旅程</text>
+          <rect class="node" x="60" y="70" width="170" height="52" rx="10"/><text class="title" x="145" y="92" text-anchor="middle">传感器 / 电表</text><text class="sub" x="145" y="111" text-anchor="middle">最底层的设备</text>
+          <rect class="node" x="330" y="70" width="170" height="52" rx="10"/><text class="title" x="415" y="92" text-anchor="middle">PLC / 控制器</text><text class="sub" x="415" y="111" text-anchor="middle">车间里的"班主任"</text>
+          <path class="edge" d="M230 96H322" marker-end="url(#ar4)"/><text class="title" x="276" y="86" text-anchor="middle">Modbus</text>
+          <rect class="node v" x="620" y="70" width="180" height="52" rx="10"/><text class="title" x="710" y="92" text-anchor="middle">网关 / 监控软件</text><text class="sub" x="710" y="111" text-anchor="middle">车间和云的翻译官</text>
+          <path class="edge" d="M500 96H612" marker-end="url(#ar4)"/><text class="title" x="556" y="86" text-anchor="middle">OPC UA</text>
+          <rect class="node g" x="900" y="70" width="120" height="52" rx="10"/><text class="title" x="960" y="92" text-anchor="middle">云平台</text><text class="sub" x="960" y="111" text-anchor="middle">手机上的报表</text>
+          <path class="edge" d="M800 96H892" marker-end="url(#ar4)"/><text class="title" x="846" y="86" text-anchor="middle">MQTT</text>
+          <rect class="lane" x="20" y="180" width="1000" height="120" rx="16"/>
+          <text class="sub" x="40" y="206">各自负责什么</text>
+          <rect class="node" x="60" y="228" width="290" height="52" rx="10"/><text class="title" x="205" y="250" text-anchor="middle">Modbus:把数据从设备里拿出来</text><text class="sub" x="205" y="268" text-anchor="middle">1979 年生 · 简单皮实 · 资格最老</text>
+          <rect class="node v" x="375" y="228" width="290" height="52" rx="10"/><text class="title" x="520" y="250" text-anchor="middle">OPC UA:让数据"说人话"</text><text class="sub" x="520" y="268" text-anchor="middle">2008 年生 · 自带说明 · 安全</text>
+          <rect class="node g" x="690" y="228" width="290" height="52" rx="10"/><text class="title" x="835" y="250" text-anchor="middle">MQTT:把数据送上互联网</text><text class="sub" x="835" y="268" text-anchor="middle">1999 年生 · 省流量 · 专治弱网</text>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ═══ 9 MQTT ═══ -->
+    <section id="sec9">
+      <div class="head"><h2>9. MQTT:为卫星链路而生的极简主义者</h2><p>1999 年 IBM 监控沙漠油管,卫星链路按字节计费——一切设计由此推导。</p></div>
+      <div class="grid3">
+        <div class="mini"><h3>发布/订阅解耦</h3><p>发布者与订阅者经 Broker 中转、互不相识;换设备加听众零改造。</p></div>
+        <div class="mini"><h3>Topic 分层通配</h3><p><code>factory/line1/temp</code> 按 <code>/</code> 分层;<code>+</code> 精确匹配单层(3 层模式配不上 4 层主题),<code>#</code> 匹配余下全部。</p></div>
+        <div class="mini"><h3>2 字节固定头</h3><p>HTTP 头几百字节 vs MQTT 最小 2 字节;剩余长度变长编码(7bit/字节,续位标志,上限 4 字节 256MB)。</p></div>
+      </div>
+
+      <h3 style="margin:28px 0 6px">9.1 QoS 状态机:从"ACK 会丢"推导出四步握手</h3>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 300" role="img" aria-labelledby="d5Title d5Desc">
+          <title id="d5Title">MQTT QoS 等级的报文交互</title>
+          <desc id="d5Desc">QoS0 单向;QoS1 发布确认但确认丢失导致重复;QoS2 四步:PUBLISH 记账、PUBREC、PUBREL 放行、PUBCOMP 清除。</desc>
+          <defs><marker id="ar5" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker>
+          <marker id="ar5a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--amber)"/></marker></defs>
+          <line class="life" x1="180" y1="30" x2="180" y2="280"/><line class="life" x1="520" y1="30" x2="520" y2="280"/>
+          <text class="title" x="180" y="22" text-anchor="middle">发送方</text><text class="title" x="520" y="22" text-anchor="middle">接收方(Broker)</text>
+          <text class="sub" x="40" y="66">QoS 0</text>
+          <path class="edge a" d="M190 70H510" marker-end="url(#ar5a)"/><text class="sub" x="350" y="62" text-anchor="middle">PUBLISH · 发完就忘,可能丢</text>
+          <text class="sub" x="40" y="122">QoS 1</text>
+          <path class="edge" d="M190 126H510" marker-end="url(#ar5)"/><text class="sub" x="350" y="118" text-anchor="middle">PUBLISH (id=5)</text>
+          <path class="edge a" d="M510 156H190" marker-end="url(#ar5a)"/><text class="sub" x="350" y="148" text-anchor="middle">PUBACK — 丢了它 → 重发 → 接收方无法区分新旧 → 重复投递</text>
+          <text class="sub" x="40" y="196">QoS 2</text>
+          <path class="edge" d="M190 202H510" marker-end="url(#ar5)"/><text class="sub" x="350" y="194" text-anchor="middle">① PUBLISH (id=5) — 接收方只记账不投递</text>
+          <path class="edge" d="M510 226H190" marker-end="url(#ar5)"/><text class="sub" x="350" y="218" text-anchor="middle">② PUBREC「已记账」</text>
+          <path class="edge" d="M190 250H510" marker-end="url(#ar5)"/><text class="sub" x="350" y="242" text-anchor="middle">③ PUBREL「可以投递并忘记 id=5」</text>
+          <path class="edge" d="M510 274H190" marker-end="url(#ar5)"/><text class="sub" x="350" y="266" text-anchor="middle">④ PUBCOMP — 双方清除状态,恰好一次</text>
+        </svg>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>推导逻辑(比背表格强):</strong>QoS1 重复的根因是"接收方单凭一条 PUBLISH 分不清是新消息还是重发"——QoS2 把"确认收到"与"允许投递"拆成两步,双方各记一张状态表(PacketID),任何一步丢包都可安全重走。选型:高频流数据 QoS0、一般业务 QoS1+消费端幂等、计费/指令 QoS2。</p></div>
+
+      <h3 style="margin:28px 0 6px">9.2 会话、遗嘱、保留与 5.0</h3>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">三个贴心机制(因果版)</h3>
+          <ul class="clean">
+            <li><strong>遗嘱 LWT</strong>:TCP 断开或 1.5 倍 KeepAlive 超时 → Broker 代发预登记的 offline,掉线秒级感知(will 记得 retain=True,否则快照过期)</li>
+            <li><strong>保留 Retained</strong>:Broker 存每主题最后一条,新订阅者零等待拿快照</li>
+            <li><strong>持久会话</strong>:CleanSession=0 时 Broker 攒离线 QoS≥1 消息,重连补发 = 离线队列</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">3.1.1 → 5.0 的六项进化</h3>
+          <ul class="clean">
+            <li>原因码(失败可诊断)/ 消息过期 / 主题别名(省流量)</li>
+            <li><strong>共享订阅</strong> <code>$share/g/topic</code>(组内负载均衡)/ 流控 / 请求响应</li>
+            <li>Broker 梯队:EMQX(百万连接/集群/规则引擎)、Mosquitto(边缘)、云托管(IoT Core 等)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 10 Modbus ═══ -->
+    <section id="sec10">
+      <div class="head"><h2>10. Modbus:寄存器柜子的四十年</h2><p>1979 年的串口约束,推导出主从、静默切帧、CRC——每个设计都是那个年代的必然。</p></div>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">数据模型:四个抽屉</h3>
+          <ul class="clean">
+            <li>线圈(1位读写,继电器)/ 离散输入(1位只读,按钮)</li>
+            <li>输入寄存器(16位只读,测量值)/ 保持寄存器(16位读写,设定值)</li>
+            <li>功能码:01/02/03/04 读四类;05/06 单写;0F/10 批写;异常=功能码+0x80(01非法功能/02非法地址/03非法数据/04从站故障)</li>
+            <li><strong>寻址大坑</strong>:文档 1-based(40001 起)vs 协议 0-based,换算减基数</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">RTU → TCP:一次"搬家手术"</h3>
+          <ul class="clean">
+            <li>RTU:地址+功能码+数据+CRC16(多项式 0xA001/初值 0xFFFF/<strong>低字节在前</strong>);帧间 3.5 字符静默切帧</li>
+            <li>TCP:CRC 丢弃(TCP+链路层已校验——与 MQTT 靠 TCP 同一哲学);地址挪进 MBAP;新增<strong>事务 ID</strong> 支持多主并发配对</li>
+            <li>MBAP:事务ID(2B)+ 协议ID(2B 恒0)+ 长度(2B,粘包切帧依据)+ 单元ID(1B,为透传串口而留)</li>
+            <li>野生变体"RTU over TCP"非标,遇网关先确认</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout warn" style="margin-top:15px"><p><strong>实战两大坑:</strong>① 32 位浮点占两寄存器,字节序 ABCD/CDAB/BADC 厂商不统一,读出天文数字先怀疑字节序;② 采集三板斧——批量读(FC03 一次最多 125 寄存器)、字节序可配置、慢设备独立超时。CRC 冷知识:pymodbus 返回的是交换后的传输序,手写实现多返回寄存器自然值——两库对账先对字节序约定。</p></div>
+    </section>
+
+    <!-- ═══ 11 OPC UA ═══ -->
+    <section id="sec11">
+      <div class="head"><h2>11. OPC UA:Modbus 三个死穴的药方</h2><p>不会自我介绍 → 信息模型;没有锁 → 安全五层;要不停追问 → 订阅推送。</p></div>
+      <div class="grid3">
+        <div class="mini"><h3>地址空间:带类型的节点图</h3><p>8 种 NodeClass(Object/Variable/Method/类型系);NodeId=命名空间+标识符,ns=0 为标准区;Browse 可运行时探索——<strong>自描述</strong>,不用翻各家手册。</p></div>
+        <div class="mini"><h3>订阅三件套</h3><p>Subscription → MonitoredItem(采样间隔/死区/队列)→ Notification(带序号可重传);变化才推、毫秒级,对比轮询省带宽省延迟。</p></div>
+        <div class="mini"><h3>安全五层</h3><p>SecureChannel 加密签名 → X.509 双向认证 → 用户认证 → 节点级授权;策略 None/Basic256Sha256/Aes256…;生产禁 None。<strong>自己实现了 TLS 思想</strong>(见第 6 章)。</p></div>
+      </div>
+      <div class="card pad" style="margin-top:15px">
+        <h3 style="margin-top:0">配套规范与 PubSub</h3>
+        <ul class="clean">
+          <li>Companion Specs:DI 设备集成 / PLCopen 控制 / PackML 包装 / Euromap 塑机——同规范两家设备零配置互通,IEC 62541</li>
+          <li>PubSub(Part 14,2015):发布订阅扩展,UDP 多播(TSN 实时)/ MQTT 中转;UA over MQTT = 语义×云连接的联姻</li>
+          <li>版本类型体系:MQTT 3.1.1→5.0、Modbus 四十年一版、OPC UA 14 个 Part 持续演进;标准组织:OASIS / Modbus.org / OPC 基金会</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ═══ 12 企业实战 ═══ -->
+    <section id="sec12">
+      <div class="head"><h2>12. 企业实战:ISA-95 地图与三类中间件</h2><p>面试聊架构,先亮分层地图再谈中间件——这是"正轨表达"。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 470" role="img" aria-labelledby="d6Title d6Desc">
+          <title id="d6Title">ISA-95 企业分层与数据旁路链路</title>
+          <desc id="d6Desc">左:第 0 到 4 层分别为设备 Modbus、PLC、SCADA、MES、ERP;右:旁路链路为边缘网关经 MQTT 到云平台再到 Kafka 时序库看板。</desc>
+          <defs><marker id="ar6" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker></defs>
+          <rect class="lane" x="20" y="20" width="620" height="430" rx="16"/>
+          <text class="sub" x="40" y="44">ISA-95 分层(自下而上)</text>
+          <rect class="node" x="60" y="400" width="540" height="38" rx="8"/><text class="title" x="80" y="424">第0层 设备层:传感器 / 电表 / 变频器</text><text class="sub" x="520" y="424">Modbus RTU 主场</text>
+          <rect class="node" x="60" y="340" width="540" height="38" rx="8"/><text class="title" x="80" y="364">第1层 控制层:PLC(S7 / 罗克韦尔 / 倍福)</text><text class="sub" x="520" y="364">OPC UA / Modbus TCP</text>
+          <rect class="node v" x="60" y="280" width="540" height="38" rx="8"/><text class="title" x="80" y="304">第2层 监控层:SCADA(WinCC / Ignition)</text><text class="sub" x="520" y="304">OPC UA 主场</text>
+          <rect class="node v" x="60" y="220" width="540" height="38" rx="8"/><text class="title" x="80" y="244">第3层 执行层:MES(工单 / 追溯 / 质量)</text><text class="sub" x="520" y="244">OPC UA 主场</text>
+          <rect class="node g" x="60" y="160" width="540" height="38" rx="8"/><text class="title" x="80" y="184">第4层 经营层:ERP(SAP / 用友)</text><text class="sub" x="520" y="184">Web Service / API</text>
+          <rect class="node a" x="60" y="60" width="540" height="80" rx="10"/><text class="title" x="80" y="90">旁路:数据上云链路(不受 ISA-95 约束)</text><text class="sub" x="80" y="112">设备 / PLC → 边缘网关(协议转换)→ MQTT → 云平台 → Kafka → 时序库 → 看板 / AI</text>
+          <rect class="node g" x="700" y="260" width="150" height="46" rx="10"/><text class="title" x="775" y="280" text-anchor="middle">边缘网关</text><text class="sub" x="775" y="298" text-anchor="middle">南向采集 · 北向上云</text>
+          <rect class="node" x="880" y="260" width="140" height="46" rx="10"/><text class="title" x="950" y="280" text-anchor="middle">云平台</text><text class="sub" x="950" y="298" text-anchor="middle">EMQX / IoT Hub</text>
+          <path class="edge" d="M854 283H872" marker-end="url(#ar6)"/><text class="title" x="863" y="272" text-anchor="middle">MQTT</text>
+          <path class="edge" d="M600 140 C 660 200 660 283 696 283" marker-end="url(#ar6)"/>
+          <rect class="node" x="700" y="360" width="150" height="46" rx="10"/><text class="title" x="775" y="380" text-anchor="middle">Kafka</text><text class="sub" x="775" y="398" text-anchor="middle">数据总线</text>
+          <rect class="node g" x="880" y="360" width="140" height="46" rx="10"/><text class="title" x="950" y="380" text-anchor="middle">时序库 + 看板</text><text class="sub" x="950" y="398" text-anchor="middle">TDengine · Grafana</text>
+          <path class="edge" d="M950 308V356" marker-end="url(#ar6)"/><path class="edge" d="M854 383H872" marker-end="url(#ar6)"/>
+        </svg>
+      </div>
+      <div class="grid3" style="margin-top:15px">
+        <div class="mini"><h3>MQTT 企业纪律</h3><p>Topic 模板化(<code>租户/厂/线/设备/测点</code>)+ ACL 前缀授权;TLS+设备证书;共享订阅扩后端;SparkPlug B 补语义(出生/死亡证书+数据模型);规则引擎→Kafka→时序库→Grafana 标准链路。</p></div>
+        <div class="mini"><h3>Modbus 企业生态</h3><p>485 手拉手→DTU→边缘网关(映翰通/有人/Moxa);<strong>KepServerEX</strong> 南向百种协议北向统一 OPC UA;日常=点表管理+三板斧。</p></div>
+        <div class="mini"><h3>OPC UA 企业生态</h3><p>S7-1500/倍福/罗克韦尔自带 Server;老设备经 KepServer 包装;调试用 <strong>UA Expert</strong>;落地最大成本=证书管理(内部 CA、换件重授权)。</p></div>
+      </div>
+    </section>
+
+    <div class="part" id="p3"><h2>PART C · 面试冲刺篇:45 题 + 场景 + 话术</h2></div>
+
+    <!-- ═══ 13 ═══ -->
+    <section id="sec13">
+      <div class="head"><h2>13. 45 道高频题速查(按协议分组)</h2><p>答题结构:一句话结论 → 机制 → "我验证过" → 延伸一个坑。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th style="width:30%">网络基础 10 题</th><th>答案要点</th></tr></thead>
+          <tbody>
+            <tr><td>① 三次握手为何不是两次</td><td>双向收发确认 + 防历史重复 SYN(第三次 ACK 可否决)</td></tr>
+            <tr><td>② 挥手为何四次</td><td>全双工独立关;被动方 ACK 与 FIN 间还要发完数据</td></tr>
+            <tr><td>③ TIME_WAIT</td><td>2MSL:末次 ACK 可重传 + 旧报文消亡;堆积→端口耗尽→用长连接</td></tr>
+            <tr><td>④ TCP 可靠四件套</td><td>序号确认 / 超时重传 / 滑动窗口 / 拥塞控制</td></tr>
+            <tr><td>⑤ 粘包与解法</td><td>字节流无边界;定长/分隔符/长度前缀(带出 MQTT/Modbus 切帧)</td></tr>
+            <tr><td>⑥ TCP vs UDP 选型</td><td>可靠有序 TCP;低延迟/多播/超轻 UDP(MQTT-SN、PubSub 多播)</td></tr>
+            <tr><td>⑦ 输入网址到显示</td><td>DNS→TCP 握手→(TLS)→HTTP→渲染</td></tr>
+            <tr><td>⑧ HTTPS 握手</td><td>见第 6 章六步;混用对称非对称;证书链;Finished 防篡改</td></tr>
+            <tr><td>⑨ HTTP 演进</td><td>1.1 keep-alive / 2 多路复用 / 3 QUIC(UDP 重建可靠)</td></tr>
+            <tr><td>⑩ NAT 内网下发指令</td><td>设备主动出连长连接,下行复用</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card pad table" style="margin-top:15px">
+        <table>
+          <thead><tr><th style="width:30%">MQTT 12 题</th><th>答案要点</th></tr></thead>
+          <tbody>
+            <tr><td>① vs HTTP</td><td>发布订阅/2B头/长连接可推;平台 API 层仍共存 HTTP</td></tr>
+            <tr><td>② QoS 三级</td><td>0 至多一次;1 至少一次(重发→重复);2 恰好一次(四步+状态表)</td></tr>
+            <tr><td>③ QoS1 为何重复</td><td>接收方分不清新消息与 ACK 丢失后的重发</td></tr>
+            <tr><td>④ QoS2 为何四步</td><td>拆"确认收到"与"允许投递",PacketID 去重,任何步丢包可重走</td></tr>
+            <tr><td>⑤ 掉线感知</td><td>遗嘱 LWT + KeepAlive 1.5 倍超时;will 要 retain</td></tr>
+            <tr><td>⑥ 最新值</td><td>保留消息,订阅即推快照</td></tr>
+            <tr><td>⑦ 通配符</td><td>+ 单层精确(3层模式≠4层主题);# 只能结尾匹配余下全部</td></tr>
+            <tr><td>⑧ CleanSession</td><td>0=持久会话攒离线 QoS≥1 消息重连补发;5.0=Session Expiry</td></tr>
+            <tr><td>⑨ 3.1.1 vs 5.0</td><td>原因码/共享订阅/过期/别名/流控/请求响应(说三个)</td></tr>
+            <tr><td>⑩ 共享订阅</td><td>$share/g/topic 组内负载均衡,解多后端重复消费</td></tr>
+            <tr><td>⑪ 百万连接</td><td>EMQX 集群+LB、Topic 纪律+ACL、TLS 证书、共享订阅、Kafka 削峰</td></tr>
+            <tr><td>⑫ 积压处理</td><td>扩消费者、幂等去重、非关键降 QoS</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">Modbus 10 题(要点)</h3>
+          <ul class="clean">
+            <li>RTU/TCP 区别:MBAP 替地址+CRC、事务 ID 多主、静默 vs 长度切帧</li>
+            <li>四寄存器 / 功能码 01-10 / 异常 fc+0x80 与异常码 1-4</li>
+            <li>32 位浮点=双寄存器拼接+字节序坑(ABCD/CDAB)</li>
+            <li>40001↔0(1-based vs 0-based)/ 从站不能主动 → 轮询与优化三板斧</li>
+            <li>Modbus vs RS-485(协议 vs 物理)/ CRC16 参数与低字节在前</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">OPC UA 8 题(要点)</h3>
+          <ul class="clean">
+            <li>vs Modbus:语义+安全+订阅三张牌全打</li>
+            <li>vs MQTT:C/S 订阅 vs Broker;控制系统 vs 广域上云,常配合</li>
+            <li>地址空间/8 NodeClass/NodeId/ns=0;Browse=自描述</li>
+            <li>订阅三件套+死区/队列/序号;Read 低频配置、订阅高频变化</li>
+            <li>安全五层+禁 None;DA→UA(COM→跨平台 IEC 62541);PubSub 走 UDP/MQTT</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 14 ═══ -->
+    <section id="sec14">
+      <div class="head"><h2>14. 场景设计四层框架 + 实验话术</h2><p>设计题不听标准答案,听你脑中的分层地图;项目题只放大真实经历。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 260" role="img" aria-labelledby="d7Title d7Desc">
+          <title id="d7Title">场景设计题万能答题框架</title>
+          <desc id="d7Desc">四步:采集层旧设备 Modbus 新 PLC 用 OPC UA;传输层网关转 MQTT 断点续传;平台层 EMQX 集群 Kafka 时序库;细节分遗嘱、字节序、时钟、补采。</desc>
+          <defs><marker id="ar7" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker></defs>
+          <rect class="node" x="40" y="40" width="210" height="80" rx="12"/><text class="title" x="145" y="70" text-anchor="middle">① 采集层</text><text class="sub" x="145" y="92" text-anchor="middle">旧设备 Modbus 批量轮询</text><text class="sub" x="145" y="108" text-anchor="middle">新 PLC 直连 OPC UA 订阅</text>
+          <rect class="node v" x="290" y="40" width="210" height="80" rx="12"/><text class="title" x="395" y="70" text-anchor="middle">② 传输层</text><text class="sub" x="395" y="92" text-anchor="middle">网关统一转 MQTT</text><text class="sub" x="395" y="108" text-anchor="middle">Topic 分层 + 断点续传缓存</text>
+          <rect class="node g" x="540" y="40" width="210" height="80" rx="12"/><text class="title" x="645" y="70" text-anchor="middle">③ 平台层</text><text class="sub" x="645" y="92" text-anchor="middle">EMQX 集群 + TLS 证书</text><text class="sub" x="645" y="108" text-anchor="middle">Kafka → 时序库 → 看板</text>
+          <rect class="node a" x="790" y="40" width="210" height="80" rx="12"/><text class="title" x="895" y="70" text-anchor="middle">④ 细节分</text><text class="sub" x="895" y="92" text-anchor="middle">遗嘱 / 字节序 / 时钟对齐</text><text class="sub" x="895" y="108" text-anchor="middle">断网补采 / 降级策略</text>
+          <path class="edge" d="M250 80H282" marker-end="url(#ar7)"/><path class="edge" d="M500 80H532" marker-end="url(#ar7)"/><path class="edge" d="M750 80H782" marker-end="url(#ar7)"/>
+          <text class="sub" x="40" y="170">每层先说"用什么"再说"为什么不用别的";高频变体:视频流(RTSP/WebRTC)/ 反向控制(权限+回执+QoS2)/ 十万设备(集群+共享订阅+分区)</text>
+          <text class="sub" x="40" y="200">经典题:300 旧电表+20 新 PLC 能耗平台 / 10 万设备消息风暴(预聚合削峰)/ 弱网不丢(QoS1+幂等+缓存续传+遗嘱)</text>
+        </svg>
+      </div>
+      <div class="card pad table" style="margin-top:15px">
+        <table>
+          <thead><tr><th style="width:38%">你真实跑过的实验 → 话术</th><th>怎么在面试桌上说</th></tr></thead>
+          <tbody>
+            <tr><td>Docker 部署 Mosquitto</td><td>"我部署过 Broker,验证过匿名开关,生产会上 TLS+证书"</td></tr>
+            <tr><td>强杀进程触发遗嘱</td><td>"遗嘱实测:强杀后订阅端同一秒收到 offline;还发现 will 不带 retain 快照会过期"</td></tr>
+            <tr><td>paho 日志观测 QoS</td><td>"抓过 QoS2 交互:收到 PUBREC 前绝不会发 PUBREL"</td></tr>
+            <tr><td>裸 socket 拼报文 + 粘包切帧</td><td>"手拼过 CONNECT/PUBLISH 和 MBAP,粘包靠长度字段切帧、事务 ID 配对——和 MQTT 剩余长度同构"</td></tr>
+            <tr><td>手写 CRC16 对账 pymodbus</td><td>"CRC 手写过;pymodbus 返回交换后的传输序,两库对接先对字节序约定"</td></tr>
+            <tr><td>OPC UA 订阅推送实测</td><td>"零轮询毫秒级推送亲测;还排查过忘调 server.start() 导致端口不监听"</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn" style="margin-top:15px"><p><strong>诚信红线:</strong>话术只放大真实经历;被追问到没做过的地方,如实说"单机验证过功能,集群了解原理未实操"——诚实+知道边界,比吹破皮安全得多。</p></div>
+    </section>
+
+    <!-- ═══ 15 ═══ -->
+    <section id="sec15">
+      <div class="head"><h2>15. 按岗位的复习优先级与冲刺计划</h2><p>45 题不必平均用力——先看目标岗。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>岗位</th><th>必答(★)</th><th>加分</th></tr></thead>
+          <tbody>
+            <tr><td>物联网平台(Java/Go)</td><td>MQTT 全部 ★★★ + 基础 10 题 ★★</td><td>积压处理、百万连接、SparkPlug</td></tr>
+            <tr><td>上位机 / SCADA(C#/Qt)</td><td>Modbus 全部 ★★★ + OPC UA 核心 ★★</td><td>配套规范、KepServer、工具链</td></tr>
+            <tr><td>边缘网关 / 嵌入式</td><td>三协议基础 ★★ + 粘包/心跳 ★★★</td><td>断网续传、MQTT-SN、资源约束</td></tr>
+            <tr><td>采集 / 实施</td><td>Modbus ★★★(字节序/寻址实战题)</td><td>DL/T 645 等行业规约、串口调试</td></tr>
+            <tr><td>MES / 工业集成</td><td>OPC UA 全部 ★★★ + 场景设计 ★★</td><td>ISA-95、证书管理、PubSub/FX 趋势</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid3" style="margin-top:15px">
+        <div class="mini"><h3>只剩一晚</h3><p>按目标岗背第 13 节对应题;四层框架默写;TLS 六步时序过三遍。</p></div>
+        <div class="mini"><h3>还有一周</h3><p>全书重读 + 九组实验重跑(每组 10 分钟);自问自答,卡壳题标记击破。</p></div>
+        <div class="mini"><h3>投递之前</h3><p>简历写"基于 paho-mqtt/pymodbus/asyncua 完成过××"——具体经历比形容词值钱十倍。</p></div>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>最后一招:</strong>找同伴(或 AI)做模拟面试,连问 10 题,每题 30 秒内开口、2 分钟内收尾——面试是表达考试,只背不说是练不出来的。</p></div>
+    </section>
+  </main>
+  <footer><div class="shell">协议全书:从比特到云端 · 合并版</div></footer>
+  <script>
+    (()=>{const root=document.documentElement,key="protocols-compendium-theme";
+      const saved=localStorage.getItem(key);
+      if(saved)root.dataset.theme=saved;document.getElementById("theme").addEventListener("click",()=>{
+        const next=root.dataset.theme==="dark"?"light":"dark";root.dataset.theme=next;localStorage.setItem(key,next)})})();
+  </script>
+</body>
+</html>

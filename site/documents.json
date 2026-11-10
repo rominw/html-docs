@@ -18,6 +18,12 @@
     "url": "documents/protocols-interview-guide.html"
   },
   {
+    "title": "协议全书:从比特到云端的底层原理",
+    "description": "协议全书:从 TCP/IP 分层到 TLS 握手逐消息、从 MQTT/Modbus/OPC UA 底层原理到企业实战与 45 道面试题——按",
+    "date": "2026-11-10",
+    "url": "documents/protocols-compendium.html"
+  },
+  {
     "title": "小白也能懂的物联网三协议:MQTT · Modbus · OPC UA",
     "description": "零基础入门工业物联网三大通信协议:用生活比喻讲透 MQTT、Modbus、OPC UA 是什么、解决什么问题,附可复制粘贴的动手实验。",
     "date": "2026-11-08",
