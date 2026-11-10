@@ -1,5 +1,11 @@
 [
   {
+    "title": "网络基础协议详解:TCP · UDP · HTTP 与工业协议的渊源",
+    "description": "网络基础协议详解:TCP/UDP/HTTP/HTTPS/WebSocket/DNS 的核心机制与高频面试题,重点讲清基础协议如何决定 MQTT、Modbus、OPC UA 等工业协议的设计。",
+    "date": "2026-11-10",
+    "url": "documents/network-protocol-fundamentals.html"
+  },
+  {
     "title": "物联网三协议进阶:术语、版本体系与企业实战",
     "description": "物联网三协议进阶指南:官方术语对照、MQTT/Modbus/OPC UA 版本与传输变体体系、ISA-95 企业分层架构、EMQX/SparkPlug/KepServerEX 等企业实战用法与岗位方向。",
     "date": "2026-11-10",

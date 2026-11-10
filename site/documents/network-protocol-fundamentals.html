@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="网络基础协议详解:TCP/UDP/HTTP/HTTPS/WebSocket/DNS 的核心机制与高频面试题,重点讲清基础协议如何决定 MQTT、Modbus、OPC UA 等工业协议的设计。">
+  <meta name="date" content="2026-11-10">
+  <title>网络基础协议详解:TCP · UDP · HTTP 与工业协议的渊源</title>
+  <style>
+    :root {
+      --bg:#f3f6fb;--panel:#fff;--panel2:#f8fafc;--ink:#152033;--muted:#66758a;
+      --line:#d9e2ee;--blue:#2563eb;--blue2:#e9f0ff;--green:#15803d;--green2:#eaf8ef;
+      --amber:#b45309;--amber2:#fff5df;--red:#b42318;--red2:#ffeded;--violet:#6d28d9;
+      --violet2:#f1ebff;--shadow:0 14px 38px rgba(31,48,78,.09);--radius:18px
+    }
+    [data-theme=dark] {
+      --bg:#0c1220;--panel:#111b2c;--panel2:#152238;--ink:#edf4ff;--muted:#9eb0c9;
+      --line:#2b3b56;--blue:#78a5ff;--blue2:#172b52;--green:#6fda91;--green2:#153624;
+      --amber:#f6bd63;--amber2:#3a2b13;--red:#ff8f88;--red2:#3c1e23;--violet:#c2a7ff;
+      --violet2:#2c2247;--shadow:0 18px 42px rgba(0,0,0,.3)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:
+      radial-gradient(circle at 8% 0,rgba(37,99,235,.13),transparent 31rem),
+      radial-gradient(circle at 96% 8%,rgba(109,40,217,.1),transparent 28rem),var(--bg);
+      font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+    a{color:var(--blue)} code{padding:.12rem .38rem;border:1px solid var(--line);border-radius:6px;
+      color:var(--violet);background:var(--panel2);font: .88em Consolas,monospace}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    header{padding:76px 0 42px}.kicker{color:var(--blue);font:700 13px Consolas,monospace;letter-spacing:.13em}
+    h1{max-width:900px;margin:16px 0 14px;font-size:clamp(38px,6vw,68px);line-height:1.06;letter-spacing:-.045em}
+    .lead{max-width:900px;margin:0;color:var(--muted);font-size:19px}
+    .doc-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;color:var(--muted);font-size:13px}
+    .doc-meta time{color:var(--ink);font-weight:600}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .btn{padding:9px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+      background:var(--panel);text-decoration:none;cursor:pointer;font:inherit}
+    .btn:hover{border-color:var(--blue)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:34px}
+    .stat{padding:18px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--panel) 88%,transparent)}
+    .stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:13px}
+    nav{position:sticky;top:0;z-index:20;border-block:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(16px)}
+    nav .shell{display:flex;gap:5px;overflow:auto;padding:10px 0}
+    nav a{flex:none;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--blue);background:var(--blue2)}
+    main{padding:32px 0 72px}section{margin-bottom:36px;scroll-margin-top:74px}
+    .head{margin-bottom:14px}.head h2{margin:0;font-size:clamp(25px,3vw,35px);letter-spacing:-.025em}
+    .head p{margin:6px 0 0;color:var(--muted)}
+    .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow)}
+    .pad{padding:24px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+    .mini{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .mini h3{margin:0 0 6px;font-size:16px}.mini p{margin:0;color:var(--muted);font-size:14px}
+    .diagram{overflow:auto;padding:20px}.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+    .lane{fill:var(--panel2);stroke:var(--line)}.node{fill:var(--panel);stroke:var(--blue);stroke-width:1.6}
+    .node.g{stroke:var(--green)}.node.a{stroke:var(--amber)}.node.r{stroke:var(--red)}.node.v{stroke:var(--violet)}
+    .decision{fill:var(--amber2);stroke:var(--amber);stroke-width:1.6}
+    .edge{fill:none;stroke:var(--blue);stroke-width:2}.edge.a{stroke:var(--amber);stroke-dasharray:6 5}
+    .edge.r{stroke:var(--red);stroke-dasharray:5 4}.title{fill:var(--ink);font-weight:700;font-size:14px}
+    .sub{fill:var(--muted);font-size:11px}.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:5 5}
+    .active{fill:var(--blue2);stroke:var(--blue);stroke-width:1.2}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+    th,td{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);background:var(--panel2);font-size:12px}th:first-child,td:first-child{border-left:1px solid var(--line)}
+    tr:first-child th{border-top:1px solid var(--line)}.table{overflow:auto}.table table{min-width:900px}
+    .callout{padding:15px 17px;border-left:4px solid var(--blue);border-radius:10px;background:var(--blue2)}
+    .callout.warn{border-color:var(--amber);background:var(--amber2)}.callout p{margin:0}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.g{color:var(--green);background:var(--green2)}.pill.a{color:var(--amber);background:var(--amber2)}
+    ul.clean{margin:8px 0 0;padding-left:20px}ul.clean li{margin:6px 0}
+    footer{padding:22px 0 44px;color:var(--muted);text-align:center;font-size:13px}
+    @media(max-width:820px){.stats,.grid2,.grid3{grid-template-columns:1fr}header{padding-top:48px}}
+    @media print{body{background:#fff}nav,.actions{display:none}.card{box-shadow:none}.shell{width:100%}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell">
+      <div class="kicker">NETWORK FUNDAMENTALS</div>
+      <h1>网络基础协议详解</h1>
+      <p class="lead">TCP、UDP、HTTP/HTTPS、WebSocket、DNS——工业三协议脚下的地基。重点讲清一件事:基础协议的特性,如何决定了 MQTT、Modbus、OPC UA 的每一个设计。</p>
+      <div class="doc-meta">
+        <time datetime="2026-11-10">2026年11月10日</time>
+        <span>协议学习专栏 · 第 3 册</span>
+      </div>
+      <div class="actions">
+        <a class="btn" href="../index.html">返回首页</a>
+        <a class="btn" href="#sec1">开始阅读</a>
+        <button class="btn" id="theme" type="button">切换主题</button>
+        <button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>2 层地基</b><span>传输层 TCP/UDP → 应用层 HTTP</span></div>
+        <div class="stat"><b>3 次握手</b><span>面试第一高频,一文讲透</span></div>
+        <div class="stat"><b>1 条主线</b><span>基础特性 → 工业协议设计动因</span></div>
+        <div class="stat"><b>20+ 考点</b><span>每章附面试视角</span></div>
+      </div>
+    </div>
+  </header>
+  <nav>
+    <div class="shell">
+      <a href="#sec1">1. 分层地图</a><a href="#sec2">2. IP 与端口</a><a href="#sec3">3. TCP</a>
+      <a href="#sec4">4. UDP</a><a href="#sec5">5. HTTP/HTTPS</a><a href="#sec6">6. WebSocket/DNS</a>
+      <a href="#sec7">7. 联动与自测</a>
+    </div>
+  </nav>
+  <main class="shell">
+
+    <!-- ═══ 1. 分层地图 ═══ -->
+    <section id="sec1">
+      <div class="head"><h2>1. 先看地图:所有协议叠成一座楼</h2><p>不懂分层,协议学习就是一堆散落的知识点;懂了分层,每个协议的怪癖都有了出处。</p></div>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 400" role="img" aria-labelledby="d1Title d1Desc">
+          <title id="d1Title">网络协议分层地图</title>
+          <desc id="d1Desc">四层地图:应用层放着 MQTT、Modbus TCP、OPC UA、HTTP、DNS;传输层是 TCP 和 UDP;网络层是 IP;链路层是以太网与 WiFi。右侧标注串口协议 Modbus RTU 不走此栈。</desc>
+          <rect class="lane" x="20" y="20" width="1000" height="90" rx="14"/>
+          <text class="sub" x="40" y="44">应用层(各说各的"业务语言")</text>
+          <rect class="node v" x="50" y="58" width="130" height="40" rx="8"/><text class="title" x="115" y="83" text-anchor="middle">MQTT</text>
+          <rect class="node v" x="195" y="58" width="130" height="40" rx="8"/><text class="title" x="260" y="83" text-anchor="middle">Modbus TCP</text>
+          <rect class="node v" x="340" y="58" width="130" height="40" rx="8"/><text class="title" x="405" y="83" text-anchor="middle">OPC UA</text>
+          <rect class="node" x="485" y="58" width="130" height="40" rx="8"/><text class="title" x="550" y="83" text-anchor="middle">HTTP/S</text>
+          <rect class="node" x="630" y="58" width="110" height="40" rx="8"/><text class="title" x="685" y="83" text-anchor="middle">DNS</text>
+          <rect class="node a" x="755" y="58" width="130" height="40" rx="8"/><text class="title" x="820" y="83" text-anchor="middle">WebSocket</text>
+          <rect class="lane" x="20" y="126" width="1000" height="76" rx="14"/>
+          <text class="sub" x="40" y="150">传输层(管"送到",不管"含义")</text>
+          <rect class="node g" x="330" y="162" width="150" height="32" rx="8"/><text class="title" x="405" y="183" text-anchor="middle">TCP · 可靠字节流</text>
+          <rect class="node a" x="510" y="162" width="150" height="32" rx="8"/><text class="title" x="585" y="183" text-anchor="middle">UDP · 尽力而为</text>
+          <rect class="lane" x="20" y="218" width="1000" height="76" rx="14"/>
+          <text class="sub" x="40" y="242">网络层(全球寻址)</text>
+          <rect class="node" x="440" y="254" width="160" height="32" rx="8"/><text class="title" x="520" y="275" text-anchor="middle">IP · IPv4 / IPv6</text>
+          <rect class="lane" x="20" y="310" width="1000" height="76" rx="14"/>
+          <text class="sub" x="40" y="334">链路/物理层(真正的电线与无线电)</text>
+          <rect class="node" x="400" y="346" width="120" height="32" rx="8"/><text class="title" x="460" y="367" text-anchor="middle">以太网/WiFi</text>
+          <rect class="node r" x="760" y="330" width="240" height="48" rx="10"/><text class="title" x="880" y="351" text-anchor="middle">Modbus RTU / RS-485</text><text class="sub" x="880" y="368" text-anchor="middle">串口协议,不进 TCP/IP 栈</text>
+        </svg>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>读图关键:</strong>应用层协议(MQTT、Modbus TCP、OPC UA、HTTP)全部<strong>叠在 TCP/UDP 之上</strong>——底层特性会向上"漏"问题:TCP 不保证消息边界(→粘包)、不保证对端应用活着(→应用层心跳)、网络断了不替你重发业务消息(→应用层 QoS)。本册主线就是把这三个"漏",与工业协议的设计一一对应。</p></div>
+    </section>
+
+    <!-- ═══ 2. IP 与端口 ═══ -->
+    <section id="sec2">
+      <div class="head"><h2>2. IP 与端口:设备的门牌系统</h2><p>所有上层协议的第一课:消息怎么找到目标。</p></div>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">IP 地址 = 小区地址</h3>
+          <ul class="clean">
+            <li><strong>IPv4</strong>:32 位,形如 <code>192.168.1.10</code>,全世界约 43 亿个,已耗尽</li>
+            <li><strong>IPv6</strong>:128 位,<code>fe80::1</code>,号称能给地球上每粒沙子发地址;物联网海量设备的主角</li>
+            <li><strong>公网 vs 内网</strong>:设备通常在内网(<code>192.168.x.x</code>、<code>10.x.x.x</code>),经 NAT 网关共享公网出口——这是"设备主动连云"架构的根本原因(MQTT 设备主动出连,云无法主动进内网)</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">端口 = 门牌号</h3>
+          <ul class="clean">
+            <li>16 位(0~65535),区分同一台机器上的不同服务</li>
+            <li>记牢几个"熟面孔":<code>80</code> HTTP / <code>443</code> HTTPS / <code>1883</code> MQTT / <code>8883</code> MQTT over TLS / <code>502</code> Modbus TCP / <code>4840</code> OPC UA / <code>53</code> DNS</li>
+            <li>看到端口号就能反推协议——排查"连不上"的第一步永远是 <code>telnet ip 端口</code> 或 <code>netstat</code></li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>面试视角:</strong>"为什么物联网设备都是主动连云平台,而不是平台连设备?"——设备在内网 NAT 之后没有公网地址,外部无法主动进入;所以 MQTT 让设备主动出连并保持长连接,反向指令也走这条已建立的连接。</p></div>
+    </section>
+
+    <!-- ═══ 3. TCP ═══ -->
+    <section id="sec3">
+      <div class="head"><h2>3. TCP:可靠字节流是怎么炼成的</h2><p>面试题密度最高的一章——握手、挥手、粘包,三个考点讲透。</p></div>
+
+      <h3 style="margin:0 0 6px">3.1 三次握手:建立连接</h3>
+      <div class="card diagram">
+        <svg viewBox="0 0 1040 230" role="img" aria-labelledby="d2Title d2Desc">
+          <title id="d2Title">TCP 三次握手与四次挥手</title>
+          <desc id="d2Desc">左侧时序:客户端发 SYN,服务端回 SYN+ACK,客户端再回 ACK,连接建立。右侧时序:主动方发 FIN,对方回 ACK,对方再发 FIN,主动方回 ACK 并进入 TIME_WAIT。</desc>
+          <defs><marker id="ar2" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--blue)"/></marker>
+          <marker id="ar2a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="var(--amber)"/></marker></defs>
+          <text class="title" x="240" y="18" text-anchor="middle">三次握手(建立连接)</text>
+          <line class="life" x1="80" y1="26" x2="80" y2="210"/><line class="life" x1="400" y1="26" x2="400" y2="210"/>
+          <text class="sub" x="80" y="22" text-anchor="middle">客户端</text><text class="sub" x="400" y="22" text-anchor="middle">服务端</text>
+          <path class="edge" d="M90 50H390" marker-end="url(#ar2)"/><text class="sub" x="240" y="44" text-anchor="middle">① SYN(seq=x)「我想连接」</text>
+          <path class="edge" d="M390 88H90" marker-end="url(#ar2)"/><text class="sub" x="240" y="82" text-anchor="middle">② SYN+ACK(seq=y, ack=x+1)「收到,我也想连」</text>
+          <path class="edge" d="M90 126H390" marker-end="url(#ar2)"/><text class="sub" x="240" y="120" text-anchor="middle">③ ACK(ack=y+1)「收到」→ 双方就绪,开始传数据</text>
+          <text class="title" x="760" y="18" text-anchor="middle">四次挥手(断开连接)</text>
+          <line class="life" x1="600" y1="26" x2="600" y2="210"/><line class="life" x1="920" y1="26" x2="920" y2="210"/>
+          <text class="sub" x="600" y="22" text-anchor="middle">主动方</text><text class="sub" x="920" y="22" text-anchor="middle">被动方</text>
+          <path class="edge a" d="M610 50H910" marker-end="url(#ar2a)"/><text class="sub" x="760" y="44" text-anchor="middle">① FIN「我说完了」</text>
+          <path class="edge a" d="M910 80H610" marker-end="url(#ar2a)"/><text class="sub" x="760" y="74" text-anchor="middle">② ACK「收到」(可能还有数据没发完 → 所以是四次不是三次)</text>
+          <path class="edge a" d="M920 116H612" marker-end="url(#ar2a)"/><text class="sub" x="760" y="110" text-anchor="middle">③ FIN「我也说完了」</text>
+          <path class="edge a" d="M612 150H920" marker-end="url(#ar2a)"/><text class="sub" x="760" y="144" text-anchor="middle">④ ACK → 主动方进入 TIME_WAIT 等 2MSL 才真正关闭</text>
+          <text class="sub" x="760" y="190" text-anchor="middle">TIME_WAIT:等最后的 ACK 别丢、让旧连接的残留报文在网络中自然死亡</text>
+        </svg>
+      </div>
+      <div class="grid2" style="margin-top:15px">
+        <div class="card pad">
+          <h3 style="margin-top:0">为什么握手是三次,两次不行吗?</h3>
+          <ul class="clean">
+            <li>核心目的:<strong>让双方都确认"我能发、他能收;他能发、我能收"</strong></li>
+            <li>两次的问题:服务端无法确认"客户端能收到我的消息";更致命的是<strong>历史重复的 SYN</strong>(网络里迷路的老连接请求)会被误当成新连接,三次握手让客户端可以用第三次 ACK 否决它</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">挥手为什么是四次?</h3>
+          <ul class="clean">
+            <li>TCP 全双工,两个方向独立关闭:被动方收到 FIN 后可能<strong>还有数据没发完</strong>,所以 ACK 先回、FIN 等发完再发——中间的缝隙就是第四次</li>
+            <li>追问高频:<strong>TIME_WAIT 为什么等 2MSL</strong>——保证最后的 ACK 可重传 + 让旧报文自然消亡;海量短连接会把 TIME_WAIT 堆成端口耗尽(所以物联网都用长连接)</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 style="margin:28px 0 6px">3.2 可靠性四件套与粘包</h3>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">可靠是怎么做到的</h3>
+          <ul class="clean">
+            <li><strong>序号 + 确认</strong>:每字节都有编号,收到要回 ACK</li>
+            <li><strong>超时重传</strong>:等 ACK 超时就重发</li>
+            <li><strong>滑动窗口</strong>:一次可发多条,兼顾吞吐;窗口随接收方缓冲自适应 = 流量控制</li>
+            <li><strong>拥塞控制</strong>:感知网络拥堵主动降速(慢启动/拥塞避免)</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">粘包:TCP 最著名的"坑"</h3>
+          <ul class="clean">
+            <li>TCP 是<strong>字节流,没有"消息"边界</strong>——发送方三次 write,接收方可能一次 read 全收到(粘),也可能半条(半包)</li>
+            <li>应用层三种切帧方案:<strong>定长 / 分隔符 / 长度前缀</strong></li>
+            <li>这正是:MQTT 用"剩余长度"、Modbus TCP 用 MBAP"长度"字段的原因;Modbus RTU 串口没长度前缀,只能靠 3.5 字符静默切帧</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout warn" style="margin-top:15px"><p><strong>面试视角高频三连:</strong>① TCP keepalive 默认 2 小时才探测,太迟钝 → 所以 MQTT 定义应用层 Keep Alive(如 60s)自己探测;② TCP 断线(拔网线)时对端可能半小时感知不到 → 所以有 MQTT 遗嘱、应用层心跳;③ TCP 的可靠只是"字节送达对方内核缓冲区",对方应用进程崩溃就白搭 → 所以 MQTT 还要应用层 QoS。三连答完,面试官知道你真懂分层。</p></div>
+    </section>
+
+    <!-- ═══ 4. UDP ═══ -->
+    <section id="sec4">
+      <div class="head"><h2>4. UDP:自由但有代价</h2><p>没有握手、没有重传、没有顺序——换来的是极致的轻与快。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>维度</th><th>TCP</th><th>UDP</th></tr></thead>
+          <tbody>
+            <tr><td>连接</td><td>三次握手建立,有状态</td><td>无连接,拿了就发</td></tr>
+            <tr><td>可靠性</td><td>确认+重传+排序,不丢不乱</td><td>尽力而为,可能丢、可能乱序</td></tr>
+            <tr><td>头部开销</td><td>20 字节起</td><td>固定 8 字节</td></tr>
+            <tr><td>收发模型</td><td>字节流(无边界→粘包问题)</td><td>数据报(一条就是一条,天然有边界)</td></tr>
+            <tr><td>一对多</td><td>只能一对一</td><td>天然支持广播/多播</td></tr>
+            <tr><td>典型用户</td><td>HTTP、MQTT、Modbus TCP、OPC UA</td><td>DNS、音视频、DHCP、<strong>MQTT-SN、OPC UA PubSub 多播</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>面试视角:</strong>"什么时候用 UDP?"——要低延迟不要重传的(音视频、实时控制);要一对多的(广播/多播,如 OPC UA PubSub 的 UDP 多播模式);包小得亏 TCP 头的(DNS 一问一答)。再补一句:"MQTT-SN 把 MQTT 搬上 UDP,给跑不动 TCP 栈的超弱传感器;可靠性靠应用层 QoS 补"——直接展示两册知识的贯通。</p></div>
+    </section>
+
+    <!-- ═══ 5. HTTP ═══ -->
+    <section id="sec5">
+      <div class="head"><h2>5. HTTP/HTTPS:互联网通用语</h2><p>网页的语言,也是物联网平台 API 的语言——但很少用于设备侧,原因值得细说。</p></div>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">核心模型</h3>
+          <ul class="clean">
+            <li><strong>请求/响应</strong>:客户端发起,服务端应答,一问一答;服务端无法主动推</li>
+            <li>方法:<code>GET</code> 读 / <code>POST</code> 建 / <code>PUT</code> 改 / <code>DELETE</code> 删 → REST 风格 API</li>
+            <li>状态码:<code>200</code> 成功 / <code>301</code> 重定向 / <code>404</code> 不存在 / <code>500</code> 服务器错误</li>
+            <li>文本协议,头几百字节起步,人可读</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">版本演进(一句话版)</h3>
+          <ul class="clean">
+            <li><strong>1.0</strong>:每次请求新建连接,贵</li>
+            <li><strong>1.1</strong>:keep-alive 长连接复用,至今主流</li>
+            <li><strong>2</strong>:二进制分帧 + 多路复用,一条连接并行多个请求</li>
+            <li><strong>3</strong>:干脆弃 TCP 改 <strong>QUIC(UDP 之上重建可靠)</strong>,解决队头阻塞</li>
+            <li><strong>HTTPS</strong>=HTTP+TLS:非对称交换密钥 → 对称加密通信,证书防冒充——和 OPC UA SecureChannel 同一套思想</li>
+          </ul>
+        </div>
+      </div>
+      <h3 style="margin:28px 0 6px">5.1 为什么物联网设备不用 HTTP?</h3>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>维度</th><th>HTTP</th><th>MQTT</th></tr></thead>
+          <tbody>
+            <tr><td>模型</td><td>请求/响应(设备只能被问)</td><td>发布/订阅(设备主动报,平台可推)</td></tr>
+            <tr><td>开销</td><td>头几百字节</td><td>固定头 2 字节</td></tr>
+            <tr><td>连接</td><td>短连接为主,反复握手耗电</td><td>长连接 + 轻量心跳,弱网稳定</td></tr>
+            <tr><td>服务端下行</td><td>难(需轮询/长轮询)</td><td>天然下行(发布到设备订阅的主题)</td></tr>
+            <tr><td>适用</td><td>平台侧 API、配置管理、文件下载</td><td>设备侧数据上报与指令下发</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>面试视角:</strong>"HTTP 和 MQTT 选谁?"的满分答法是<strong>分层使用</strong>:"设备到平台用 MQTT(省电、弱网、可下行);平台对外提供 REST API 给应用系统(HTTP);文件/固件升级用 HTTPS 下载。我搭过的链路里三者共存。"</p></div>
+    </section>
+
+    <!-- ═══ 6. WebSocket/DNS ═══ -->
+    <section id="sec6">
+      <div class="head"><h2>6. 两个配角:WebSocket 与 DNS</h2><p>出场率不高,但各有一个必考点。</p></div>
+      <div class="grid2">
+        <div class="card pad">
+          <h3 style="margin-top:0">WebSocket:HTTP 升级出的全双工</h3>
+          <ul class="clean">
+            <li>先用一次 HTTP 握手(<code>Upgrade: websocket</code>)"改签",之后变成长连双工通道</li>
+            <li>解决 HTTP 服务端不能推的痛点:网页实时刷新、在线看板</li>
+            <li><strong>必考联动</strong>:MQTT over WebSocket(端口 8083)——让浏览器里的 JS 也能直连 MQTT Broker,Grafana 类 Web 看板常用</li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <h3 style="margin-top:0">DNS:域名 → IP 的电话簿</h3>
+          <ul class="clean">
+            <li>浏览器/客户端先问 DNS(<code>udp 53</code>)把域名换成 IP,再发起连接</li>
+            <li>分层缓存:本机 → 本地 DNS → 根 → 顶级 → 权威;TTL 控制缓存时效</li>
+            <li><strong>必考点</strong>:"改了域名解析为什么没立刻生效?"——各级缓存 + TTL;物联网侧:设备端长连接重连时要重新解析域名,否则换了 Broker IP 还傻连旧地址</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 7. 联动与自测 ═══ -->
+    <section id="sec7">
+      <div class="head"><h2>7. 总复习:基础 → 工业的六条因果线 + 自测</h2><p>本册的全部内容,浓缩成六条"因为所以"——面试里随口说出,含金量拉满。</p></div>
+      <div class="card pad table">
+        <table>
+          <thead><tr><th>#</th><th>基础协议特性</th><th>工业协议的应对(因果线)</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>TCP 字节流无边界</td><td>MQTT 用变长"剩余长度"切帧;Modbus TCP 用 MBAP 长度字段切帧;Modbus RTU 串口没长度,靠 3.5 字符静默</td></tr>
+            <tr><td>2</td><td>TCP 只保证"点到点"字节送达</td><td>MQTT/OPC UA 定义应用层确认(QoS 确认链 / 通知序号重传)保证"端到端"业务可靠</td></tr>
+            <tr><td>3</td><td>TCP keepalive 迟钝(默认 2 小时)</td><td>MQTT 应用层 Keep Alive(如 60s)+ 遗嘱消息,掉线秒级感知</td></tr>
+            <tr><td>4</td><td>设备藏在 NAT 内网,外部进不去</td><td>设备主动出连 Broker 并保持长连接;下行指令复用该连接</td></tr>
+            <tr><td>5</td><td>UDP 轻量、可多播但不可靠</td><td>MQTT-SN 给超弱传感器;OPC UA PubSub 用 UDP 多播做实时分发</td></tr>
+            <tr><td>6</td><td>HTTP 头重、单向、短连接</td><td>设备侧换 MQTT;HTTP 退守平台 API / 文件下载层</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card pad" style="margin-top:15px">
+        <h3 style="margin-top:0">十题自测(能脱口而出再进面试场)</h3>
+        <ul class="clean">
+          <li>① 三次握手为什么不是两次? ② 挥手为什么四次? ③ TIME_WAIT 等多久、在等什么?</li>
+          <li>④ TCP 怎么实现可靠(四件套)? ⑤ 粘包是什么、应用层三种解法?</li>
+          <li>⑥ TCP UDP 各适合什么场景(各举物联网一例)? ⑦ HTTP 各版本一句话演进?</li>
+          <li>⑧ HTTPS 握手做了哪两件事? ⑨ MQTT 为什么不直接用 TCP keepalive 做心跳?</li>
+          <li>⑩ 设备在内网,平台怎么给设备下发指令?</li>
+        </ul>
+      </div>
+      <div class="callout" style="margin-top:15px"><p><strong>下一步:</strong>基础夯实后,进入专栏第 1、2 册(MQTT/Modbus/OPC UA 的入门与进阶),再用第 4 册(协议面试题全集)检验成果——四册读完,JD 上那句"熟悉 TCP/IP 及物联网协议"就真正属于你了。</p></div>
+    </section>
+  </main>
+  <footer><div class="shell">网络基础协议详解 · 协议学习专栏第 3 册</div></footer>
+  <script>
+    (()=>{const root=document.documentElement,key="network-fundamentals-doc-theme";
+      const saved=localStorage.getItem(key);
+      if(saved)root.dataset.theme=saved;document.getElementById("theme").addEventListener("click",()=>{
+        const next=root.dataset.theme==="dark"?"light":"dark";root.dataset.theme=next;localStorage.setItem(key,next)})})();
+  </script>
+</body>
+</html>
